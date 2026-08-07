@@ -1,0 +1,15 @@
+{
+  "name": "campusone",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:admin": "npm run dev --workspace @campusone/institute-admin-web",
+    "dev:platform-admin": "npm run dev --workspace @campusone/platform-admin-web",
+    "test:admin": "npm run test --workspace @campusone/institute-admin-web",
+    "build:admin": "npm run build --workspace @campusone/institute-admin-web",
+    "build:platform-admin": "npm run build --workspace @campusone/platform-admin-web"
+  }
+}

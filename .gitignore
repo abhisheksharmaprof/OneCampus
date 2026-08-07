@@ -1,0 +1,50 @@
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.venv/
+*.sqlite3
+*.egg-info/
+.hypothesis/
+.tox/
+
+# Django/local runtime files
+*.log
+local_settings.py
+db.sqlite3
+services/api/staticfiles/
+services/api/test-institute-credentials.txt
+
+# JavaScript/TypeScript tooling
+*.tsbuildinfo
+.eslintcache
+.vite/
+coverage/
+storybook-static/
+
+# Temporary/local agent and automation output
+_tmp_nodepty/
+.playwright-mcp/
+.agents/
+.claude/
+.octogent/
+octogent-src/
+
+# Node
+node_modules/
+dist/
+
+# Editors and OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

@@ -1,0 +1,13 @@
+{
+  "breakpoints": [375, 768, 1280],
+  "out": "./apps/institute-admin-web/src/bones",
+  "color": "#e8edf3",
+  "darkColor": "#263242",
+  "animate": "shimmer",
+  "shimmerColor": "#f7f9fb",
+  "darkShimmerColor": "#344255",
+  "speed": "1.8s",
+  "select": "viewport",
+  "transition": 240,
+  "routes": ["/__boneyard"]
+}

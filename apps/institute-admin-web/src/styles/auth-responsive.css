@@ -1,0 +1,44 @@
+/* Prevent long auth helper content from widening the mobile grid. */
+.auth-page,
+.auth-panel,
+.auth-card {
+  min-width: 0;
+}
+
+.auth-page {
+  overflow-x: hidden;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 28rem;
+  overflow: hidden;
+}
+
+@media (width <= 56rem) {
+  .auth-page,
+  .auth-panel {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .auth-panel {
+    width: 100%;
+    overflow: hidden;
+  }
+
+  .auth-card {
+    width: calc(100vw - 2rem);
+    max-width: calc(100vw - 2rem);
+  }
+
+  .auth-form,
+  .auth-field,
+  .auth-switch {
+    min-width: 0;
+  }
+
+  .auth-switch {
+    flex-wrap: wrap;
+    text-align: center;
+  }
+}

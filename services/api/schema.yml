@@ -1,0 +1,1452 @@
+openapi: 3.0.3
+info:
+  title: CampusOne API
+  version: 1.0.0
+  description: Multi-tenant school CRM API
+paths:
+  /api/v1/admin/attendance/overview:
+    get:
+      operationId: v1_admin_attendance_overview_list
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Attendance'
+          description: ''
+    post:
+      operationId: v1_admin_attendance_overview_create
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AttendanceWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AttendanceWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AttendanceWrite'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Attendance'
+          description: ''
+  /api/v1/admin/branches:
+    get:
+      operationId: v1_admin_branches_retrieve
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BranchListSuccess'
+          description: ''
+    post:
+      operationId: v1_admin_branches_create
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BranchCreate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/BranchCreate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/BranchCreate'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BranchSuccess'
+          description: ''
+  /api/v1/admin/branches/{branch_id}:
+    patch:
+      operationId: v1_admin_branches_partial_update
+      parameters:
+      - in: path
+        name: branch_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedBranchUpdate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedBranchUpdate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedBranchUpdate'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BranchSuccess'
+          description: ''
+  /api/v1/admin/calendar/events:
+    get:
+      operationId: v1_admin_calendar_events_list
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Event'
+          description: ''
+    post:
+      operationId: v1_admin_calendar_events_create
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EventWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/EventWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/EventWrite'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Event'
+          description: ''
+  /api/v1/admin/dashboard:
+    get:
+      operationId: v1_admin_dashboard_retrieve
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardSuccess'
+          description: ''
+  /api/v1/admin/enquiries:
+    get:
+      operationId: v1_admin_enquiries_list
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Enquiry'
+          description: ''
+    post:
+      operationId: v1_admin_enquiries_create
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EnquiryWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/EnquiryWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/EnquiryWrite'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Enquiry'
+          description: ''
+  /api/v1/admin/fees/invoices:
+    get:
+      operationId: v1_admin_fees_invoices_list
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Invoice'
+          description: ''
+    post:
+      operationId: v1_admin_fees_invoices_create
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InvoiceWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/InvoiceWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/InvoiceWrite'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invoice'
+          description: ''
+  /api/v1/admin/fees/payments:
+    post:
+      operationId: v1_admin_fees_payments_create
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PaymentWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PaymentWrite'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/admin/institute:
+    get:
+      operationId: v1_admin_institute_retrieve
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InstituteSuccess'
+          description: ''
+    patch:
+      operationId: v1_admin_institute_partial_update
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedInstituteUpdate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedInstituteUpdate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedInstituteUpdate'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InstituteSuccess'
+          description: ''
+  /api/v1/admin/parents:
+    get:
+      operationId: v1_admin_parents_list
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Parent'
+          description: ''
+    post:
+      operationId: v1_admin_parents_create
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ParentWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ParentWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ParentWrite'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Parent'
+          description: ''
+  /api/v1/admin/parents/{parent_id}/students:
+    post:
+      operationId: v1_admin_parents_students_create
+      parameters:
+      - in: path
+        name: parent_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExistingParentLink'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ExistingParentLink'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ExistingParentLink'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Parent'
+          description: ''
+  /api/v1/admin/staff:
+    get:
+      operationId: v1_admin_staff_list
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Staff'
+          description: ''
+    post:
+      operationId: v1_admin_staff_create
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StaffWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/StaffWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/StaffWrite'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Staff'
+          description: ''
+  /api/v1/admin/students:
+    get:
+      operationId: v1_admin_students_list
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Student'
+          description: ''
+    post:
+      operationId: v1_admin_students_create
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StudentWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/StudentWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/StudentWrite'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Student'
+          description: ''
+  /api/v1/admin/students/{student_id}:
+    patch:
+      operationId: v1_admin_students_partial_update
+      parameters:
+      - in: path
+        name: student_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedStudentWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedStudentWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedStudentWrite'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Student'
+          description: ''
+  /api/v1/health:
+    get:
+      operationId: v1_health_retrieve
+      tags:
+      - v1
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+          description: ''
+  /api/v1/identity/sessions:
+    post:
+      operationId: v1_identity_sessions_create
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SessionCreate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SessionCreate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/SessionCreate'
+        required: true
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionSuccess'
+          description: ''
+  /api/v1/identity/sessions/current:
+    get:
+      operationId: v1_identity_sessions_current_retrieve
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionCurrentSuccess'
+          description: ''
+    delete:
+      operationId: v1_identity_sessions_current_destroy
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionLogoutSuccess'
+          description: ''
+  /api/v1/identity/sessions/refresh:
+    post:
+      operationId: v1_identity_sessions_refresh_create
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SessionRefresh'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SessionRefresh'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/SessionRefresh'
+        required: true
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionSuccess'
+          description: ''
+  /api/v1/institute-onboarding/registrations:
+    post:
+      operationId: v1_institute_onboarding_registrations_create
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InstituteOnboarding'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/InstituteOnboarding'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/InstituteOnboarding'
+        required: true
+      security:
+      - {}
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InstituteOnboardingSuccess'
+          description: ''
+  /api/v1/ready:
+    get:
+      operationId: v1_ready_retrieve
+      tags:
+      - v1
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadinessResponse'
+          description: ''
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadinessResponse'
+          description: ''
+components:
+  schemas:
+    Attendance:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        studentId:
+          type: string
+          format: uuid
+          readOnly: true
+        studentName:
+          type: string
+          readOnly: true
+        date:
+          type: string
+          format: date
+        status:
+          $ref: '#/components/schemas/AttendanceStatus'
+      required:
+      - date
+      - id
+      - status
+      - studentId
+      - studentName
+    AttendanceStatus:
+      enum:
+      - PRESENT
+      - ABSENT
+      - LATE
+      - EXCUSED
+      type: string
+      description: |-
+        * `PRESENT` - Present
+        * `ABSENT` - Absent
+        * `LATE` - Late
+        * `EXCUSED` - Excused
+    AttendanceWrite:
+      type: object
+      properties:
+        studentId:
+          type: string
+          format: uuid
+        date:
+          type: string
+          format: date
+        status:
+          $ref: '#/components/schemas/AttendanceStatus'
+      required:
+      - status
+      - studentId
+    Branch:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        name:
+          type: string
+          maxLength: 200
+        code:
+          type: string
+          maxLength: 32
+        isHeadOffice:
+          type: boolean
+        isActive:
+          type: boolean
+        timezone:
+          type: string
+          maxLength: 64
+      required:
+      - code
+      - id
+      - isActive
+      - isHeadOffice
+      - name
+    BranchCreate:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 200
+          minLength: 2
+        timezone:
+          type: string
+          default: Asia/Kolkata
+          maxLength: 64
+      required:
+      - name
+    BranchListData:
+      type: object
+      properties:
+        count:
+          type: integer
+        next:
+          type: string
+          format: uri
+          nullable: true
+        previous:
+          type: string
+          format: uri
+          nullable: true
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Branch'
+      required:
+      - count
+      - items
+      - next
+      - previous
+    BranchListSuccess:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/BranchListData'
+      required:
+      - data
+      - success
+    BranchSuccess:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/Branch'
+      required:
+      - data
+      - success
+    BranchSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        name:
+          type: string
+          maxLength: 200
+        code:
+          type: string
+          maxLength: 32
+      required:
+      - code
+      - id
+      - name
+    ClientEnum:
+      enum:
+      - admin-web
+      - parent-mobile
+      - staff-mobile
+      type: string
+      description: |-
+        * `admin-web` - admin-web
+        * `parent-mobile` - parent-mobile
+        * `staff-mobile` - staff-mobile
+    DashboardSuccess:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data: {}
+      required:
+      - data
+      - success
+    Enquiry:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        guardianName:
+          type: string
+        contactEmail:
+          oneOf:
+          - type: string
+            format: email
+          - type: string
+            maxLength: 0
+        status:
+          $ref: '#/components/schemas/EnquiryStatus'
+        branchId:
+          type: string
+          format: uuid
+          readOnly: true
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - branchId
+      - createdAt
+      - guardianName
+      - id
+    EnquiryStatus:
+      enum:
+      - ENQUIRY
+      - VISIT_SCHEDULED
+      - APPLIED
+      - ENROLLED
+      - LOST
+      type: string
+      description: |-
+        * `ENQUIRY` - Enquiry
+        * `VISIT_SCHEDULED` - Visit scheduled
+        * `APPLIED` - Applied
+        * `ENROLLED` - Enrolled
+        * `LOST` - Lost
+    EnquiryWrite:
+      type: object
+      properties:
+        guardianName:
+          type: string
+          maxLength: 200
+        contactEmail:
+          oneOf:
+          - type: string
+            format: email
+          - type: string
+            maxLength: 0
+        branchId:
+          type: string
+          format: uuid
+          nullable: true
+        status:
+          $ref: '#/components/schemas/EnquiryStatus'
+      required:
+      - guardianName
+    Event:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        title:
+          type: string
+          maxLength: 250
+        eventType:
+          type: string
+        branchId:
+          type: string
+          format: uuid
+          readOnly: true
+        startsOn:
+          type: string
+          format: date
+        endsOn:
+          type: string
+          format: date
+      required:
+      - branchId
+      - endsOn
+      - eventType
+      - id
+      - startsOn
+      - title
+    EventTypeEnum:
+      enum:
+      - EXAM
+      - HOLIDAY
+      - PTM
+      - EVENT
+      type: string
+      description: |-
+        * `EXAM` - Exam
+        * `HOLIDAY` - Holiday
+        * `PTM` - Parent-teacher meeting
+        * `EVENT` - Event
+    EventWrite:
+      type: object
+      properties:
+        title:
+          type: string
+          maxLength: 250
+        eventType:
+          $ref: '#/components/schemas/EventTypeEnum'
+        branchId:
+          type: string
+          format: uuid
+          nullable: true
+        startsOn:
+          type: string
+          format: date
+        endsOn:
+          type: string
+          format: date
+      required:
+      - endsOn
+      - eventType
+      - startsOn
+      - title
+    ExistingParentLink:
+      type: object
+      properties:
+        studentId:
+          type: string
+          format: uuid
+        relationship:
+          $ref: '#/components/schemas/RelationshipEnum'
+      required:
+      - relationship
+      - studentId
+    HealthResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+          additionalProperties: {}
+      required:
+      - data
+      - success
+    Institute:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        name:
+          type: string
+          maxLength: 200
+        code:
+          type: string
+          maxLength: 32
+        isActive:
+          type: boolean
+      required:
+      - code
+      - id
+      - isActive
+      - name
+    InstituteOnboarding:
+      type: object
+      properties:
+        instituteName:
+          type: string
+          maxLength: 200
+          minLength: 2
+        branchName:
+          type: string
+          maxLength: 200
+          minLength: 2
+        adminName:
+          type: string
+          maxLength: 300
+          minLength: 2
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        password:
+          type: string
+          writeOnly: true
+          maxLength: 128
+          minLength: 8
+      required:
+      - adminName
+      - branchName
+      - email
+      - instituteName
+      - password
+    InstituteOnboardingData:
+      type: object
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+        user:
+          type: object
+          additionalProperties: {}
+        onboarding:
+          type: object
+          additionalProperties: {}
+      required:
+      - accessToken
+      - onboarding
+      - refreshToken
+      - user
+    InstituteOnboardingSuccess:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/InstituteOnboardingData'
+      required:
+      - data
+      - success
+    InstituteSuccess:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/Institute'
+      required:
+      - data
+      - success
+    Invoice:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        studentId:
+          type: string
+          format: uuid
+          readOnly: true
+        studentName:
+          type: string
+          readOnly: true
+        amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+        due_date:
+          type: string
+          format: date
+        totalPaid:
+          type: string
+          readOnly: true
+      required:
+      - amount
+      - due_date
+      - id
+      - studentId
+      - studentName
+      - totalPaid
+    InvoiceWrite:
+      type: object
+      properties:
+        studentId:
+          type: string
+          format: uuid
+        amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+        dueDate:
+          type: string
+          format: date
+      required:
+      - amount
+      - dueDate
+      - studentId
+    Parent:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        fullName:
+          type: string
+          readOnly: true
+        email:
+          type: string
+          format: email
+          readOnly: true
+        phone:
+          type: string
+          readOnly: true
+        children:
+          type: array
+          items:
+            type: object
+            additionalProperties:
+              type: string
+          readOnly: true
+      required:
+      - children
+      - email
+      - fullName
+      - id
+      - phone
+    ParentWrite:
+      type: object
+      properties:
+        fullName:
+          type: string
+          maxLength: 200
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+          maxLength: 20
+        studentId:
+          type: string
+          format: uuid
+        relationship:
+          $ref: '#/components/schemas/RelationshipEnum'
+      required:
+      - email
+      - fullName
+      - phone
+      - relationship
+      - studentId
+    PatchedBranchUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 200
+          minLength: 2
+        timezone:
+          type: string
+          maxLength: 64
+        isActive:
+          type: boolean
+    PatchedInstituteUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 200
+          minLength: 2
+    PatchedStudentWrite:
+      type: object
+      properties:
+        branchId:
+          type: string
+          format: uuid
+        firstName:
+          type: string
+          maxLength: 100
+        lastName:
+          type: string
+          maxLength: 100
+    PaymentWrite:
+      type: object
+      properties:
+        invoiceId:
+          type: string
+          format: uuid
+        amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+      required:
+      - amount
+      - invoiceId
+    ReadinessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+          additionalProperties: {}
+      required:
+      - data
+      - success
+    RelationshipEnum:
+      enum:
+      - FATHER
+      - MOTHER
+      - GUARDIAN
+      type: string
+      description: |-
+        * `FATHER` - Father
+        * `MOTHER` - Mother
+        * `GUARDIAN` - Guardian
+    RoleEnum:
+      enum:
+      - TEACHER
+      - STAFF
+      type: string
+      description: |-
+        * `TEACHER` - TEACHER
+        * `STAFF` - STAFF
+    SessionCreate:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          writeOnly: true
+        client:
+          $ref: '#/components/schemas/ClientEnum'
+        instituteId:
+          type: string
+          format: uuid
+      required:
+      - client
+      - email
+      - password
+    SessionCurrentData:
+      type: object
+      properties:
+        user:
+          $ref: '#/components/schemas/SessionUser'
+      required:
+      - user
+    SessionCurrentSuccess:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/SessionCurrentData'
+      required:
+      - data
+      - success
+    SessionData:
+      type: object
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+        user:
+          $ref: '#/components/schemas/SessionUser'
+      required:
+      - accessToken
+      - refreshToken
+      - user
+    SessionLogoutSuccess:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+          additionalProperties: {}
+      required:
+      - data
+      - success
+    SessionRefresh:
+      type: object
+      properties:
+        refreshToken:
+          type: string
+          writeOnly: true
+      required:
+      - refreshToken
+    SessionSuccess:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/SessionData'
+      required:
+      - data
+      - success
+    SessionUser:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        displayName:
+          type: string
+        roles:
+          type: array
+          items:
+            type: string
+        activeRole:
+          type: string
+        instituteId:
+          type: string
+          format: uuid
+        branchIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+      required:
+      - activeRole
+      - branchIds
+      - displayName
+      - id
+      - instituteId
+      - roles
+    Staff:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        fullName:
+          type: string
+          readOnly: true
+        email:
+          type: string
+          format: email
+          readOnly: true
+        employee_code:
+          type: string
+          maxLength: 64
+        branch:
+          type: object
+          additionalProperties:
+            type: string
+          nullable: true
+          readOnly: true
+        role:
+          type: string
+          readOnly: true
+        status:
+          type: string
+          readOnly: true
+      required:
+      - branch
+      - email
+      - fullName
+      - id
+      - role
+      - status
+    StaffWrite:
+      type: object
+      properties:
+        fullName:
+          type: string
+          maxLength: 200
+        email:
+          type: string
+          format: email
+        branchId:
+          type: string
+          format: uuid
+        role:
+          $ref: '#/components/schemas/RoleEnum'
+        employeeCode:
+          type: string
+          maxLength: 64
+      required:
+      - branchId
+      - email
+      - fullName
+      - role
+    Student:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        admissionNumber:
+          type: string
+          readOnly: true
+        firstName:
+          type: string
+        lastName:
+          type: string
+        isActive:
+          type: boolean
+          readOnly: true
+        branch:
+          allOf:
+          - $ref: '#/components/schemas/BranchSummary'
+          readOnly: true
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+        updatedAt:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - admissionNumber
+      - branch
+      - createdAt
+      - firstName
+      - id
+      - isActive
+      - lastName
+      - updatedAt
+    StudentWrite:
+      type: object
+      properties:
+        branchId:
+          type: string
+          format: uuid
+        firstName:
+          type: string
+          maxLength: 100
+        lastName:
+          type: string
+          maxLength: 100
+      required:
+      - branchId
+      - firstName
+  securitySchemes:
+    jwtAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
