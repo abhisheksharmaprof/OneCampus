@@ -97,6 +97,34 @@ type TeachingAssignment = {
   periodsPerWeek?: number
 }
 
+type StaffRec = Record<string, unknown> & {
+  id?: string
+  branch?: { id?: string }
+  branchId?: string
+}
+
+type PublishedTimetableSlot = {
+  day: string
+  period: number
+  startTime: string | null
+  endTime: string | null
+  className: string
+  subjectName: string
+  roomName: string
+  classId: string
+  subjectId: string
+  roomId: string
+}
+
+type PublishedTimetable = {
+  timetableRecordId: string
+  timetableTitle: string
+  timetableUpdatedAt: string | null
+  workingDays: string[]
+  periods: Array<{ number: number; type?: string; start: string; end: string }>
+  slots: PublishedTimetableSlot[]
+}
+
 type FeeInvoice = { id: string; studentId: string; amount: string; due_date: string; totalPaid: string }
 type StudentAttendanceSummary = { summary: { present: number; absent: number; late: number; excused: number; total: number; attendancePercentage: number } }
 type StudentTimetableEntry = { id: string; subjectName: string; teacherName: string }
@@ -886,7 +914,6 @@ function StaffProfilePage({ id, accessToken, onBack }: { id?: string; accessToke
       : 'Overview',
   )
 
-  type StaffRec = Record<string, unknown>
   const [person, setPerson] = useState({ name: 'Staff Member', status: 'Active', badge: 'Teacher', phone: '', email: '' })
   const [staffRecord, setStaffRecord] = useState<StaffRec | null>(null)
   const [staffUserId, setStaffUserId] = useState('')
@@ -1150,7 +1177,7 @@ function StaffOverview({ staff, person, assignments, accessToken }: { staff: Rec
   </div>
 }
 
-function StaffTimetable({ staff, assignments, publishedTimetable, loading, onOpenTimetable }: { staff: Record<string, unknown> | null; assignments: TeachingAssignment[]; publishedTimetable: { timetableRecordId: string; timetableTitle: string; timetableUpdatedAt: string | null; workingDays: string[]; periods: Array<{ number: number; type?: string; start: string; end: string }>; slots: Array<{ day: string; period: number; startTime: string | null; endTime: string | null; className: string; subjectName: string; roomName: string; classId: string; subjectId: string; roomId: string }> } | null; loading: boolean; onOpenTimetable: () => void }) {
+function StaffTimetable({ staff, assignments, publishedTimetable, loading, onOpenTimetable }: { staff: StaffRec | null; assignments: TeachingAssignment[]; publishedTimetable: PublishedTimetable | null; loading: boolean; onOpenTimetable: () => void }) {
   const timetableAssignments = assignments.length ? assignments : (Array.isArray(staff?.teachingAssignments) ? (staff.teachingAssignments as TeachingAssignment[]) : [])
   const breakCards = STAFF_BREAKS
 
@@ -1160,7 +1187,7 @@ function StaffTimetable({ staff, assignments, publishedTimetable, loading, onOpe
   const periods = hasPublishedTimetable ? publishedTimetable.periods : STAFF_TIMETABLE_SLOTS.map((s) => ({ number: s.period, start: s.time.split(' – ')[0] || '', end: s.time.split(' – ')[1]?.replace(' AM', '').replace(' PM', '') || '' }))
 
   // Build a lookup map: day -> period -> slot
-  const slotMap: Record<string, Record<number, typeof publishedTimetable extends { slots: Array<infer T> } ? T : never>> = {}
+  const slotMap: Record<string, Record<number, PublishedTimetableSlot>> = {}
   if (hasPublishedTimetable) {
     for (const slot of publishedTimetable.slots) {
       if (!slotMap[slot.day]) slotMap[slot.day] = {}
