@@ -34,7 +34,7 @@ export function MarkAttendanceTab({
   
   const [roster, setRoster] = useState<StudentRosterItem[]>([])
   const [draft, setDraft] = useState<Record<string, { status: AttendanceStatus; remark?: string }>>({})
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [saved, setSaved] = useState('')

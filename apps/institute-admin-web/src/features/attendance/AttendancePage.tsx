@@ -6,12 +6,8 @@ import {
   CalendarDays,
   CheckCircle2,
   Clock3,
-  Settings2,
   ShieldCheck,
-  UserCheck,
-  Users,
 } from 'lucide-react'
-import { Tabs, type TabItem } from '../../components/admin-ui/Tabs'
 import { LeaveApprovalsTab } from './components/LeaveApprovalsTab'
 import { MarkAttendanceTab } from './components/MarkAttendanceTab'
 import { OverviewTab } from './components/OverviewTab'
@@ -23,6 +19,7 @@ import {
   getLeaveApplications,
   type MissingAttendanceSection,
 } from './api/attendanceApi'
+import { Skeleton } from '../../components/admin-ui'
 import './attendance-redesign.css'
 
 export type AttendanceTab = 'mark' | 'overview' | 'student-leave' | 'staff-leave' | 'leave' | 'reports' | 'settings'
@@ -42,47 +39,60 @@ export function AttendancePage({
   onTabChange?: (tab: AttendanceTab) => void
   initialTab?: AttendanceTab
 }) {
-  const [tab, setTab] = useState<AttendanceTab>(initialTab)
+  const tab = initialTab
   const [reminders, setReminders] = useState<MissingAttendanceSection[]>([])
   const [rosterStats, setRosterStats] = useState({ total: 0, present: 0, absent: 0, late: 0 })
   const [pendingLeaves, setPendingLeaves] = useState(0)
-  const [pulseLoading, setPulseLoading] = useState(true)
+  const [pulseLoading, setPulseLoading] = useState(false)
   const [markTarget, setMarkTarget] = useState<{ classId?: string; sectionId?: string }>({})
 
   const selectTab = (nextTab: AttendanceTab) => {
-    setTab(nextTab)
     onTabChange?.(nextTab)
   }
 
   useEffect(() => {
-    setTab(initialTab)
-  }, [initialTab])
-
-  useEffect(() => {
     const controller = new AbortController()
     const branchId = selectedBranch === 'all' ? undefined : selectedBranch
-    setPulseLoading(true)
-    Promise.all([
-      getAttendanceReminders(accessToken, { date: selectedDate, branchId }, controller.signal),
-      getDailyRoster(accessToken, { date: selectedDate, branchId }, controller.signal),
-      getLeaveApplications(accessToken, { status: 'pending', branchId }, controller.signal),
-    ])
-      .then(([reminderData, roster, leaves]) => {
-        setReminders(Array.isArray(reminderData?.missingSections) ? reminderData.missingSections : [])
-        setRosterStats({
-          total: roster.length,
-          present: roster.filter((item) => item.status === 'PRESENT').length,
-          absent: roster.filter((item) => item.status === 'ABSENT').length,
-          late: roster.filter((item) => item.status === 'LATE').length,
-        })
-        setPendingLeaves(leaves.length)
-      })
-      .catch(() => undefined)
-      .finally(() => {
+    const loadPulse = async () => {
+      // The shell only requests the small summary needed by the active subpage.
+      // The subpage components own their detailed API calls and skeletons.
+      setPulseLoading(tab === 'overview' || tab === 'mark' || tab === 'student-leave' || tab === 'staff-leave' || tab === 'leave')
+      setReminders([])
+      setRosterStats({ total: 0, present: 0, absent: 0, late: 0 })
+      setPendingLeaves(0)
+      try {
+        if (tab === 'overview') {
+          const [reminderData, roster] = await Promise.all([
+            getAttendanceReminders(accessToken, { date: selectedDate, branchId }, controller.signal),
+            getDailyRoster(accessToken, { date: selectedDate, branchId }, controller.signal),
+          ])
+          setReminders(Array.isArray(reminderData?.missingSections) ? reminderData.missingSections : [])
+          setRosterStats({
+            total: roster.length,
+            present: roster.filter((item) => item.status === 'PRESENT').length,
+            absent: roster.filter((item) => item.status === 'ABSENT').length,
+            late: roster.filter((item) => item.status === 'LATE').length,
+          })
+        } else if (tab === 'mark') {
+          const reminderData = await getAttendanceReminders(accessToken, { date: selectedDate, branchId }, controller.signal)
+          setReminders(Array.isArray(reminderData?.missingSections) ? reminderData.missingSections : [])
+        } else if (tab === 'student-leave' || tab === 'staff-leave' || tab === 'leave') {
+          const leaves = await getLeaveApplications(accessToken, {
+            status: 'pending',
+            applicantType: tab === 'staff-leave' ? 'staff' : 'student',
+            branchId,
+          }, controller.signal)
+          setPendingLeaves(leaves.length)
+        }
+      } catch {
+        // The detailed subpage owns and displays its own error state.
+      } finally {
         if (!controller.signal.aborted) setPulseLoading(false)
-      })
+      }
+    }
+    void loadPulse()
     return () => controller.abort()
-  }, [accessToken, selectedBranch, selectedDate])
+  }, [accessToken, selectedBranch, selectedDate, tab])
 
   const completion = useMemo(() => {
     if (!rosterStats.total) return 0
@@ -97,79 +107,6 @@ export function AttendancePage({
       document.querySelector('[data-testid="mark-attendance-tab"]')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }, 80)
   }
-
-  const tabs: readonly TabItem[] = [
-    {
-      id: 'overview',
-      label: 'Overview',
-      panel: (
-        <OverviewTab
-          accessToken={accessToken}
-          selectedBranch={selectedBranch}
-          selectedDate={selectedDate}
-          onDateChange={onDateChange}
-          onSwitchToMarkTab={() => selectTab('mark')}
-        />
-      ),
-    },
-    {
-      id: 'mark',
-      label: 'Mark Attendance',
-      panel: (
-        <MarkAttendanceTab
-          accessToken={accessToken}
-          selectedBranch={selectedBranch}
-          selectedDate={selectedDate}
-          onDateChange={onDateChange}
-          initialClassId={markTarget.classId}
-          initialSectionId={markTarget.sectionId}
-        />
-      ),
-    },
-    {
-      id: 'student-leave',
-      label: <><UserCheck aria-hidden="true" />Student Leave</>,
-      panel: (
-        <LeaveApprovalsTab
-          accessToken={accessToken}
-          selectedBranch={selectedBranch}
-          initialType="student"
-          showTypeSwitcher={false}
-        />
-      ),
-    },
-    {
-      id: 'staff-leave',
-      label: <><Users aria-hidden="true" />Staff Leave</>,
-      panel: (
-        <LeaveApprovalsTab
-          accessToken={accessToken}
-          selectedBranch={selectedBranch}
-          initialType="staff"
-          showTypeSwitcher={false}
-        />
-      ),
-    },
-    {
-      id: 'reports',
-      label: 'Reports & Analytics',
-      panel: (
-        <ReportsAnalyticsTab
-          accessToken={accessToken}
-          selectedBranch={selectedBranch}
-        />
-      ),
-    },
-    {
-      id: 'settings',
-      label: 'Settings',
-      panel: (
-        <SettingsTab
-          accessToken={accessToken}
-        />
-      ),
-    },
-  ]
 
   const currentTabLabel =
     tab === 'mark'
@@ -211,20 +148,20 @@ export function AttendancePage({
       <section className="attendance-pulse" aria-label="Daily attendance summary">
         <article className="attendance-kpi attendance-kpi--primary">
           <span className="attendance-kpi__icon"><CalendarCheck2 aria-hidden="true" /></span>
-          <div><small>Register completion</small><strong>{pulseLoading ? '—' : `${completion}%`}</strong><p>{rosterStats.total} students in scope</p></div>
+          <div><small>Register completion</small><strong>{pulseLoading ? <Skeleton width="2.5rem" height="1.5rem" /> : `${completion}%`}</strong><p>{rosterStats.total} students in scope</p></div>
           <span className="attendance-kpi__meter"><i style={{ width: `${completion}%` }} /></span>
         </article>
         <article className="attendance-kpi">
           <span className="attendance-kpi__icon attendance-kpi__icon--success"><CheckCircle2 aria-hidden="true" /></span>
-          <div><small>Present today</small><strong>{pulseLoading ? '—' : rosterStats.present}</strong><p>{rosterStats.late} arrived late</p></div>
+          <div><small>Present today</small><strong>{pulseLoading ? <Skeleton width="2rem" height="1.5rem" /> : rosterStats.present}</strong><p>{rosterStats.late} arrived late</p></div>
         </article>
         <article className="attendance-kpi">
           <span className="attendance-kpi__icon attendance-kpi__icon--danger"><AlertTriangle aria-hidden="true" /></span>
-          <div><small>Unmarked classes</small><strong>{pulseLoading ? '—' : reminders.length}</strong><p>{reminders.length ? 'Action required' : 'All caught up'}</p></div>
+          <div><small>Unmarked classes</small><strong>{pulseLoading ? <Skeleton width="2rem" height="1.5rem" /> : reminders.length}</strong><p>{reminders.length ? 'Action required' : 'All caught up'}</p></div>
         </article>
         <article className="attendance-kpi">
           <span className="attendance-kpi__icon attendance-kpi__icon--amber"><Clock3 aria-hidden="true" /></span>
-          <div><small>Pending leave</small><strong>{pulseLoading ? '—' : pendingLeaves}</strong><p>Student and staff requests</p></div>
+          <div><small>Pending leave</small><strong>{pulseLoading ? <Skeleton width="2rem" height="1.5rem" /> : pendingLeaves}</strong><p>Student and staff requests</p></div>
         </article>
       </section>
 
@@ -251,11 +188,14 @@ export function AttendancePage({
         <div className="attendance-context"><BarChart3 aria-hidden="true" />{selectedBranch === 'all' ? 'All branches' : 'Selected branch'} · live records</div>
       </div>
 
-      <div className="attendance-nav-icons" aria-hidden="true">
-        <span><BarChart3 /></span><span><CalendarCheck2 /></span><span><UserCheck /></span>
-        <span><Users /></span><span><BarChart3 /></span><span><Settings2 /></span>
-      </div>
-      <Tabs tabs={tabs} activeId={tab === 'leave' ? 'student-leave' : tab} onChange={(id) => selectTab(id as AttendanceTab)} label="Attendance Navigation" />
+      <section className="attendance-section-panel" aria-label={currentTabLabel}>
+        {(tab === 'overview') && <OverviewTab accessToken={accessToken} selectedBranch={selectedBranch} selectedDate={selectedDate} onDateChange={onDateChange} onSwitchToMarkTab={() => selectTab('mark')} />}
+        {(tab === 'mark') && <MarkAttendanceTab accessToken={accessToken} selectedBranch={selectedBranch} selectedDate={selectedDate} onDateChange={onDateChange} initialClassId={markTarget.classId} initialSectionId={markTarget.sectionId} />}
+        {(tab === 'student-leave' || tab === 'leave') && <LeaveApprovalsTab accessToken={accessToken} selectedBranch={selectedBranch} initialType="student" showTypeSwitcher={false} />}
+        {(tab === 'staff-leave') && <LeaveApprovalsTab accessToken={accessToken} selectedBranch={selectedBranch} initialType="staff" showTypeSwitcher={false} />}
+        {(tab === 'reports') && <ReportsAnalyticsTab accessToken={accessToken} selectedBranch={selectedBranch} />}
+        {(tab === 'settings') && <SettingsTab accessToken={accessToken} />}
+      </section>
     </div>
   )
 }

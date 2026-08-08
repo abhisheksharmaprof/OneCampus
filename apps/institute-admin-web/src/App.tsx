@@ -105,12 +105,14 @@ function RoutedApp() {
   const attendanceTabByRoute: Record<string, AttendanceTab> = {
     AT1: 'mark',
     AT2: 'overview',
+    AT6: 'student-leave',
+    AT7: 'staff-leave',
     ST3: 'student-leave',
     AT4: 'reports',
     AT5: 'settings',
     RA1: 'reports',
   }
-  const attendanceInitialTab = route?.id === 'ST3' && searchParams.get('leaveType') === 'staff'
+  const attendanceInitialTab = (route?.id === 'ST3' || route?.id === 'AT6') && searchParams.get('leaveType') === 'staff'
     ? 'staff-leave'
     : route?.id
       ? attendanceTabByRoute[route.id]
@@ -138,9 +140,9 @@ function RoutedApp() {
     const pathByTab: Record<AttendanceTab, string> = {
       overview: '/attendance',
       mark: '/attendance/mark',
-      'student-leave': '/staff/leave-approvals?leaveType=student',
-      'staff-leave': '/staff/leave-approvals?leaveType=staff',
-      leave: '/staff/leave-approvals?leaveType=student',
+      'student-leave': '/attendance/student-leave',
+      'staff-leave': '/attendance/staff-leave',
+      leave: '/attendance/student-leave',
       reports: '/attendance/reports',
       settings: '/attendance/settings',
     }
@@ -305,7 +307,7 @@ function RoutedApp() {
       {route?.id === 'RP2' && <RoleBuilderPage accessToken={session.accessToken} branches={visibleBranches} roleId={searchParams.get('role') ?? undefined} onSaved={() => navigateWithBranch('/roles')} onCancel={() => navigateWithBranch('/roles')} />}
       {route?.id === 'RP3' && <RoleAssignmentsPage accessToken={session.accessToken} branches={visibleBranches} users={assignableUsers} />}
       {route?.view === 'coming-soon' && <UnavailableModulePage title={route.label} breadcrumb={route.breadcrumb} comingSoon />}
-      {route?.view === 'operational' && !['AY1', 'CL1', 'SU1', 'AHS1', 'RF1', 'HC1', 'FN1', 'FN5', 'FN6', 'FN7', 'FN8', 'SE3', 'RP1', 'RP2', 'RP3', 'BR2', 'STP1', 'SDP1', 'PDP1', 'ST3', 'RA1', 'AT1', 'AT2', 'AT4', 'AT5', 'AL1'].includes(route.id) && <OperationalListPage accessToken={session.accessToken} route={route} selectedBranch={selectedBranch} />}
+      {route?.view === 'operational' && !['AY1', 'CL1', 'SU1', 'AHS1', 'RF1', 'HC1', 'FN1', 'FN5', 'FN6', 'FN7', 'FN8', 'SE3', 'RP1', 'RP2', 'RP3', 'BR2', 'STP1', 'SDP1', 'PDP1', 'ST3', 'RA1', 'AT1', 'AT2', 'AT4', 'AT5', 'AT6', 'AT7', 'AL1'].includes(route.id) && <OperationalListPage accessToken={session.accessToken} route={route} selectedBranch={selectedBranch} />}
       {!route && <UnavailableModulePage title="Page not found" breadcrumb="Admin" />}
       </AdminErrorBoundary>
       <div className="sr-only" role="status" aria-live="polite">{announcement}</div>

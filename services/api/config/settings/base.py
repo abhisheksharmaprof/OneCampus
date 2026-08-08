@@ -78,7 +78,10 @@ if USE_SQLITE:
     }
 else:
     DATABASES = {"default": env.db("DATABASE_URL")}
-    DATABASES["default"]["CONN_MAX_AGE"] = env.int("DATABASE_CONN_MAX_AGE", default=60)
+    # Persistent connections are useful in production, but they easily exhaust
+    # small hosted Postgres plans during local Django development/reloads.
+    default_conn_max_age = 0 if DEBUG else 60
+    DATABASES["default"]["CONN_MAX_AGE"] = env.int("DATABASE_CONN_MAX_AGE", default=default_conn_max_age)
     if env.bool("DATABASE_SSL_REQUIRE", default=True):
         DATABASES["default"].setdefault("OPTIONS", {})["sslmode"] = "require"
 

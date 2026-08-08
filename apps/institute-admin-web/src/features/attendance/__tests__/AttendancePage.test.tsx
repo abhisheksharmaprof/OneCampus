@@ -1,5 +1,4 @@
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
-import userEvent from '@testing-library/user-event'
+import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { AttendancePage } from '../AttendancePage'
 
@@ -52,27 +51,17 @@ describe('AttendancePage', () => {
     const dateInput = screen.getByLabelText('Attendance date')
     expect(dateInput).toHaveValue('2026-07-21')
 
-    // Student and staff leave have dedicated workspaces.
-    const tabList = screen.getByRole('tablist', { name: 'Attendance Navigation' })
-    expect(within(tabList).getAllByRole('tab')).toHaveLength(6)
-    const tabs = within(tabList).getAllByRole('tab')
-    expect(tabs[0]).toHaveAccessibleName('Overview')
-    expect(tabs[1]).toHaveAccessibleName('Mark Attendance')
-    expect(within(tabList).getByRole('tab', { name: 'Overview' })).toHaveAttribute('aria-selected', 'true')
-    expect(within(tabList).getByRole('tab', { name: 'Student Leave' })).toBeInTheDocument()
-    expect(within(tabList).getByRole('tab', { name: 'Staff Leave' })).toBeInTheDocument()
-    expect(within(tabList).getByRole('tab', { name: 'Reports & Analytics' })).toBeInTheDocument()
-    expect(within(tabList).getByRole('tab', { name: 'Settings' })).toBeInTheDocument()
+    // Sections are selected from the sidebar, not duplicated as an in-page tab bar.
+    expect(screen.queryByRole('tablist', { name: 'Attendance Navigation' })).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Attendance Overview' })).toBeInTheDocument()
 
     // Default active panel is Overview
     expect(screen.getByTestId('overview-tab')).toBeInTheDocument()
   })
 
-  it('switches tabs smoothly when clicking tabs', async () => {
+  it('renders the section selected by the navigation route', async () => {
     installFetchMock()
-    const user = userEvent.setup()
-
-    render(
+    const { rerender } = render(
       <AttendancePage
         accessToken="test-token"
         selectedBranch="branch-main"
@@ -81,23 +70,16 @@ describe('AttendancePage', () => {
       />,
     )
 
-    // Switch to Overview
-    await user.click(screen.getByRole('tab', { name: 'Overview' }))
-    expect(await screen.findByTestId('overview-tab')).toBeInTheDocument()
-
-    // Switch to Student Leave
-    await user.click(screen.getByRole('tab', { name: 'Student Leave' }))
+    rerender(<AttendancePage accessToken="test-token" selectedBranch="branch-main" selectedDate="2026-07-21" onDateChange={() => undefined} initialTab="student-leave" />)
     expect(await screen.findByTestId('leave-approvals-tab')).toBeInTheDocument()
 
-    await user.click(screen.getByRole('tab', { name: 'Staff Leave' }))
+    rerender(<AttendancePage accessToken="test-token" selectedBranch="branch-main" selectedDate="2026-07-21" onDateChange={() => undefined} initialTab="staff-leave" />)
     expect(await screen.findByText('Staff leave decisions')).toBeInTheDocument()
 
-    // Switch to Reports & Analytics
-    await user.click(screen.getByRole('tab', { name: 'Reports & Analytics' }))
+    rerender(<AttendancePage accessToken="test-token" selectedBranch="branch-main" selectedDate="2026-07-21" onDateChange={() => undefined} initialTab="reports" />)
     expect(await screen.findByTestId('reports-analytics-tab')).toBeInTheDocument()
 
-    // Switch to Settings
-    await user.click(screen.getByRole('tab', { name: 'Settings' }))
+    rerender(<AttendancePage accessToken="test-token" selectedBranch="branch-main" selectedDate="2026-07-21" onDateChange={() => undefined} initialTab="settings" />)
     expect(await screen.findByTestId('settings-tab')).toBeInTheDocument()
   })
 })

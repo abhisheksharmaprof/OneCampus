@@ -38,7 +38,7 @@ export function OverviewTab({
     calendar?: CalendarCell[]
   }>({ records: [], calendarDates: [], calendar: [] })
   
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
   useEffect(() => {

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { adminRequest } from '../../admin/admin.api'
+import { PageSkeleton } from '../../../components/admin-ui'
 import { getAttendanceSettings, getLeaveTypes, updateAttendanceSettings } from '../api/attendanceApi'
 import type { AttendanceSettings, LeaveType } from '../types'
 
@@ -29,6 +30,7 @@ export function SettingsTab({ accessToken }: SettingsTabProps) {
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -44,6 +46,9 @@ export function SettingsTab({ accessToken }: SettingsTabProps) {
         if (!controller.signal.aborted) {
           setError(cause instanceof Error ? cause.message : 'Attendance settings could not be loaded.')
         }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false)
       })
     return () => controller.abort()
   }, [accessToken])
@@ -105,6 +110,8 @@ export function SettingsTab({ accessToken }: SettingsTabProps) {
       : [...currentModes, id]
     change({ enabledCaptureModes: updated })
   }
+
+  if (loading) return <PageSkeleton name="attendance-settings" label="Loading attendance settings" variant="form" />
 
   return (
     <div className="settings-tab" data-testid="settings-tab">
