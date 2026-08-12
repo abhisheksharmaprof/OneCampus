@@ -205,3 +205,29 @@ def test_cancel_without_payments_succeeds(api_client):
 
     assert cancelled.status_code == 200
     assert cancelled.json()["data"]["status"] == "CANCELLED"
+
+
+@pytest.mark.django_db
+def test_writes_reject_foreign_tenant_references(api_client):
+    institute, branch, token = make_admin(api_client)
+    other_institute, other_branch, _ = make_admin(api_client, code="OTHER")
+    foreign_student = make_student(other_institute, other_branch, admission="OTH-0001", first_name="Zara")
+    foreign_invoice = FeeInvoice.objects.create(
+        institute=other_institute, branch=other_branch, student=foreign_student,
+        amount=Decimal("77.00"), total=Decimal("77.00"), due_date=date.today(),
+    )
+    api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
+
+    create_foreign_student = api_client.post(
+        "/api/v1/admin/fees/invoices",
+        {**INVOICE_BODY, "studentId": str(foreign_student.id)},
+        format="json",
+    )
+    patch_foreign_invoice = api_client.patch(
+        f"/api/v1/admin/fees/invoices/{foreign_invoice.id}", {"status": "CANCELLED"}, format="json"
+    )
+    bad_param = api_client.get("/api/v1/admin/fees/invoices?studentId=not-a-uuid")
+
+    assert create_foreign_student.status_code == 404
+    assert patch_foreign_invoice.status_code == 404
+    assert bad_param.status_code == 400

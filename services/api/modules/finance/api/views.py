@@ -34,6 +34,13 @@ def invoice_queryset(institute):
     )
 
 
+class InvoiceFilterSerializer(serializers.Serializer):
+    studentId = serializers.UUIDField(required=False)
+    classId = serializers.UUIDField(required=False)
+    dateFrom = serializers.DateField(required=False)
+    dateTo = serializers.DateField(required=False)
+
+
 class LineItemSerializer(serializers.Serializer):
     description = serializers.CharField(max_length=200)
     period = serializers.CharField(max_length=60, required=False, allow_blank=True, default="")
@@ -175,26 +182,29 @@ class FeeInvoiceListCreateView(APIView):
     @extend_schema(responses={status.HTTP_200_OK: InvoiceSerializer(many=True)})
     def get(self, request):
         invoices = invoice_queryset(request.institute)
+        filter_serializer = InvoiceFilterSerializer(data=request.query_params)
+        filter_serializer.is_valid(raise_exception=True)
+        filters = filter_serializer.validated_data
         branch_id = request.query_params.get("branchId")
         if branch_id:
             get_object_or_404(Branch, id=branch_id, institute=request.institute, is_active=True)
             invoices = invoices.filter(branch_id=branch_id)
-        student_id = request.query_params.get("studentId")
+        student_id = filters.get("studentId")
         if student_id:
             invoices = invoices.filter(student_id=student_id)
         status_filter = request.query_params.get("status", "").strip().upper()
         if status_filter in FeeInvoice.Status.values:
             invoices = invoices.filter(status=status_filter)
-        class_id = request.query_params.get("classId")
+        class_id = filters.get("classId")
         if class_id:
             enrolled = StudentEnrollment.objects.filter(
                 class_section__grade_id=class_id, left_at__isnull=True
             ).values("student_id")
             invoices = invoices.filter(student_id__in=enrolled)
-        date_from = request.query_params.get("dateFrom")
+        date_from = filters.get("dateFrom")
         if date_from:
             invoices = invoices.filter(due_date__gte=date_from)
-        date_to = request.query_params.get("dateTo")
+        date_to = filters.get("dateTo")
         if date_to:
             invoices = invoices.filter(due_date__lte=date_to)
         search = request.query_params.get("search", "").strip()
