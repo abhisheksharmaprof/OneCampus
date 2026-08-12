@@ -4,7 +4,7 @@
 per-institute FinanceSettings row so concurrent creations never collide.
 """
 
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 
 from django.utils import timezone
 
@@ -26,15 +26,17 @@ def next_document_number(*, institute, kind: str) -> str:
         settings.save(update_fields=("receipt_sequence", "updated_at"))
     else:
         raise ValueError(f"Unknown document kind: {kind}")
-    return f"{prefix}-{timezone.now().year}-{sequence:04d}"
+    return f"{prefix}-{timezone.localdate().year}-{sequence:04d}"
 
 
 def compute_totals(*, line_items, discount_amount, tax_amount):
     subtotal = sum(
         (Decimal(str(item["amount"])) * Decimal(str(item.get("qty", 1))) for item in line_items),
         Decimal("0.00"),
-    ).quantize(TWO_PLACES)
-    total = (subtotal - Decimal(discount_amount) + Decimal(tax_amount)).quantize(TWO_PLACES)
+    ).quantize(TWO_PLACES, rounding=ROUND_HALF_UP)
+    total = (subtotal - Decimal(str(discount_amount)) + Decimal(str(tax_amount))).quantize(
+        TWO_PLACES, rounding=ROUND_HALF_UP
+    )
     return subtotal, total
 
 

@@ -37,6 +37,24 @@ def test_next_document_number_uses_configured_prefix():
     assert number.startswith("FEE-")
 
 
+@pytest.mark.django_db
+def test_next_document_number_rejects_unknown_kind():
+    institute = Institute.objects.create(name="Northstar Academy", code="NSA")
+    with pytest.raises(ValueError):
+        with transaction.atomic():
+            next_document_number(institute=institute, kind="voucher")
+
+
+def test_compute_totals_rounds_half_up():
+    subtotal, total = compute_totals(
+        line_items=[{"description": "Fee", "qty": 1, "amount": "1234.565"}],
+        discount_amount=Decimal("0.00"),
+        tax_amount=Decimal("0.00"),
+    )
+    assert subtotal == Decimal("1234.57")
+    assert total == Decimal("1234.57")
+
+
 def test_compute_totals_sums_line_items_with_qty():
     subtotal, total = compute_totals(
         line_items=[
