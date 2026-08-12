@@ -310,7 +310,7 @@ describe('Institute Admin dashboard', () => {
     const financeNav = await screen.findByRole('navigation', { name: 'Finance sections' })
     expect(within(financeNav).getByRole('button', { name: /payments & receipts/i })).toBeInTheDocument()
     expect(within(financeNav).getByRole('button', { name: /^invoices$/i })).toBeInTheDocument()
-    expect(screen.getByText('Coming in a later task.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /new invoice/i })).toBeInTheDocument()
 
     await userEvent.click(within(financeNav).getByRole('button', { name: /payments & receipts/i }))
     expect(await screen.findByText('Coming in a later task.')).toBeInTheDocument()
