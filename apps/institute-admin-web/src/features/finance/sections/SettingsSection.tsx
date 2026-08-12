@@ -18,6 +18,7 @@ export default function SettingsSection({ accessToken }: FinanceSectionProps) {
   const update = (patch: Partial<FinanceSettings>) => {
     setForm((current) => (current ? { ...current, ...patch } : current))
     setSaved(false)
+    setError(null)
   }
 
   const submit = () => {
