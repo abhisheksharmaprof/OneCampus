@@ -20,7 +20,12 @@ from modules.attendance.api.views import (
     LowAttendanceNotifyView,
     AttendanceNotificationActionView,
 )
-from modules.finance.api.views import FeeInvoiceListCreateView, FeePaymentCreateView, FinanceRecordListCreateView
+from modules.finance.api.views import (
+    FeeInvoiceDetailView,
+    FeeInvoiceListCreateView,
+    FeePaymentCreateView,
+    FinanceRecordListCreateView,
+)
 from modules.people.api.parents import ParentListCreateView, ParentStudentLinkView
 from modules.people.api.staff import StaffDetailView, StaffListCreateView
 from modules.people.api.views import StudentBulkDeleteView, StudentDetailView, StudentListCreateView
@@ -78,6 +83,11 @@ urlpatterns = [
     path("attendance/leave-balances", LeaveBalancesView.as_view(), name="admin-attendance-leave-balances"),
     path("attendance/leave-quotas", LeaveBalancesView.as_view(), name="admin-attendance-leave-quotas"),
     path("fees/invoices", FeeInvoiceListCreateView.as_view(), name="admin-fee-invoices"),
+    path(
+        "fees/invoices/<uuid:invoice_id>",
+        FeeInvoiceDetailView.as_view(),
+        name="admin-fee-invoice-detail",
+    ),
     path("fees/payments", FeePaymentCreateView.as_view(), name="admin-fee-payments"),
     path("finance/records", FinanceRecordListCreateView.as_view(), name="admin-finance-records"),
     path("calendar/events", CalendarEventListCreateView.as_view(), name="admin-calendar-events"),
