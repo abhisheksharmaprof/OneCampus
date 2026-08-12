@@ -33,6 +33,7 @@ from modules.finance.api.templates_views import (
 )
 from modules.finance.api.plans_views import FeePlanDetailView, FeePlanListCreateView
 from modules.finance.api.insights_views import FeeDuesView, FeeSummaryView
+from modules.finance.api.settings_views import FinanceSettingsView
 from modules.people.api.parents import ParentListCreateView, ParentStudentLinkView
 from modules.people.api.staff import StaffDetailView, StaffListCreateView
 from modules.people.api.views import StudentBulkDeleteView, StudentDetailView, StudentListCreateView
@@ -112,6 +113,7 @@ urlpatterns = [
     path("fees/summary", FeeSummaryView.as_view(), name="admin-fee-summary"),
     path("fees/dues", FeeDuesView.as_view(), name="admin-fee-dues"),
     path("finance/records", FinanceRecordListCreateView.as_view(), name="admin-finance-records"),
+    path("finance/settings", FinanceSettingsView.as_view(), name="admin-finance-settings"),
     path("calendar/events", CalendarEventListCreateView.as_view(), name="admin-calendar-events"),
     path("institute", CurrentInstituteView.as_view(), name="admin-current-institute"),
     path("branches", BranchListCreateView.as_view(), name="admin-branch-list-create"),
