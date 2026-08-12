@@ -31,6 +31,7 @@ from modules.finance.api.templates_views import (
     InvoiceTemplateDetailView,
     InvoiceTemplateListCreateView,
 )
+from modules.finance.api.plans_views import FeePlanDetailView, FeePlanListCreateView
 from modules.people.api.parents import ParentListCreateView, ParentStudentLinkView
 from modules.people.api.staff import StaffDetailView, StaffListCreateView
 from modules.people.api.views import StudentBulkDeleteView, StudentDetailView, StudentListCreateView
@@ -105,6 +106,8 @@ urlpatterns = [
         InvoiceTemplateDetailView.as_view(),
         name="admin-fee-template-detail",
     ),
+    path("fees/plans", FeePlanListCreateView.as_view(), name="admin-fee-plans"),
+    path("fees/plans/<uuid:plan_id>", FeePlanDetailView.as_view(), name="admin-fee-plan-detail"),
     path("finance/records", FinanceRecordListCreateView.as_view(), name="admin-finance-records"),
     path("calendar/events", CalendarEventListCreateView.as_view(), name="admin-calendar-events"),
     path("institute", CurrentInstituteView.as_view(), name="admin-current-institute"),
