@@ -75,8 +75,16 @@ export const adminNavigation: AdminNavigationItem[] = [
   ] },
   { label: 'Finance', icon: 'fees', children: [
     route('FH1', 'Finance Overview', '/finance', 'Finance', 'finance'),
-    route('FF1', 'Fees & Collections', '/finance/fees', 'Finance', 'finance'),
-    route('FO1', 'Operations & Reports', '/finance/operations', 'Finance', 'finance'),
+    route('FFS1', 'Fee Structure', '/finance/fee-structure', 'Finance', 'finance'),
+    route('FIN1', 'Invoices', '/finance/invoices', 'Finance', 'finance'),
+    route('FPY1', 'Payments', '/finance/payments', 'Finance', 'finance'),
+    route('FDU1', 'Dues', '/finance/dues', 'Finance', 'finance'),
+    route('FIT1', 'Invoice Templates', '/finance/invoice-templates', 'Finance', 'finance'),
+    route('FST1', 'Finance Settings', '/finance/settings', 'Finance', 'finance'),
+    route('FEX1', 'Expenses', '/finance/expenses', 'Finance', 'finance'),
+    route('FPR1', 'Payroll', '/finance/payroll', 'Finance', 'finance'),
+    route('FBU1', 'Budget', '/finance/budget', 'Finance', 'finance'),
+    route('FRP1', 'Finance Reports', '/finance/reports', 'Finance', 'finance'),
   ] },
   { label: 'Timetable', icon: 'calendar', children: [
     route('TT1', 'View Timetable', '/timetable', 'Timetable', 'timetable'),
@@ -149,12 +157,10 @@ const legacyPaths = new Map<string, AdminRoute>([
   ['/academics/assessments', adminRoutes.find((item) => item.id === 'AAR1')!],
   ['/academics/common-tests', adminRoutes.find((item) => item.id === 'AAR1')!],
   ['/academics/report-cards', adminRoutes.find((item) => item.id === 'AAR1')!],
-  ['/fees/structure', adminRoutes.find((item) => item.id === 'FF1')!],
-  ['/fees/collections', adminRoutes.find((item) => item.id === 'FF1')!],
-  ['/finance/expenses', adminRoutes.find((item) => item.id === 'FO1')!],
-  ['/finance/payroll', adminRoutes.find((item) => item.id === 'FO1')!],
-  ['/finance/budget', adminRoutes.find((item) => item.id === 'FO1')!],
-  ['/finance/reports', adminRoutes.find((item) => item.id === 'FO1')!],
+  ['/fees/structure', adminRoutes.find((item) => item.id === 'FFS1')!],
+  ['/fees/collections', adminRoutes.find((item) => item.id === 'FIN1')!],
+  ['/finance/fees', adminRoutes.find((item) => item.id === 'FIN1')!],
+  ['/finance/operations', adminRoutes.find((item) => item.id === 'FEX1')!],
 ])
 
 const routesByLabel = new Map(allAdminRoutes.map((item) => [item.label, item]))
@@ -184,14 +190,9 @@ const actionAliases: Record<string, string> = {
   'Marks & Report Cards': 'Assessment & Results',
   'Branches List': 'Branches',
   'Attendance Dashboard': 'Overview',
-  'Collection Dashboard & Invoices': 'Collections',
-  'Collections': 'Fees & Collections',
-  'Fee Structure': 'Fees & Collections',
-  'Expenses': 'Operations & Reports',
-  'Payroll': 'Operations & Reports',
-  'Budget': 'Operations & Reports',
-  'Reports': 'Operations & Reports',
-  'Finance Reports': 'Operations & Reports',
+  'Collection Dashboard & Invoices': 'Invoices',
+  'Collections': 'Payments',
+  'Reports': 'Finance Reports',
   'Enquiries Inbox': 'Enquiries',
 }
 
