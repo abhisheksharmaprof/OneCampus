@@ -9,7 +9,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from modules.academics.models import StudentEnrollment
-from modules.finance.models import FeeInvoice, FeePayment, FinanceRecord, InvoiceTemplate
+from modules.finance.models import FeeInvoice, FeePayment, FeePlan, FinanceRecord, InvoiceTemplate
 from modules.finance.services import compute_totals, next_document_number, resolve_status
 from modules.institutes.api.permissions import IsCurrentInstituteAdmin
 from modules.institutes.models import Branch
@@ -353,6 +353,118 @@ class FeeInvoiceDetailView(APIView):
         )
         fresh = invoice_queryset(request.institute).get(id=invoice.id)
         return Response({"success": True, "data": InvoiceSerializer(fresh).data})
+
+
+class BulkGenerateSerializer(serializers.Serializer):
+    feePlanId = serializers.UUIDField()
+    classIds = serializers.ListField(child=serializers.UUIDField(), allow_empty=False)
+    issueDate = serializers.DateField()
+    dueDate = serializers.DateField()
+    templateId = serializers.UUIDField(required=False, allow_null=True, default=None)
+
+    def validate(self, attrs):
+        if attrs["dueDate"] < attrs["issueDate"]:
+            raise serializers.ValidationError(
+                {"dueDate": ["Due date cannot be before the issue date."]}
+            )
+        return attrs
+
+
+class FeeInvoiceBulkGenerateView(APIView):
+    permission_classes = (IsCurrentInstituteAdmin,)
+
+    @extend_schema(request=BulkGenerateSerializer, responses={status.HTTP_201_CREATED: dict})
+    def post(self, request):
+        serializer = BulkGenerateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        values = serializer.validated_data
+        with transaction.atomic():
+            plan = get_object_or_404(
+                FeePlan, id=values["feePlanId"], institute=request.institute, is_active=True
+            )
+            template = None
+            if values["templateId"]:
+                template = get_object_or_404(
+                    InvoiceTemplate, id=values["templateId"], institute=request.institute
+                )
+            line_items = [
+                {
+                    "description": item.get("head", ""),
+                    "period": item.get("period", ""),
+                    "qty": 1,
+                    "amount": str(item.get("amount", "0")),
+                }
+                for item in plan.items
+            ]
+            subtotal, total = compute_totals(
+                line_items=line_items,
+                discount_amount=Decimal("0.00"),
+                tax_amount=Decimal("0.00"),
+            )
+            if total <= 0:
+                raise serializers.ValidationError(
+                    {"feePlanId": ["The fee plan has no billable items."]}
+                )
+            enrollments = (
+                StudentEnrollment.objects.filter(
+                    class_section__grade_id__in=values["classIds"],
+                    left_at__isnull=True,
+                    student__institute=request.institute,
+                    student__is_active=True,
+                )
+                .select_related("student")
+            )
+            students = {enrollment.student_id: enrollment.student for enrollment in enrollments}
+            already_invoiced = set(
+                FeeInvoice.objects.filter(
+                    institute=request.institute, plan=plan, student_id__in=students.keys()
+                )
+                .exclude(status=FeeInvoice.Status.CANCELLED)
+                .values_list("student_id", flat=True)
+            )
+            created = []
+            for student_id, student in students.items():
+                if student_id in already_invoiced:
+                    continue
+                invoice = FeeInvoice(
+                    institute=request.institute,
+                    branch=student.branch,
+                    student=student,
+                    plan=plan,
+                    template=template,
+                    invoice_number=next_document_number(
+                        institute=request.institute, kind="invoice"
+                    ),
+                    status=FeeInvoice.Status.ISSUED,
+                    issue_date=values["issueDate"],
+                    due_date=values["dueDate"],
+                    line_items=line_items,
+                    subtotal=subtotal,
+                    total=total,
+                    amount=total,
+                )
+                invoice.save()
+                created.append(invoice)
+        audit_mutation(
+            request=request,
+            verb="Created",
+            target_label=f"{len(created)} fee invoices from plan '{plan.name}'",
+            target_type="fee_plan",
+            target_id=plan.id,
+            extra_meta={
+                "feePlanId": str(plan.id),
+                "createdCount": len(created),
+                "skippedCount": len(students) - len(created),
+                "total": str(total),
+            },
+        )
+        return Response(
+            {
+                "success": True,
+                "data": {"created": len(created), "skipped": len(students) - len(created)},
+            },
+            status=status.HTTP_201_CREATED,
+        )
 
 
 class PaymentSerializer(serializers.ModelSerializer):

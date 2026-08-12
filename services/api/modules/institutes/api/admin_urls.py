@@ -21,6 +21,7 @@ from modules.attendance.api.views import (
     AttendanceNotificationActionView,
 )
 from modules.finance.api.views import (
+    FeeInvoiceBulkGenerateView,
     FeeInvoiceDetailView,
     FeeInvoiceListCreateView,
     FeePaymentListCreateView,
@@ -83,6 +84,11 @@ urlpatterns = [
     path("attendance/leave-balances", LeaveBalancesView.as_view(), name="admin-attendance-leave-balances"),
     path("attendance/leave-quotas", LeaveBalancesView.as_view(), name="admin-attendance-leave-quotas"),
     path("fees/invoices", FeeInvoiceListCreateView.as_view(), name="admin-fee-invoices"),
+    path(
+        "fees/invoices/bulk-generate",
+        FeeInvoiceBulkGenerateView.as_view(),
+        name="admin-fee-invoices-bulk-generate",
+    ),
     path(
         "fees/invoices/<uuid:invoice_id>",
         FeeInvoiceDetailView.as_view(),
