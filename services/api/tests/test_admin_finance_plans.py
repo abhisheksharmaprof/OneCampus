@@ -100,3 +100,30 @@ def test_plan_delete_is_soft_when_referenced(api_client):
     referenced.refresh_from_db()
     assert referenced.is_active is False
     assert not FeePlan.objects.filter(id=unreferenced.id).exists()
+
+
+@pytest.mark.django_db
+def test_plan_rejects_negative_amounts_and_foreign_detail_access(api_client):
+    institute, branch, token = make_admin(api_client)
+    other_institute, other_branch, _ = make_admin(api_client, code="OTHER")
+    foreign_plan = FeePlan.objects.create(
+        institute=other_institute, name="Foreign plan", items=[{"head": "Fee", "amount": "10.00"}]
+    )
+    api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
+
+    negative = api_client.post(
+        "/api/v1/admin/fees/plans",
+        {"name": "Bad plan", "items": [{"head": "Tuition", "amount": "-5.00"}]},
+        format="json",
+    )
+    foreign_get = api_client.get(f"/api/v1/admin/fees/plans/{foreign_plan.id}")
+    foreign_patch = api_client.patch(
+        f"/api/v1/admin/fees/plans/{foreign_plan.id}", {"name": "Hacked"}, format="json"
+    )
+    foreign_delete = api_client.delete(f"/api/v1/admin/fees/plans/{foreign_plan.id}")
+
+    assert negative.status_code == 400
+    assert foreign_get.status_code == 404
+    assert foreign_patch.status_code == 404
+    assert foreign_delete.status_code == 404
+    assert FeePlan.objects.filter(id=foreign_plan.id).exists()

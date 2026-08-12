@@ -1,5 +1,6 @@
 from decimal import Decimal
 
+from django.db import transaction
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema
 from rest_framework import serializers, status
@@ -70,7 +71,7 @@ def validate_applies_to(request, grade_ids):
         raise serializers.ValidationError(
             {"appliesTo": ["One or more classes do not belong to this institute."]}
         )
-    return grade_ids
+    return list(dict.fromkeys(grade_ids))
 
 
 class FeePlanListCreateView(APIView):
@@ -166,14 +167,17 @@ class FeePlanDetailView(APIView):
         return Response({"success": True, "data": FeePlanSerializer(plan).data})
 
     def delete(self, request, plan_id):
-        plan = get_object_or_404(FeePlan, id=plan_id, institute=request.institute)
-        if plan.invoices.exists():
-            plan.is_active = False
-            plan.save(update_fields=("is_active", "updated_at"))
-            action = "deactivated (referenced by invoices)"
-        else:
-            plan.delete()
-            action = "deleted"
+        with transaction.atomic():
+            plan = get_object_or_404(
+                FeePlan.objects.select_for_update(), id=plan_id, institute=request.institute
+            )
+            if plan.invoices.exists():
+                plan.is_active = False
+                plan.save(update_fields=("is_active", "updated_at"))
+                action = "deactivated (referenced by invoices)"
+            else:
+                plan.delete()
+                action = "deleted"
         audit_mutation(
             request=request,
             verb="Deleted",
