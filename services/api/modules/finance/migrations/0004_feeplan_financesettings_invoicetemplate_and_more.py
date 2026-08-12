@@ -12,7 +12,7 @@ class Migration(migrations.Migration):
     dependencies = [
         ("finance", "0003_financerecord"),
         ("institutes", "0010_avoid_main_branch_code"),
-        ("people", "0016_assign_admin_employee_codes"),
+        ("people", "0014_remove_inactive_student_guardian_links"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
