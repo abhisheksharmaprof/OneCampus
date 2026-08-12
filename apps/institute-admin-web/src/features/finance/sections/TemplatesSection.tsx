@@ -92,7 +92,9 @@ export default function TemplatesSection({ accessToken }: FinanceSectionProps) {
   const createNew = () => {
     setBusy(true)
     setError(null)
-    createTemplate(accessToken, { name: 'New template', kind: 'INVOICE', layout: DEFAULT_LAYOUT })
+    // Deep-clone so this new template's layout never shares object references with DEFAULT_LAYOUT
+    // (editing one template's columns/branding must not mutate the shared default constant).
+    createTemplate(accessToken, { name: 'New template', kind: 'INVOICE', layout: JSON.parse(JSON.stringify(DEFAULT_LAYOUT)) })
       .then((created) => {
         templatesLoad.reload()
         selectTemplate(created)
@@ -171,6 +173,8 @@ export default function TemplatesSection({ accessToken }: FinanceSectionProps) {
   const items = templates
   const listLoading = templatesLoad.loading
   const listError = templatesLoad.error
+  const selectedRecord = templates.find((record) => record.id === selectedId) ?? null
+  const isDefaultSelected = selectedRecord?.isDefault ?? false
 
   return (
     <div className="fin-gallery">
@@ -268,11 +272,45 @@ export default function TemplatesSection({ accessToken }: FinanceSectionProps) {
               </div>
             </div>
 
+            <h4>Header fields</h4>
+            <p className="fin-hint">Extra lines shown next to the document number and date. Supports the same {'{{token}}'} placeholders as the title. The seeded defaults duplicate the invoice number/issue date already shown alongside them — clear or edit them here if that's not wanted.</p>
+            <div className="fin-rows">
+              {draft.layout.header.fields.map((field, index) => (
+                <div className="fin-row fin-row--column" key={index}>
+                  <input
+                    value={field}
+                    onChange={(event) => patchLayout((layout) => ({
+                      ...layout,
+                      header: { ...layout.header, fields: layout.header.fields.map((current, position) => (position === index ? event.target.value : current)) },
+                    }))}
+                  />
+                  <button
+                    type="button"
+                    className="fin-btn fin-btn--danger"
+                    onClick={() => patchLayout((layout) => ({
+                      ...layout,
+                      header: { ...layout.header, fields: layout.header.fields.filter((_, position) => position !== index) },
+                    }))}
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
+            <button
+              type="button"
+              className="fin-btn"
+              onClick={() => patchLayout((layout) => ({ ...layout, header: { ...layout.header, fields: [...layout.header.fields, ''] } }))}
+            >
+              + Add header field
+            </button>
+
             <h4>Columns</h4>
             <div className="fin-rows">
               {draft.layout.columns.map((column, index) => (
                 <div className="fin-row fin-row--column" key={column.id}>
                   <label className="fin-row__checkbox">
+                    {/* Disabling every column produces an empty table — acceptable, left unguarded since it's an obvious, immediately-visible state in the preview. */}
                     <input
                       type="checkbox"
                       checked={column.enabled}
@@ -324,16 +362,13 @@ export default function TemplatesSection({ accessToken }: FinanceSectionProps) {
             </div>
 
             <div className="fin-modal__actions">
-              {!templates.find((record) => record.id === selectedId)?.isDefault && (
-                <button type="button" className="fin-btn fin-btn--danger" disabled={deletingId === selectedId} onClick={() => {
-                  const record = templates.find((candidate) => candidate.id === selectedId)
-                  if (record) remove(record)
-                }}>
+              {!isDefaultSelected && selectedRecord && (
+                <button type="button" className="fin-btn fin-btn--danger" disabled={deletingId === selectedId} onClick={() => remove(selectedRecord)}>
                   {deletingId === selectedId ? 'Deleting…' : 'Delete'}
                 </button>
               )}
               <button type="button" className="fin-btn" disabled={busy} onClick={duplicate}>Duplicate</button>
-              {!templates.find((record) => record.id === selectedId)?.isDefault && (
+              {!isDefaultSelected && (
                 <button type="button" className="fin-btn" disabled={busy} onClick={setAsDefault}>Set as default</button>
               )}
               <button type="button" className="fin-btn fin-btn--primary" disabled={saving} onClick={save}>{saving ? 'Saving…' : 'Save'}</button>
