@@ -116,7 +116,12 @@ class FeeInvoice(TimeStampedModel):
                 fields=("institute", "invoice_number"),
                 condition=~Q(invoice_number=""),
                 name="uq_invoice_number_per_institute",
-            )
+            ),
+            models.UniqueConstraint(
+                fields=("institute", "plan", "student"),
+                condition=Q(plan__isnull=False) & ~Q(status="CANCELLED"),
+                name="uq_plan_invoice_per_student",
+            ),
         ]
         indexes = [
             models.Index(fields=("institute", "branch", "due_date")),

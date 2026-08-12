@@ -8,7 +8,7 @@ from rest_framework import serializers, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from modules.academics.models import StudentEnrollment
+from modules.academics.models import Grade, StudentEnrollment
 from modules.finance.models import FeeInvoice, FeePayment, FeePlan, FinanceRecord, InvoiceTemplate
 from modules.finance.services import compute_totals, next_document_number, resolve_status
 from modules.institutes.api.permissions import IsCurrentInstituteAdmin
@@ -380,8 +380,18 @@ class FeeInvoiceBulkGenerateView(APIView):
         values = serializer.validated_data
         with transaction.atomic():
             plan = get_object_or_404(
-                FeePlan, id=values["feePlanId"], institute=request.institute, is_active=True
+                FeePlan.objects.select_for_update(),
+                id=values["feePlanId"],
+                institute=request.institute,
+                is_active=True,
             )
+            valid_grades = Grade.objects.filter(
+                institute=request.institute, id__in=values["classIds"]
+            ).count()
+            if valid_grades != len(set(values["classIds"])):
+                raise serializers.ValidationError(
+                    {"classIds": ["One or more classes do not belong to this institute."]}
+                )
             template = None
             if values["templateId"]:
                 template = get_object_or_404(
@@ -408,6 +418,7 @@ class FeeInvoiceBulkGenerateView(APIView):
             enrollments = (
                 StudentEnrollment.objects.filter(
                     class_section__grade_id__in=values["classIds"],
+                    class_section__academic_year__is_current=True,
                     left_at__isnull=True,
                     student__institute=request.institute,
                     student__is_active=True,

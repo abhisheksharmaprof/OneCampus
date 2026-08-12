@@ -132,3 +132,31 @@ def test_bulk_generate_rejects_foreign_or_inactive_plan(api_client, context):
 
     assert foreign.status_code == 404
     assert inactive.status_code == 404
+
+
+@pytest.mark.django_db
+def test_bulk_generate_rejects_foreign_class_ids(api_client, context):
+    other = Institute.objects.create(name="Other Academy", code="OTHER")
+    foreign_grade = Grade.objects.create(institute=other, name="Class 9")
+
+    response = api_client.post(
+        "/api/v1/admin/fees/invoices/bulk-generate",
+        {**body(context), "classIds": [str(foreign_grade.id)]},
+        format="json",
+    )
+
+    assert response.status_code == 400
+
+
+@pytest.mark.django_db
+def test_bulk_generate_excludes_left_students(api_client, context):
+    from django.utils import timezone
+    enrollment = StudentEnrollment.objects.get(student=context["students"][0])
+    enrollment.left_at = timezone.now()
+    enrollment.save(update_fields=("left_at",))
+
+    response = api_client.post(
+        "/api/v1/admin/fees/invoices/bulk-generate", body(context), format="json"
+    )
+
+    assert response.json()["data"]["created"] == 2
