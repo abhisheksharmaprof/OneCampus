@@ -122,7 +122,7 @@ function PlanEditorModal({ accessToken, branchId, grades, plan, onClose }: {
     if (!cleanItems.length) { setError('Add at least one fee-head item.'); return }
     setSaving(true)
     setError(null)
-    const body = { name: name.trim(), academicYear: academicYear.trim(), appliesTo: classIds, items: cleanItems, branchId: branchId ?? null }
+    const body = { name: name.trim(), academicYear: academicYear.trim(), appliesTo: classIds, items: cleanItems, branchId: plan?.branchId ?? branchId ?? null }
     const request = plan ? patchFeePlan(accessToken, plan.id, body) : createFeePlan(accessToken, body)
     request
       .then(() => onClose(true))
