@@ -31,8 +31,17 @@ def _money(value):
     return str(Decimal(value).quantize(Decimal("0.01")))
 
 
-def validated_branch_id(request):
-    branch_id = request.query_params.get("branchId")
+class BranchFilterSerializer(serializers.Serializer):
+    branchId = serializers.UUIDField(required=False)
+
+
+class DuesFilterSerializer(serializers.Serializer):
+    branchId = serializers.UUIDField(required=False)
+    classId = serializers.UUIDField(required=False)
+    minDaysOverdue = serializers.IntegerField(required=False, min_value=0)
+
+
+def validated_branch_id(request, branch_id):
     if branch_id:
         get_object_or_404(Branch, id=branch_id, institute=request.institute, is_active=True)
     return branch_id
@@ -42,9 +51,11 @@ class FeeSummaryView(APIView):
     permission_classes = (IsCurrentInstituteAdmin,)
 
     def get(self, request):
+        filters = BranchFilterSerializer(data=request.query_params)
+        filters.is_valid(raise_exception=True)
         today = timezone.localdate()
         month_start = today.replace(day=1)
-        branch_id = validated_branch_id(request)
+        branch_id = validated_branch_id(request, filters.validated_data.get("branchId"))
 
         payments = FeePayment.objects.filter(institute=request.institute)
         open_invoices = FeeInvoice.objects.filter(
@@ -123,26 +134,33 @@ class FeeDuesView(APIView):
     permission_classes = (IsCurrentInstituteAdmin,)
 
     def get(self, request):
+        filters_serializer = DuesFilterSerializer(data=request.query_params)
+        filters_serializer.is_valid(raise_exception=True)
+        filters = filters_serializer.validated_data
+
         today = timezone.localdate()
         invoices = FeeInvoice.objects.filter(
             institute=request.institute, status__in=OPEN_STATUSES
         )
-        branch_id = validated_branch_id(request)
+        branch_id = validated_branch_id(request, filters.get("branchId"))
         if branch_id:
             invoices = invoices.filter(branch_id=branch_id)
-        class_id = request.query_params.get("classId")
+        class_id = filters.get("classId")
         if class_id:
             enrolled = StudentEnrollment.objects.filter(
                 class_section__grade_id=class_id, left_at__isnull=True
             ).values("student_id")
             invoices = invoices.filter(student_id__in=enrolled)
 
+        paid_filters = {
+            "institute": request.institute,
+            "invoice__student_id": OuterRef("student_id"),
+            "invoice__status__in": OPEN_STATUSES,
+        }
+        if branch_id:
+            paid_filters["invoice__branch_id"] = branch_id
         paid_per_student = (
-            FeePayment.objects.filter(
-                institute=request.institute,
-                invoice__student_id=OuterRef("student_id"),
-                invoice__status__in=OPEN_STATUSES,
-            )
+            FeePayment.objects.filter(**paid_filters)
             .values("invoice__student_id")
             .annotate(total=Sum("amount"))
             .values("total")[:1]
@@ -163,11 +181,11 @@ class FeeDuesView(APIView):
             )
             .annotate(outstanding=F("billed") - F("paid"))
             .filter(outstanding__gt=0)
-            .order_by("-outstanding")
+            .order_by("-outstanding", "student_id")
         )
-        min_days = request.query_params.get("minDaysOverdue")
-        if min_days:
-            rows = rows.filter(earliest_due__lte=today - timedelta(days=int(min_days)))
+        min_days = filters.get("minDaysOverdue")
+        if min_days is not None:
+            rows = rows.filter(earliest_due__lte=today - timedelta(days=min_days))
         return Response(
             {
                 "success": True,

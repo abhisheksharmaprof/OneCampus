@@ -104,3 +104,34 @@ def test_insights_are_tenant_scoped(api_client, context):
     assert summary.json()["data"]["outstandingTotal"] == "270.00"
     names = [row["studentName"] for row in dues.json()["data"]["items"]]
     assert "Zara" not in names
+
+
+@pytest.mark.django_db
+def test_dues_branch_filter_scopes_payments_and_rejects_bad_params(api_client, context):
+    bad_min_days = api_client.get("/api/v1/admin/fees/dues?minDaysOverdue=abc")
+    bad_class = api_client.get("/api/v1/admin/fees/dues?classId=not-a-uuid")
+    bad_branch_summary = api_client.get("/api/v1/admin/fees/summary?branchId=not-a-uuid")
+
+    assert bad_min_days.status_code == 400
+    assert bad_class.status_code == 400
+    assert bad_branch_summary.status_code == 400
+
+    institute = context["institute"]
+    diya = context["diya"]
+    main_branch = Branch.objects.get(institute=institute, is_head_office=True)
+    other_branch = Branch.objects.create(
+        institute=institute, name="North Campus", code="NSA-NORTH", is_head_office=False
+    )
+    other_invoice = FeeInvoice.objects.create(
+        institute=institute, branch=other_branch, student=diya,
+        amount=Decimal("500.00"), total=Decimal("500.00"), status="ISSUED",
+        due_date=date.today() + timedelta(days=5),
+    )
+    FeePayment.objects.create(
+        institute=institute, invoice=other_invoice, amount=Decimal("500.00"),
+        receipt_number="RCP-2026-0002",
+    )
+
+    scoped = api_client.get(f"/api/v1/admin/fees/dues?branchId={main_branch.id}")
+    rows = {row["studentName"]: row for row in scoped.json()["data"]["items"]}
+    assert rows["Diya"]["paid"] == "30.00"
