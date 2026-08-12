@@ -7,7 +7,10 @@ import {
 import { AdminApiError } from '../../admin/admin.api'
 import { buildDocumentModel, openPrintWindow, renderDocumentHtml, resolveLayout } from '../invoiceRender'
 import InvoiceEditor from './InvoiceEditor'
-import { money, Pagination, StatePanel, StatusBadge, useAbortableLoad, type FinanceSectionProps } from './shared'
+import {
+  inDays, money, Pagination, StatePanel, StatusBadge, today, useAbortableLoad, useModalKeyHandling,
+  type FinanceSectionProps,
+} from './shared'
 
 const METHODS: PaymentMethod[] = ['CASH', 'UPI', 'CARD', 'BANK', 'CHEQUE', 'OTHER']
 
@@ -22,6 +25,7 @@ export default function InvoicesSection({ accessToken, branchId }: Props) {
   const [busyMessage, setBusyMessage] = useState<string | null>(null)
   const [bulkOpen, setBulkOpen] = useState(false)
   const [payFor, setPayFor] = useState<Invoice | null>(null)
+  const [cancellingId, setCancellingId] = useState<string | null>(null)
 
   const invoices = useAbortableLoad(
     (signal) => listInvoices(accessToken, { page, branchId, status: statusFilter, classId: classFilter, search }, signal),
@@ -49,9 +53,11 @@ export default function InvoicesSection({ accessToken, branchId }: Props) {
   const cancelInvoice = (invoice: Invoice) => {
     if (!window.confirm(`Cancel invoice ${invoice.invoiceNumber}? This cannot be undone.`)) return
     setBusyMessage(null)
+    setCancellingId(invoice.id)
     patchInvoice(accessToken, invoice.id, { status: 'CANCELLED' })
       .then(() => invoices.reload())
       .catch((cause: unknown) => setBusyMessage(cause instanceof AdminApiError ? (cause.fieldErrors.status?.[0] ?? cause.message) : 'Cancel failed.'))
+      .finally(() => setCancellingId(null))
   }
 
   if (mode === 'editor') {
@@ -102,7 +108,14 @@ export default function InvoicesSection({ accessToken, branchId }: Props) {
                       </>
                     )}
                     {invoice.status !== 'CANCELLED' && invoice.status !== 'PAID' && (
-                      <button type="button" className="fin-btn fin-btn--danger" onClick={() => cancelInvoice(invoice)}>Cancel</button>
+                      <button
+                        type="button"
+                        className="fin-btn fin-btn--danger"
+                        disabled={cancellingId === invoice.id}
+                        onClick={() => cancelInvoice(invoice)}
+                      >
+                        {cancellingId === invoice.id ? 'Cancelling…' : 'Cancel'}
+                      </button>
                     )}
                   </td>
                 </tr>
@@ -138,11 +151,13 @@ function BulkGenerateModal({ accessToken, grades, onClose }: {
   const plans = useAbortableLoad((signal) => listFeePlans(accessToken, false, signal), [accessToken])
   const [planId, setPlanId] = useState('')
   const [classIds, setClassIds] = useState<string[]>([])
-  const [issueDate, setIssueDate] = useState(new Date().toISOString().slice(0, 10))
-  const [dueDate, setDueDate] = useState(new Date(Date.now() + 15 * 86400000).toISOString().slice(0, 10))
+  const [issueDate, setIssueDate] = useState(today())
+  const [dueDate, setDueDate] = useState(inDays(15))
   const [result, setResult] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [running, setRunning] = useState(false)
+
+  useModalKeyHandling(() => onClose(false))
 
   const selectedPlan = useMemo(() => plans.data?.items.find((plan: FeePlan) => plan.id === planId), [plans.data, planId])
 
@@ -170,7 +185,7 @@ function BulkGenerateModal({ accessToken, grades, onClose }: {
           <>
             <div className="fin-form">
               <label className="is-wide">Fee plan
-                <select value={planId} onChange={(event) => {
+                <select autoFocus value={planId} onChange={(event) => {
                   setPlanId(event.target.value)
                   const plan = plans.data?.items.find((candidate: FeePlan) => candidate.id === event.target.value)
                   if (plan?.appliesTo.length) setClassIds(plan.appliesTo)
@@ -212,6 +227,8 @@ export function RecordPaymentModal({ accessToken, invoice, onClose }: {
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
+  useModalKeyHandling(() => onClose(false))
+
   const submit = () => {
     setSaving(true)
     setError(null)
@@ -230,7 +247,7 @@ export function RecordPaymentModal({ accessToken, invoice, onClose }: {
         <p>{invoice.studentName} · outstanding {money(outstanding)}</p>
         {error && <p className="fin-field-error" role="alert">{error}</p>}
         <div className="fin-form">
-          <label>Amount<input type="number" min={0.01} step="0.01" value={amount} onChange={(event) => setAmount(event.target.value)} /></label>
+          <label>Amount<input autoFocus type="number" min={0.01} step="0.01" value={amount} onChange={(event) => setAmount(event.target.value)} /></label>
           <label>Method
             <select value={method} onChange={(event) => setMethod(event.target.value as PaymentMethod)}>
               {METHODS.map((value) => <option key={value} value={value}>{value}</option>)}

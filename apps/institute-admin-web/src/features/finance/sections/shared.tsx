@@ -77,3 +77,15 @@ export function Pagination(props: { page: number; totalPages: number; onPage: (p
     </div>
   )
 }
+
+export const today = () => new Date().toISOString().slice(0, 10)
+export const inDays = (days: number) => new Date(Date.now() + days * 86400000).toISOString().slice(0, 10)
+
+/** Escape-to-close for modal dialogs — pair with an autoFocus on the modal's first meaningful field. */
+export function useModalKeyHandling(onClose: () => void) {
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose() }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [onClose])
+}

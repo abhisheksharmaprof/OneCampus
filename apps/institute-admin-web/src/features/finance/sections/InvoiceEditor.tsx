@@ -1,12 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   createInvoice, fetchInstituteBranding, listFeePlans, listTemplates, searchStudents,
-  type InstituteBranding, type Invoice, type InvoiceLineItem, type FeePlan,
-  type StudentOption, type TemplateRecord,
+  type Invoice, type InvoiceLineItem, type StudentOption,
 } from '../finance.api'
 import { AdminApiError } from '../../admin/admin.api'
 import { buildDocumentModel, openPrintWindow, renderDocumentHtml, resolveLayout } from '../invoiceRender'
-import { money } from './shared'
+import { inDays, money, StatePanel, today, useAbortableLoad } from './shared'
 
 type InvoiceEditorProps = {
   accessToken: string
@@ -14,8 +13,6 @@ type InvoiceEditorProps = {
 }
 
 const emptyItem = (): InvoiceLineItem => ({ description: '', period: '', qty: 1, amount: '0.00' })
-const today = () => new Date().toISOString().slice(0, 10)
-const inDays = (days: number) => new Date(Date.now() + days * 86400000).toISOString().slice(0, 10)
 
 function studentLabel(student: StudentOption | null): string {
   if (!student) return ''
@@ -32,31 +29,23 @@ export default function InvoiceEditor({ accessToken, onClose }: InvoiceEditorPro
   const [issueDate, setIssueDate] = useState(today())
   const [dueDate, setDueDate] = useState(inDays(15))
   const [notes, setNotes] = useState('')
-  const [templates, setTemplates] = useState<TemplateRecord[]>([])
   const [templateId, setTemplateId] = useState<string | null>(null)
-  const [plans, setPlans] = useState<FeePlan[]>([])
-  const [branding, setBranding] = useState<InstituteBranding | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const previewRef = useRef<HTMLIFrameElement>(null)
 
+  const branding = useAbortableLoad((signal) => fetchInstituteBranding(accessToken, signal), [accessToken])
+  const templatesLoad = useAbortableLoad((signal) => listTemplates(accessToken, 'INVOICE', signal), [accessToken])
+  const plansLoad = useAbortableLoad((signal) => listFeePlans(accessToken, false, signal), [accessToken])
+  const templates = templatesLoad.data?.items ?? []
+  const plans = plansLoad.data?.items ?? []
+
   useEffect(() => {
-    const controller = new AbortController()
-    fetchInstituteBranding(accessToken, controller.signal)
-      .then((profile) => setBranding(profile))
-      .catch(() => setBranding({ name: '', logoUrl: null, brandColor: null }))
-    listTemplates(accessToken, 'INVOICE', controller.signal)
-      .then((page) => {
-        setTemplates(page.items)
-        const preferred = page.items.find((template) => template.isDefault) ?? page.items[0]
-        setTemplateId(preferred?.id ?? null)
-      })
-      .catch(() => setTemplates([]))
-    listFeePlans(accessToken, false, controller.signal)
-      .then((page) => setPlans(page.items))
-      .catch(() => setPlans([]))
-    return () => controller.abort()
-  }, [accessToken])
+    if (templateId !== null) return
+    const preferred = templates.find((template) => template.isDefault) ?? templates[0]
+    if (preferred) setTemplateId(preferred.id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only run the default-selection logic when the template list itself changes.
+  }, [templates])
 
   useEffect(() => {
     if (studentQuery.trim().length < 2) { setStudentOptions([]); return }
@@ -64,7 +53,7 @@ export default function InvoiceEditor({ accessToken, onClose }: InvoiceEditorPro
     const timer = setTimeout(() => {
       searchStudents(accessToken, studentQuery.trim(), controller.signal)
         .then((page) => setStudentOptions(page.items))
-        .catch(() => setStudentOptions([]))
+        .catch(() => { if (!controller.signal.aborted) setStudentOptions([]) })
     }, 250)
     return () => { clearTimeout(timer); controller.abort() }
   }, [accessToken, studentQuery])
@@ -77,7 +66,7 @@ export default function InvoiceEditor({ accessToken, onClose }: InvoiceEditorPro
   const template = templates.find((candidate) => candidate.id === templateId) ?? null
 
   const previewHtml = useMemo(() => {
-    if (!branding) return ''
+    if (!branding.data) return ''
     const draft: Invoice = {
       id: 'preview', invoiceNumber: '(assigned on save)',
       studentId: student?.id ?? '', studentName: studentLabel(student) || 'Select a student',
@@ -88,13 +77,17 @@ export default function InvoiceEditor({ accessToken, onClose }: InvoiceEditorPro
       taxAmount: Number(tax || 0).toFixed(2), total: total.toFixed(2),
       notes, templateId, totalPaid: '0.00',
     }
-    return renderDocumentHtml(buildDocumentModel({ invoice: draft, branding }), resolveLayout(template?.layout))
-  }, [branding, student, items, subtotal, discount, tax, total, issueDate, dueDate, notes, template, templateId])
+    return renderDocumentHtml(buildDocumentModel({ invoice: draft, branding: branding.data }), resolveLayout(template?.layout))
+  }, [branding.data, student, items, subtotal, discount, tax, total, issueDate, dueDate, notes, template, templateId])
 
+  // Debounced so a fast typist doesn't trigger a full iframe document.write() on every keystroke.
   useEffect(() => {
-    previewRef.current?.contentDocument?.open()
-    previewRef.current?.contentDocument?.write(previewHtml)
-    previewRef.current?.contentDocument?.close()
+    const timer = setTimeout(() => {
+      previewRef.current?.contentDocument?.open()
+      previewRef.current?.contentDocument?.write(previewHtml)
+      previewRef.current?.contentDocument?.close()
+    }, 200)
+    return () => clearTimeout(timer)
   }, [previewHtml])
 
   const applyPlan = (planId: string) => {
@@ -125,16 +118,21 @@ export default function InvoiceEditor({ accessToken, onClose }: InvoiceEditorPro
         discountAmount: Number(discount || 0).toFixed(2), taxAmount: Number(tax || 0).toFixed(2),
         notes, templateId, status,
       })
-      if (printAfter && branding) {
+      if (printAfter && branding.data) {
         const printed = openPrintWindow(
-          renderDocumentHtml(buildDocumentModel({ invoice: created, branding }), resolveLayout(template?.layout)),
+          renderDocumentHtml(buildDocumentModel({ invoice: created, branding: branding.data }), resolveLayout(template?.layout)),
         )
         if (!printed) setError('The invoice was saved, but the print popup was blocked by the browser.')
       }
       return created
     } catch (cause) {
       setError(cause instanceof AdminApiError
-        ? Object.values(cause.fieldErrors)[0]?.[0] ?? cause.message
+        ? (cause.fieldErrors.studentId?.[0]
+            ?? cause.fieldErrors.issueDate?.[0]
+            ?? cause.fieldErrors.dueDate?.[0]
+            ?? cause.fieldErrors.discountAmount?.[0]
+            ?? cause.fieldErrors.lineItems?.[0]
+            ?? cause.message)
         : 'The invoice could not be saved.')
       return null
     } finally {
@@ -148,6 +146,20 @@ export default function InvoiceEditor({ accessToken, onClose }: InvoiceEditorPro
       if (reset) { setStudent(null); setStudentQuery(''); setItems([emptyItem()]); setNotes('') }
       else onClose(true)
     })
+  }
+
+  const editorLoading = branding.loading || templatesLoad.loading || plansLoad.loading
+  const editorError = branding.error ?? templatesLoad.error ?? plansLoad.error
+  const reloadEditorData = () => { branding.reload(); templatesLoad.reload(); plansLoad.reload() }
+
+  if (editorLoading || editorError) {
+    return (
+      <div className="fin-card">
+        <StatePanel loading={editorLoading} error={editorError} onRetry={reloadEditorData}>
+          <></>
+        </StatePanel>
+      </div>
+    )
   }
 
   return (
