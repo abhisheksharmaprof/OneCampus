@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   fetchInstituteBranding, getInvoice, listInvoices, listPayments, listTemplates, searchStudents,
   type Invoice, type Payment, type PaymentMethod, type StudentOption,
@@ -22,7 +22,7 @@ export default function PaymentsSection({ accessToken, branchId }: FinanceSectio
   const [pickerOpen, setPickerOpen] = useState(false)
   const [payFor, setPayFor] = useState<Invoice | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
-  const [printingId, setPrintingId] = useState<string | null>(null)
+  const [printingIds, setPrintingIds] = useState<Set<string>>(new Set())
 
   const payments = useAbortableLoad(
     (signal) => listPayments(accessToken, { page, branchId, method, search, dateFrom, dateTo }, signal),
@@ -32,9 +32,9 @@ export default function PaymentsSection({ accessToken, branchId }: FinanceSectio
   const branding = useAbortableLoad((signal) => fetchInstituteBranding(accessToken, signal), [accessToken])
 
   const printReceipt = async (payment: Payment) => {
-    if (!branding.data) return
+    if (!branding.data || printingIds.has(payment.id)) return
+    setPrintingIds((current) => new Set(current).add(payment.id))
     setNotice(null)
-    setPrintingId(payment.id)
     try {
       // Receipt rendering needs the invoice's line items and student class.
       const invoice = await getInvoice(accessToken, payment.invoiceId)
@@ -49,7 +49,11 @@ export default function PaymentsSection({ accessToken, branchId }: FinanceSectio
     } catch {
       setNotice('Could not load the invoice for this receipt.')
     } finally {
-      setPrintingId(null)
+      setPrintingIds((current) => {
+        const next = new Set(current)
+        next.delete(payment.id)
+        return next
+      })
     }
   }
 
@@ -83,8 +87,8 @@ export default function PaymentsSection({ accessToken, branchId }: FinanceSectio
                   <td>{payment.method}{payment.reference ? ` · ${payment.reference}` : ''}</td>
                   <td>{payment.paidAt.slice(0, 10)}</td>
                   <td>
-                    <button type="button" className="fin-btn" disabled={printingId === payment.id} onClick={() => void printReceipt(payment)}>
-                      {printingId === payment.id ? 'Preparing…' : 'Print receipt'}
+                    <button type="button" className="fin-btn" disabled={printingIds.has(payment.id)} onClick={() => void printReceipt(payment)}>
+                      {printingIds.has(payment.id) ? 'Preparing…' : 'Print receipt'}
                     </button>
                   </td>
                 </tr>
@@ -136,13 +140,16 @@ function InvoicePickerModal({ accessToken, onPick, onClose }: {
     [accessToken, student],
   )
 
-  const runSearch = (value: string) => {
-    setStudentQuery(value)
-    if (value.trim().length < 2) { setOptions([]); return }
-    searchStudents(accessToken, value.trim())
-      .then((pageData) => setOptions(pageData.items))
-      .catch(() => setOptions([]))
-  }
+  useEffect(() => {
+    if (studentQuery.trim().length < 2) { setOptions([]); return }
+    const controller = new AbortController()
+    const timer = setTimeout(() => {
+      searchStudents(accessToken, studentQuery.trim(), controller.signal)
+        .then((pageData) => setOptions(pageData.items))
+        .catch(() => { if (!controller.signal.aborted) setOptions([]) })
+    }, 250)
+    return () => { clearTimeout(timer); controller.abort() }
+  }, [accessToken, studentQuery])
 
   return (
     <div className="fin-modal-backdrop" role="dialog" aria-modal="true">
@@ -154,7 +161,7 @@ function InvoicePickerModal({ accessToken, onPick, onClose }: {
               autoFocus
               value={studentQuery}
               placeholder="Search student by name or admission number"
-              onChange={(event) => runSearch(event.target.value)}
+              onChange={(event) => setStudentQuery(event.target.value)}
             />
             {options.map((option) => (
               <button key={option.id} type="button" className="fin-btn" onClick={() => { setStudent(option); setOptions([]) }}>
