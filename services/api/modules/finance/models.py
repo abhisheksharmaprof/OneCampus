@@ -44,6 +44,13 @@ class InvoiceTemplate(TimeStampedModel):
 
     class Meta:
         ordering = ("name",)
+        constraints = [
+            models.UniqueConstraint(
+                fields=("institute", "kind"),
+                condition=Q(is_default=True),
+                name="uq_default_template_per_kind",
+            )
+        ]
         indexes = [models.Index(fields=("institute", "kind"))]
 
 

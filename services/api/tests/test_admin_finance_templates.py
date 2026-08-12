@@ -91,3 +91,28 @@ def test_delete_blocked_for_default_template_and_foreign_access(api_client):
     assert delete_default.status_code == 400
     assert delete_extra.status_code == 204
     assert delete_foreign.status_code == 404
+
+
+@pytest.mark.django_db
+def test_layout_must_be_object_and_default_kind_locked(api_client):
+    institute, token = make_admin(api_client)
+    api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
+    api_client.get("/api/v1/admin/fees/templates")  # seed
+    default = InvoiceTemplate.objects.get(
+        institute=institute, kind="INVOICE", is_default=True
+    )
+
+    bad_layout = api_client.post(
+        "/api/v1/admin/fees/templates",
+        {"name": "Bad", "kind": "INVOICE", "layout": ["not", "a", "dict"]},
+        format="json",
+    )
+    kind_change = api_client.patch(
+        f"/api/v1/admin/fees/templates/{default.id}", {"kind": "RECEIPT"}, format="json"
+    )
+
+    assert bad_layout.status_code == 400
+    assert kind_change.status_code == 400
+    assert InvoiceTemplate.objects.filter(
+        institute=institute, kind="INVOICE", is_default=True
+    ).count() == 1

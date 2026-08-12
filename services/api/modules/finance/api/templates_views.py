@@ -1,4 +1,6 @@
-from django.db import transaction
+import json
+
+from django.db import IntegrityError, transaction
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema
 from rest_framework import serializers, status
@@ -96,15 +98,21 @@ PRESETS = [
 def seed_presets(request):
     if InvoiceTemplate.objects.filter(institute=request.institute).exists():
         return
-    for preset in PRESETS:
-        InvoiceTemplate.objects.create(
-            institute=request.institute,
-            name=preset["name"],
-            kind=preset["kind"],
-            layout=preset["layout"],
-            is_default=preset["is_default"],
-            created_by=request.user,
-        )
+    try:
+        with transaction.atomic():
+            for preset in PRESETS:
+                InvoiceTemplate.objects.create(
+                    institute=request.institute,
+                    name=preset["name"],
+                    kind=preset["kind"],
+                    layout=preset["layout"],
+                    is_default=preset["is_default"],
+                    created_by=request.user,
+                )
+    except IntegrityError:
+        # A concurrent request seeded first; the constraint on default
+        # templates rejects the duplicate seed — nothing to do.
+        pass
 
 
 class TemplateSerializer(serializers.ModelSerializer):
@@ -125,6 +133,8 @@ class TemplateWriteSerializer(serializers.Serializer):
     def validate_layout(self, value):
         if not isinstance(value, dict):
             raise serializers.ValidationError("Layout must be an object.")
+        if len(json.dumps(value)) > 65536:
+            raise serializers.ValidationError("Layout is too large (max 64 KB).")
         return value
 
 
@@ -212,6 +222,16 @@ class InvoiceTemplateDetailView(APIView):
                 id=template_id,
                 institute=request.institute,
             )
+            new_kind = values.get("kind", template.kind)
+            if new_kind != template.kind and template.is_default:
+                raise serializers.ValidationError(
+                    {
+                        "kind": [
+                            "The default template's kind cannot be changed. "
+                            "Set another default for its kind first."
+                        ]
+                    }
+                )
             template.name = values.get("name", template.name)
             template.kind = values.get("kind", template.kind)
             template.layout = values.get("layout", template.layout)
@@ -229,16 +249,18 @@ class InvoiceTemplateDetailView(APIView):
         return Response({"success": True, "data": TemplateSerializer(template).data})
 
     def delete(self, request, template_id):
-        template = get_object_or_404(
-            InvoiceTemplate, id=template_id, institute=request.institute
-        )
-        if template.is_default:
-            raise serializers.ValidationError(
-                {"id": ["The default template cannot be deleted. Set another default first."]}
+        with transaction.atomic():
+            template = get_object_or_404(
+                InvoiceTemplate.objects.select_for_update(),
+                id=template_id,
+                institute=request.institute,
             )
-        name = template.name
-        template.invoices.update(template=None)
-        template.delete()
+            if template.is_default:
+                raise serializers.ValidationError(
+                    {"id": ["The default template cannot be deleted. Set another default first."]}
+                )
+            name = template.name
+            template.delete()
         audit_mutation(
             request=request,
             verb="Deleted",
