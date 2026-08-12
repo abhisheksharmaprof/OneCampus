@@ -156,15 +156,19 @@ export function listInvoices(accessToken: string, filters: InvoiceFilters, signa
   return adminRequest<PageData<Invoice>>(accessToken, `fees/invoices${query(filters)}`, { signal })
 }
 
-export function getInvoice(accessToken: string, invoiceId: string) {
-  return adminRequest<Invoice>(accessToken, `fees/invoices/${invoiceId}`)
+export function getInvoice(accessToken: string, invoiceId: string, signal?: AbortSignal) {
+  return adminRequest<Invoice>(accessToken, `fees/invoices/${invoiceId}`, { signal })
 }
 
 export function createInvoice(accessToken: string, body: InvoiceWrite) {
   return adminRequest<Invoice>(accessToken, 'fees/invoices', { method: 'POST', body: JSON.stringify(body) })
 }
 
-export function patchInvoice(accessToken: string, invoiceId: string, body: Partial<InvoiceWrite> & { status?: InvoiceStatus }) {
+export function patchInvoice(
+  accessToken: string,
+  invoiceId: string,
+  body: Omit<Partial<InvoiceWrite>, 'status'> & { status?: 'DRAFT' | 'ISSUED' | 'CANCELLED' },
+) {
   return adminRequest<Invoice>(accessToken, `fees/invoices/${invoiceId}`, { method: 'PATCH', body: JSON.stringify(body) })
 }
 
@@ -216,7 +220,9 @@ export function fetchSummary(accessToken: string, branchId?: string, signal?: Ab
 export function listFeePlans(accessToken: string, includeInactive = false, signal?: AbortSignal) {
   return adminRequest<PageData<FeePlan>>(
     accessToken,
-    `fees/plans${query({ includeInactive: includeInactive ? 'true' : '', pageSize: 100 })}`,
+    // pageSize: 100 is a deliberate bound — fee plans are a small, curated list per institute;
+    // callers needing more would need real pagination, not a higher cap.
+    `fees/plans${query({ includeInactive: includeInactive ? 'true' : undefined, pageSize: 100 })}`,
     { signal },
   )
 }
@@ -234,6 +240,7 @@ export function deleteFeePlan(accessToken: string, planId: string) {
 }
 
 export function listTemplates(accessToken: string, kind?: TemplateKind, signal?: AbortSignal) {
+  // pageSize: 100 is a deliberate bound — invoice/receipt templates are a small, curated set.
   return adminRequest<PageData<TemplateRecord>>(accessToken, `fees/templates${query({ kind, pageSize: 100 })}`, { signal })
 }
 
@@ -273,7 +280,7 @@ export function patchFinanceSettings(accessToken: string, body: Partial<FinanceS
  * existing usage in apps/institute-admin-web/src/features/institute/BrandingPage.tsx.
  */
 export function fetchInstituteBranding(accessToken: string, signal?: AbortSignal) {
-  return adminRequest<InstituteBranding & Record<string, unknown>>(accessToken, 'institute', { signal })
+  return adminRequest<InstituteBranding>(accessToken, 'institute', { signal })
 }
 
 /**
@@ -298,5 +305,7 @@ export function searchStudents(accessToken: string, search: string, signal?: Abo
 export type GradeOption = { id: string; name: string }
 
 export function listGrades(accessToken: string, signal?: AbortSignal) {
+  // pageSize: 100 is a deliberate bound — the number of grades/classes at an institute is small
+  // and finite (not paginated in the UI).
   return adminRequest<PageData<GradeOption>>(accessToken, `academics/classes${query({ pageSize: 100 })}`, { signal })
 }
