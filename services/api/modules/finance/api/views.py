@@ -397,6 +397,8 @@ class PaymentWriteSerializer(serializers.Serializer):
 class PaymentFilterSerializer(serializers.Serializer):
     invoiceId = serializers.UUIDField(required=False)
     studentId = serializers.UUIDField(required=False)
+    branchId = serializers.UUIDField(required=False)
+    method = serializers.ChoiceField(choices=FeePayment.Method.choices, required=False)
     dateFrom = serializers.DateField(required=False)
     dateTo = serializers.DateField(required=False)
 
@@ -412,7 +414,7 @@ class FeePaymentListCreateView(APIView):
         payments = FeePayment.objects.filter(institute=request.institute).select_related(
             "invoice__student"
         )
-        branch_id = request.query_params.get("branchId")
+        branch_id = filters.get("branchId")
         if branch_id:
             get_object_or_404(Branch, id=branch_id, institute=request.institute, is_active=True)
             payments = payments.filter(invoice__branch_id=branch_id)
@@ -420,9 +422,8 @@ class FeePaymentListCreateView(APIView):
             payments = payments.filter(invoice_id=filters["invoiceId"])
         if filters.get("studentId"):
             payments = payments.filter(invoice__student_id=filters["studentId"])
-        method = request.query_params.get("method", "").strip().upper()
-        if method in FeePayment.Method.values:
-            payments = payments.filter(method=method)
+        if filters.get("method"):
+            payments = payments.filter(method=filters["method"])
         if filters.get("dateFrom"):
             payments = payments.filter(paid_at__date__gte=filters["dateFrom"])
         if filters.get("dateTo"):

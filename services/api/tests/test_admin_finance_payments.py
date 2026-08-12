@@ -126,3 +126,15 @@ def test_payment_list_filters_and_tenant_isolation(api_client):
     assert upi_only.json()["data"]["items"] == []
     assert len(by_invoice.json()["data"]["items"]) == 1
     assert foreign_payment.status_code == 404
+
+
+@pytest.mark.django_db
+def test_payment_list_rejects_malformed_filters(api_client):
+    institute, branch, token = make_admin(api_client)
+    api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
+
+    bad_branch = api_client.get("/api/v1/admin/fees/payments?branchId=not-a-uuid")
+    bad_method = api_client.get("/api/v1/admin/fees/payments?method=PAYPAL")
+
+    assert bad_branch.status_code == 400
+    assert bad_method.status_code == 400
