@@ -313,7 +313,7 @@ describe('Institute Admin dashboard', () => {
     expect(screen.getByRole('button', { name: /new invoice/i })).toBeInTheDocument()
 
     await userEvent.click(within(financeNav).getByRole('button', { name: /payments & receipts/i }))
-    expect(await screen.findByText('Coming in a later task.')).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: /record payment/i })).toBeInTheDocument()
   })
 
   it('restores the staff screen with API-backed staff accounts', async () => {
