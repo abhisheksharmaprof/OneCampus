@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { buildDocumentModel, renderDocumentHtml, resolveLayout } from './invoiceRender'
-import type { Invoice } from './finance.api'
+import type { Invoice, Payment } from './finance.api'
 
 const invoice: Invoice = {
   id: 'inv-1',
@@ -26,6 +26,12 @@ const invoice: Invoice = {
 }
 
 const branding = { name: 'Northstar Academy', logoUrl: null, brandColor: '#143f5c' }
+
+const payment: Payment = {
+  id: 'pay-1', receiptNumber: 'RCP-2026-0001', invoiceId: 'inv-1', invoiceNumber: 'INV-2026-0001',
+  studentId: 's-1', studentName: 'Diya', admissionNumber: 'NSA-0001',
+  amount: '5100.00', method: 'CASH', reference: '', remarks: '', paidAt: '2026-08-12T10:00:00Z',
+}
 
 describe('invoiceRender', () => {
   it('escapes every interpolated value', () => {
@@ -78,5 +84,13 @@ describe('invoiceRender', () => {
     const html = renderDocumentHtml(buildDocumentModel({ invoice, branding }), layout)
     expect(html).not.toContain('onmouseover')
     expect(html).toContain('width:100%')
+  })
+
+  it('renders the receipt path with payment method and receipt number', () => {
+    const layout = resolveLayout({ header: { title: 'FEE RECEIPT', fields: ['{{receipt_no}}'] } })
+    const html = renderDocumentHtml(buildDocumentModel({ invoice, branding, payment }), layout)
+    expect(html).toContain('RCP-2026-0001')
+    expect(html).toContain('Amount received (CASH)')
+    expect(html).toContain('2026-08-12')
   })
 })

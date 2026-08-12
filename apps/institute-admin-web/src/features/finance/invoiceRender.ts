@@ -7,9 +7,11 @@ export function escapeHtml(value: string): string {
   ))
 }
 
-const money = (value: string | number) =>
-  new Intl.NumberFormat('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-    .format(typeof value === 'number' ? value : Number(value || 0))
+const money = (value: string | number) => {
+  const num = typeof value === 'number' ? value : Number(value || 0)
+  return new Intl.NumberFormat('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    .format(Number.isFinite(num) ? num : 0)
+}
 
 export const DEFAULT_LAYOUT: TemplateLayout = {
   branding: { mode: 'institute', name: '', address: '', phone: '', email: '', logoUrl: '', primary: '#143f5c', accent: '#16a085' },
@@ -44,6 +46,8 @@ export function resolveLayout(layout: StoredLayout | null | undefined): Template
     header: { ...DEFAULT_LAYOUT.header, ...stored.header },
     computed: { ...DEFAULT_LAYOUT.computed, ...stored.computed },
     footer: { ...DEFAULT_LAYOUT.footer, ...stored.footer },
+    // Deliberate asymmetry vs. header.fields: an empty columns array would render an unusable
+    // table with no cells at all, so we fall back to the defaults instead of respecting `[]`.
     columns: stored.columns?.length ? stored.columns : DEFAULT_LAYOUT.columns,
   }
 }
@@ -68,8 +72,9 @@ export function buildDocumentModel(options: {
   branding: InstituteBranding
   payment?: Payment
   academicYear?: string
+  instituteAddress?: string
 }): DocumentModel {
-  const { invoice, branding, payment, academicYear } = options
+  const { invoice, branding, payment, academicYear, instituteAddress } = options
   return {
     kind: payment ? 'receipt' : 'invoice',
     placeholders: {
@@ -82,7 +87,7 @@ export function buildDocumentModel(options: {
       due_date: invoice.dueDate,
       academic_year: academicYear ?? '',
       institute_name: branding.name,
-      institute_address: '',
+      institute_address: instituteAddress ?? '',
     },
     lineItems: invoice.lineItems,
     subtotal: invoice.subtotal,
