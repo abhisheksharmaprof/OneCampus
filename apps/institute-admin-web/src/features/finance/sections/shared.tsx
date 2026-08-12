@@ -12,6 +12,7 @@ export function errorMessage(error: unknown): string {
   return 'Something went wrong while loading data.'
 }
 
+// deps must list every value `loader` closes over — ESLint can't check this here (exhaustive-deps is disabled below because it can't see inside the closure).
 /** Standard loader: AbortController + revision counter, matching the app-wide pattern. */
 export function useAbortableLoad<T>(
   loader: (signal: AbortSignal) => Promise<T>,
@@ -35,7 +36,7 @@ export function useAbortableLoad<T>(
         setLoading(false)
       })
     return () => controller.abort()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- set-state-in-effect here matches the app-wide convention (e.g. StudentsPage.tsx); known, pre-existing lint debt, not something to "fix" in isolation.
   }, [...deps, revision])
 
   return { data, loading, error, reload }
