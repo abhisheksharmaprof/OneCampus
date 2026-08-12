@@ -52,4 +52,12 @@
 .fin-gallery__item { padding: 12px; border: 1px solid #e4e7ec; border-radius: 10px; background: #fff; text-align: left; cursor: pointer; }
 .fin-gallery__item.is-active { border-color: #1d4ed8; box-shadow: 0 0 0 1px #1d4ed8; }
 .fin-field-error { color: #b42318; font-size: 12px; }
+.fin-plans-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+.fin-plan-card { display: flex; flex-direction: column; gap: 6px; }
+.fin-plan-card__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.fin-plan-card__head h4 { margin: 0; }
+.fin-plan-card__items { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+.fin-plan-card__items li { display: flex; justify-content: space-between; gap: 8px; }
+.fin-plan-card__total { margin-top: 4px; }
+.fin-row--plan { grid-template-columns: 1fr 110px 110px 32px; }
 @media (max-width: 1100px) { .fin-editor, .fin-gallery { grid-template-columns: 1fr; } .fin-editor__preview { position: static; height: 480px; } }
