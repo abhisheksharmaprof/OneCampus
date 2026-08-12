@@ -23,7 +23,7 @@ from modules.attendance.api.views import (
 from modules.finance.api.views import (
     FeeInvoiceDetailView,
     FeeInvoiceListCreateView,
-    FeePaymentCreateView,
+    FeePaymentListCreateView,
     FinanceRecordListCreateView,
 )
 from modules.people.api.parents import ParentListCreateView, ParentStudentLinkView
@@ -88,7 +88,7 @@ urlpatterns = [
         FeeInvoiceDetailView.as_view(),
         name="admin-fee-invoice-detail",
     ),
-    path("fees/payments", FeePaymentCreateView.as_view(), name="admin-fee-payments"),
+    path("fees/payments", FeePaymentListCreateView.as_view(), name="admin-fee-payments"),
     path("finance/records", FinanceRecordListCreateView.as_view(), name="admin-finance-records"),
     path("calendar/events", CalendarEventListCreateView.as_view(), name="admin-calendar-events"),
     path("institute", CurrentInstituteView.as_view(), name="admin-current-institute"),

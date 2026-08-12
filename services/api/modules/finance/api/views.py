@@ -10,7 +10,7 @@ from rest_framework.views import APIView
 
 from modules.academics.models import StudentEnrollment
 from modules.finance.models import FeeInvoice, FeePayment, FinanceRecord, InvoiceTemplate
-from modules.finance.services import compute_totals, next_document_number
+from modules.finance.services import compute_totals, next_document_number, resolve_status
 from modules.institutes.api.permissions import IsCurrentInstituteAdmin
 from modules.institutes.models import Branch
 from modules.people.models import Student
@@ -355,50 +355,149 @@ class FeeInvoiceDetailView(APIView):
         return Response({"success": True, "data": InvoiceSerializer(fresh).data})
 
 
+class PaymentSerializer(serializers.ModelSerializer):
+    receiptNumber = serializers.CharField(source="receipt_number", read_only=True)
+    invoiceId = serializers.UUIDField(source="invoice_id", read_only=True)
+    invoiceNumber = serializers.CharField(source="invoice.invoice_number", read_only=True)
+    studentId = serializers.UUIDField(source="invoice.student_id", read_only=True)
+    studentName = serializers.SerializerMethodField()
+    admissionNumber = serializers.CharField(
+        source="invoice.student.admission_number", read_only=True
+    )
+    paidAt = serializers.DateTimeField(source="paid_at", read_only=True)
+
+    class Meta:
+        model = FeePayment
+        fields = (
+            "id", "receiptNumber", "invoiceId", "invoiceNumber", "studentId",
+            "studentName", "admissionNumber", "amount", "method", "reference",
+            "remarks", "paidAt",
+        )
+
+    def get_studentName(self, payment) -> str:
+        return payment.invoice.student.full_name
+
+
 class PaymentWriteSerializer(serializers.Serializer):
     invoiceId = serializers.UUIDField()
-    amount = serializers.DecimalField(max_digits=12, decimal_places=2, min_value=Decimal("0.01"))
+    amount = serializers.DecimalField(
+        max_digits=12, decimal_places=2, min_value=Decimal("0.01")
+    )
+    method = serializers.ChoiceField(
+        choices=FeePayment.Method.choices, default=FeePayment.Method.CASH
+    )
+    reference = serializers.CharField(
+        required=False, allow_blank=True, default="", max_length=120
+    )
+    remarks = serializers.CharField(
+        required=False, allow_blank=True, default="", max_length=2000
+    )
 
 
-class FeePaymentCreateView(APIView):
+class PaymentFilterSerializer(serializers.Serializer):
+    invoiceId = serializers.UUIDField(required=False)
+    studentId = serializers.UUIDField(required=False)
+    dateFrom = serializers.DateField(required=False)
+    dateTo = serializers.DateField(required=False)
+
+
+class FeePaymentListCreateView(APIView):
     permission_classes = (IsCurrentInstituteAdmin,)
 
-    @extend_schema(request=PaymentWriteSerializer, responses={status.HTTP_201_CREATED: dict})
-    def post(self, request):
-        serializer = PaymentWriteSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        with transaction.atomic():
-            invoice = get_object_or_404(
-                FeeInvoice.objects.select_for_update(),
-                id=serializer.validated_data["invoiceId"],
-                institute=request.institute,
-            )
-            amount_paid = invoice.payments.aggregate(total=Sum("amount"))["total"] or Decimal(
-                "0.00"
-            )
-            amount = serializer.validated_data["amount"]
-            if amount > invoice.amount - amount_paid:
-                raise serializers.ValidationError(
-                    {"amount": ["Payment exceeds the outstanding balance."]}
-                )
-            payment = FeePayment.objects.create(invoice=invoice, amount=amount)
-        audit_mutation(
-            request=request,
-            verb="PAYMENT",
-            target_label=f"fee payment of {amount} for invoice {invoice.id}",
-            target_type="fee_payment",
-            target_id=payment.id,
-            extra_meta={"amount": str(amount), "invoiceId": str(invoice.id)},
+    @extend_schema(responses={status.HTTP_200_OK: PaymentSerializer(many=True)})
+    def get(self, request):
+        filter_serializer = PaymentFilterSerializer(data=request.query_params)
+        filter_serializer.is_valid(raise_exception=True)
+        filters = filter_serializer.validated_data
+        payments = FeePayment.objects.filter(institute=request.institute).select_related(
+            "invoice__student"
         )
+        branch_id = request.query_params.get("branchId")
+        if branch_id:
+            get_object_or_404(Branch, id=branch_id, institute=request.institute, is_active=True)
+            payments = payments.filter(invoice__branch_id=branch_id)
+        if filters.get("invoiceId"):
+            payments = payments.filter(invoice_id=filters["invoiceId"])
+        if filters.get("studentId"):
+            payments = payments.filter(invoice__student_id=filters["studentId"])
+        method = request.query_params.get("method", "").strip().upper()
+        if method in FeePayment.Method.values:
+            payments = payments.filter(method=method)
+        if filters.get("dateFrom"):
+            payments = payments.filter(paid_at__date__gte=filters["dateFrom"])
+        if filters.get("dateTo"):
+            payments = payments.filter(paid_at__date__lte=filters["dateTo"])
+        search = request.query_params.get("search", "").strip()
+        if search:
+            payments = payments.filter(
+                Q(invoice__student__first_name__icontains=search)
+                | Q(invoice__student__last_name__icontains=search)
+                | Q(receipt_number__icontains=search)
+                | Q(invoice__invoice_number__icontains=search)
+            )
         return Response(
             {
                 "success": True,
-                "data": {
-                    "id": str(payment.id),
-                    "amount": str(payment.amount),
-                    "invoiceId": str(invoice.id),
-                },
+                "data": paginate_admin_queryset(
+                    request=request, queryset=payments, serializer_class=PaymentSerializer
+                ),
+            }
+        )
+
+    @extend_schema(request=PaymentWriteSerializer, responses={status.HTTP_201_CREATED: PaymentSerializer})
+    def post(self, request):
+        serializer = PaymentWriteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        values = serializer.validated_data
+        with transaction.atomic():
+            invoice = get_object_or_404(
+                FeeInvoice.objects.select_for_update(),
+                id=values["invoiceId"],
+                institute=request.institute,
+            )
+            if invoice.status in (FeeInvoice.Status.DRAFT, FeeInvoice.Status.CANCELLED):
+                raise serializers.ValidationError(
+                    {"invoiceId": ["Payments can only be recorded against issued invoices."]}
+                )
+            amount_paid = invoice.payments.aggregate(total=Sum("amount"))["total"] or Decimal(
+                "0.00"
+            )
+            amount = values["amount"]
+            if amount > invoice.total - amount_paid:
+                raise serializers.ValidationError(
+                    {"amount": ["Payment exceeds the outstanding balance."]}
+                )
+            payment = FeePayment.objects.create(
+                institute=request.institute,
+                invoice=invoice,
+                amount=amount,
+                receipt_number=next_document_number(institute=request.institute, kind="receipt"),
+                method=values["method"],
+                reference=values["reference"],
+                remarks=values["remarks"],
+            )
+            invoice.status = resolve_status(invoice=invoice, paid_total=amount_paid + amount)
+            invoice.save(update_fields=("status", "updated_at"))
+        audit_mutation(
+            request=request,
+            verb="PAYMENT",
+            target_label=(
+                f"fee payment {payment.receipt_number} of {amount} "
+                f"for invoice {invoice.invoice_number}"
+            ),
+            target_type="fee_payment",
+            target_id=payment.id,
+            extra_meta={
+                "receiptNumber": payment.receipt_number,
+                "amount": str(amount),
+                "method": payment.method,
+                "invoiceId": str(invoice.id),
+                "invoiceNumber": invoice.invoice_number,
+                "invoiceStatus": invoice.status,
             },
+        )
+        return Response(
+            {"success": True, "data": PaymentSerializer(payment).data},
             status=status.HTTP_201_CREATED,
         )
 
