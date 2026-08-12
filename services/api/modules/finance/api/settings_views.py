@@ -68,19 +68,20 @@ class FinanceSettingsView(APIView):
         serializer = FinanceSettingsWriteSerializer(data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         settings, _ = FinanceSettings.objects.get_or_create(institute=request.institute)
-        changed = []
+        changed, changed_camel = [], []
         for camel, snake in FIELD_MAP.items():
             if camel in serializer.validated_data:
                 setattr(settings, snake, serializer.validated_data[camel])
                 changed.append(snake)
+                changed_camel.append(camel)
         if changed:
             settings.save(update_fields=(*changed, "updated_at"))
-        audit_mutation(
-            request=request,
-            verb="Updated",
-            target_label="finance settings",
-            target_type="finance_settings",
-            target_id=settings.id,
-            extra_meta={"changedFields": changed},
-        )
+            audit_mutation(
+                request=request,
+                verb="Updated",
+                target_label="finance settings",
+                target_type="finance_settings",
+                target_id=settings.id,
+                extra_meta={"changedFields": changed_camel},
+            )
         return Response({"success": True, "data": FinanceSettingsSerializer(settings).data})

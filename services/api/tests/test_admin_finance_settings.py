@@ -1,5 +1,6 @@
 import pytest
 
+from modules.finance.models import FinanceSettings
 from modules.identity.models import User
 from modules.institutes.models import Branch, Institute, InstituteMembership
 from platform_core.models import AuditEvent
@@ -51,3 +52,9 @@ def test_settings_get_creates_defaults_and_patch_updates(api_client):
     assert AuditEvent.objects.filter(
         institute=institute, target_type="finance_settings"
     ).exists()
+    assert "invoiceSequence" not in initial.json()["data"]
+    tamper = api_client.patch(
+        "/api/v1/admin/finance/settings", {"invoiceSequence": 999}, format="json"
+    )
+    assert tamper.status_code == 200
+    assert FinanceSettings.objects.get(institute=institute).invoice_sequence == 0
