@@ -113,9 +113,9 @@ export function buildDocumentModel(options: {
   }
 }
 
-/** Replace {{token}} placeholders with escaped values; unknown tokens become ''. */
+/** Escape the whole string, then replace {{token}} placeholders with escaped values; unknown tokens become ''. */
 function substitute(text: string, placeholders: Record<string, string>): string {
-  return text.replace(/\{\{\s*([a-z_]+)\s*\}\}/g, (_match, token: string) =>
+  return escapeHtml(text).replace(/\{\{\s*([a-z_]+)\s*\}\}/g, (_match, token: string) =>
     escapeHtml(placeholders[token] ?? ''),
   )
 }
@@ -129,6 +129,9 @@ function cellValue(columnId: string, item: DocumentModel['lineItems'][number]): 
     default: return '—'
   }
 }
+
+const safeAlign = (value: string) => (['left', 'center', 'right'].includes(value) ? value : 'left')
+const safeWidth = (value: number) => (Number.isFinite(value) ? Math.min(Math.max(Number(value), 1), 100) : 20)
 
 export function renderDocumentHtml(model: DocumentModel, layout: TemplateLayout): string {
   const useInstitute = layout.branding.mode === 'institute'
@@ -149,7 +152,7 @@ export function renderDocumentHtml(model: DocumentModel, layout: TemplateLayout)
 
   const rows = model.lineItems
     .map((item) => `<tr>${columns
-      .map((column) => `<td style="text-align:${column.align}">${cellValue(column.id, item)}</td>`)
+      .map((column) => `<td style="text-align:${safeAlign(column.align)}">${cellValue(column.id, item)}</td>`)
       .join('')}</tr>`)
     .join('')
 
@@ -209,7 +212,7 @@ footer{position:absolute;bottom:17mm;left:18mm;right:18mm;padding-top:12px;borde
   }</div></div>
 <div class="doc"><h2>${substitute(layout.header.title, model.placeholders)}</h2><strong>#${escapeHtml(documentNumber)}</strong>${headerMeta}<p>${escapeHtml(documentDate)}</p></div></header>
 ${layout.showStudentDetails ? `<section class="details"><div><b>Bill to</b><span><strong>${escapeHtml(model.student.name)}</strong></span><span>${escapeHtml(model.student.admissionNumber)}${model.student.className ? ` · ${escapeHtml(model.student.className)}` : ''}</span></div><div><b>Payment details</b><span>Due date: ${escapeHtml(model.placeholders.due_date)}</span><span class="status">${escapeHtml(model.status.replace('_', ' '))}</span></div></section>` : ''}
-<table><thead><tr>${columns.map((column) => `<th style="width:${column.width}%;text-align:${column.align}">${escapeHtml(column.label)}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table>
+<table><thead><tr>${columns.map((column) => `<th style="width:${safeWidth(column.width)}%;text-align:${safeAlign(column.align)}">${escapeHtml(column.label)}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table>
 <section class="summary">${computedRows.join('')}</section>
 ${layout.footer.showSignature ? '<div class="signature">Authorised signature</div>' : ''}
 <footer>${escapeHtml(layout.footer.note)}</footer>

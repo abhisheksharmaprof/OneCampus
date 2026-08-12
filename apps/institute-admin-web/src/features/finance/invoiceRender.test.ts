@@ -62,4 +62,21 @@ describe('invoiceRender', () => {
     const html = renderDocumentHtml(buildDocumentModel({ invoice, branding }), layout)
     expect(html).not.toContain('{{bogus_token}}')
   })
+
+  it('escapes literal text around placeholder tokens', () => {
+    const layout = resolveLayout({ header: { title: '<img src=x onerror=alert(1)> {{invoice_no}}', fields: [] } })
+    const html = renderDocumentHtml(buildDocumentModel({ invoice, branding }), layout)
+    expect(html).not.toContain('<img src=x')
+    expect(html).toContain('&lt;img src=x')
+    expect(html).toContain('INV-2026-0001')
+  })
+
+  it('sanitizes column align and width from stored layout', () => {
+    const layout = resolveLayout({
+      columns: [{ id: 'description', label: 'Desc', width: 9999, align: 'left" onmouseover="alert(1)' as never, enabled: true }],
+    })
+    const html = renderDocumentHtml(buildDocumentModel({ invoice, branding }), layout)
+    expect(html).not.toContain('onmouseover')
+    expect(html).toContain('width:100%')
+  })
 })
