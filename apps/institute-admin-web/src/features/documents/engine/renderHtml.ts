@@ -32,7 +32,7 @@ export const safePct = (value: number): number =>
 
 const formatNumber = (value: unknown): string => {
   const num = Number(value)
-  if (!Number.isFinite(num)) return String(value ?? '')
+  if (!Number.isFinite(num)) return escapeHtml(String(value ?? ''))
   return num.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 

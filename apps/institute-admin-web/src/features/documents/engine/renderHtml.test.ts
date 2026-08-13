@@ -67,4 +67,26 @@ describe('renderElementInner', () => {
     withUrl.data.qrDataUrls = { q1: 'data:image/png;base64,AAA' }
     expect(renderElementInner(qr, withUrl)).toContain('<img')
   })
+
+  it('escapes string-valued formula results in table cells and totals rows', () => {
+    const table: TableElement = {
+      id: 't2', type: 'table', x: 0, y: 0, w: 190, h: 60, datasetId: 'fee_items',
+      columns: [
+        ...FEE_ITEMS_DATASET.columns,
+        { id: 'c9', label: 'Danger', type: 'formula', formula: '=IF([Qty]>0,"<img src=x onerror=alert(1)>","safe")', widthPct: 10, align: 'left' },
+      ],
+      style: { headerBg: '#173A5E', headerColor: '#FFFFFF', fontSize: 10 },
+    }
+    const tableHtml = renderElementInner(table, ctx())
+    expect(tableHtml).not.toContain('<img src=x')
+    expect(tableHtml).toContain('&lt;img src=x')
+
+    const totals: TotalsElement = {
+      id: 'to2', type: 'totals', x: 0, y: 0, w: 70, h: 30, datasetId: 'fee_items',
+      rows: [{ id: 'r1', label: 'Evil', kind: 'formula', formula: '=IF(1>0,"<script>x</script>","ok")' }],
+    }
+    const totalsHtml = renderElementInner(totals, ctx())
+    expect(totalsHtml).not.toContain('<script>')
+    expect(totalsHtml).toContain('&lt;script&gt;')
+  })
 })
