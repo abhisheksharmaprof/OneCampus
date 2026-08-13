@@ -68,6 +68,26 @@ describe('renderDocumentHtml', () => {
     expect(html).toContain('&lt;script&gt;')
   })
 
+  it('coerces non-finite geometry to safe numbers', () => {
+    const attacker = text('t', 40, 'hi')
+    attacker.x = '0mm" onmouseover="alert(1)' as unknown as number
+    const layout = layoutWith([attacker])
+    const html = renderDocumentHtml({ layout, data: sampleDocumentData('FEE_INVOICE'), mode: 'print' })
+    expect(html).not.toContain('onmouseover')
+    expect(html).toContain('left:0mm')
+  })
+
+  it('renders all table rows when fontSize is non-finite', () => {
+    const tbl = table()
+    tbl.style.fontSize = NaN
+    const layout = layoutWith([tbl])
+    const data = sampleDocumentData('FEE_INVOICE')
+    const html = renderDocumentHtml({ layout, data, mode: 'print' })
+    for (const row of data.rows) {
+      expect(html).toContain(String(row.c1))
+    }
+  })
+
   it('renders two sheets for a CR80 two-page layout and a watermark when enabled', () => {
     const layout = defaultLayout('CR80', 2)
     layout.pages[0].elements = [text('f', 10, 'front')]

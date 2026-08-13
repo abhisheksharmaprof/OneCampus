@@ -5,9 +5,13 @@
 import { ELEMENT_CSS, escapeHtml, renderElementInner, safeColor, type RenderContext } from './renderHtml'
 import { PAGE_SIZES_MM, type CanvasElement, type DocumentData, type LayoutV2, type TableElement } from './types'
 
+/** Coerce untrusted geometry to a finite number before interpolating into CSS. */
+const mm = (n: unknown): number => (Number.isFinite(n) ? (n as number) : 0)
+
 /** Deterministic per-row height estimate in mm (fontSize is px). */
 export function tableRowMm(fontSizePx: number): number {
-  return fontSizePx * 0.35 + 3.2
+  const size = Number.isFinite(fontSizePx) ? fontSizePx : 10
+  return size * 0.35 + 3.2
 }
 
 export function tableRowsPerPage(fontSizePx: number, availableMm: number): number {
@@ -114,8 +118,8 @@ export function renderDocumentHtml({ layout, data, mode, sampleMode = true }: Re
     : `background-image:url('${escapeHtml(layout.page.background.imageUrl)}');background-size:cover`
   const watermark = layout.watermark.enabled
     ? (layout.watermark.mode === 'text'
-      ? `<div class="doc-watermark"><span style="opacity:${Math.min(Math.max(layout.watermark.opacity, 0.02), 0.4)}">${escapeHtml(layout.watermark.text)}</span></div>`
-      : `<div class="doc-watermark"><img src="${escapeHtml(layout.watermark.imageUrl)}" style="opacity:${Math.min(Math.max(layout.watermark.opacity * 4, 0.05), 0.6)}" alt="" /></div>`)
+      ? `<div class="doc-watermark"><span style="opacity:${Math.min(Math.max(mm(layout.watermark.opacity), 0.02), 0.4)}">${escapeHtml(layout.watermark.text)}</span></div>`
+      : `<div class="doc-watermark"><img src="${escapeHtml(layout.watermark.imageUrl)}" style="opacity:${Math.min(Math.max(mm(layout.watermark.opacity) * 4, 0.05), 0.6)}" alt="" /></div>`)
     : ''
 
   const sheets: string[] = []
@@ -126,7 +130,7 @@ export function renderDocumentHtml({ layout, data, mode, sampleMode = true }: Re
         const content = element.type === 'table' && plan.rowRange
           ? renderElementInner(element, { ...ctx, data: { ...data, rows: data.rows.slice(plan.rowRange[0], plan.rowRange[1]) } })
           : renderElementInner(element, ctx)
-        return `<div class="doc-el" style="left:${element.x}mm;top:${y}mm;width:${element.w}mm;${element.type === 'table' || element.type === 'totals' ? '' : `height:${element.h}mm;`}">${content}</div>`
+        return `<div class="doc-el" style="left:${mm(element.x)}mm;top:${mm(y)}mm;width:${mm(element.w)}mm;${element.type === 'table' || element.type === 'totals' ? '' : `height:${mm(element.h)}mm;`}">${content}</div>`
       }).join('')
       sheets.push(`<div class="doc-sheet" style="${background}">${watermark}${inner}</div>`)
     })
