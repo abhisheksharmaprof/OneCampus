@@ -3,14 +3,44 @@ from datetime import date
 import pytest
 from django.core.exceptions import ValidationError
 
-from modules.academics.models import AcademicYear, ClassSection, Grade
+from modules.academics.models import (
+    AcademicYear,
+    ClassSection,
+    Grade,
+    Subject,
+    SubjectTeacherAssignment,
+)
 from modules.academics.services import (
     AcademicsValidationError,
     create_enrollment,
     set_current_academic_year,
 )
+from modules.identity.models import User
 from modules.institutes.models import Branch, Institute
 from modules.people.models import Student
+
+
+def _build_assignment_fixtures():
+    institute = Institute.objects.create(name="Northstar Academy", code="NSA")
+    branch = Branch.objects.create(institute=institute, name="Main", code="MAIN")
+    grade = Grade.objects.create(institute=institute, name="Class 8")
+    year = AcademicYear.objects.create(
+        institute=institute,
+        name="2026-27",
+        start_date=date(2026, 4, 1),
+        end_date=date(2027, 3, 31),
+    )
+    section_a = ClassSection.objects.create(
+        branch=branch, grade=grade, academic_year=year, section_name="A"
+    )
+    section_b = ClassSection.objects.create(
+        branch=branch, grade=grade, academic_year=year, section_name="B"
+    )
+    subject = Subject.objects.create(institute=institute, name="French")
+    teacher = User.objects.create_user(
+        email="teacher@campusone.test", password="StrongPass123!"
+    )
+    return section_a, section_b, subject, teacher
 
 
 @pytest.mark.django_db
@@ -121,3 +151,26 @@ def test_enrollment_enforces_branch_consistency_and_capacity():
     with pytest.raises(AcademicsValidationError) as exc_info:
         create_enrollment(student=second, class_section=section, roll_number="2")
     assert "maximum strength" in str(exc_info.value.field_errors)
+
+
+@pytest.mark.django_db
+def test_assignment_supports_multiple_sections():
+    section_a, section_b, subject, teacher = _build_assignment_fixtures()
+
+    assignment = SubjectTeacherAssignment.objects.create(
+        subject=subject, teacher=teacher, combined_slot_label="Second Language"
+    )
+    assignment.class_sections.set([section_a, section_b])
+
+    assert assignment.class_sections.count() == 2
+    assert assignment.combined_slot_label == "Second Language"
+
+
+@pytest.mark.django_db
+def test_assignment_label_defaults_blank():
+    section_a, _section_b, subject, teacher = _build_assignment_fixtures()
+
+    assignment = SubjectTeacherAssignment.objects.create(subject=subject, teacher=teacher)
+    assignment.class_sections.set([section_a])
+
+    assert assignment.combined_slot_label == ""
