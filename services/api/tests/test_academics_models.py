@@ -174,3 +174,14 @@ def test_assignment_label_defaults_blank():
     assignment.class_sections.set([section_a])
 
     assert assignment.combined_slot_label == ""
+
+
+@pytest.mark.django_db
+def test_assignment_label_is_stripped_on_save():
+    _section_a, _section_b, subject, teacher = _build_assignment_fixtures()
+
+    assignment = SubjectTeacherAssignment.objects.create(
+        subject=subject, teacher=teacher, combined_slot_label="  Second Language  "
+    )
+
+    assert assignment.combined_slot_label == "Second Language"

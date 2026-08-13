@@ -16,10 +16,14 @@ def copy_sections_forward(apps, schema_editor):
 
 
 def copy_sections_backward(apps, schema_editor):
+    # Lossy for multi-section assignments (only one section is kept, the
+    # alphabetically first by section_name) and for zero-section rows (FK
+    # left NULL, which the restored NOT NULL constraint will reject).
     Assignment = apps.get_model("academics", "SubjectTeacherAssignment")
     for assignment in Assignment.objects.prefetch_related("class_sections"):
-        first = assignment.class_sections.first()
-        assignment.class_section_id = first.id if first else None
+        sections = list(assignment.class_sections.all())
+        sections.sort(key=lambda s: s.section_name)
+        assignment.class_section_id = sections[0].id if sections else None
         assignment.save(update_fields=["class_section"])
 
 

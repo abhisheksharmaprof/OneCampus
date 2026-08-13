@@ -312,7 +312,7 @@ class SubjectTeacherAssignment(TimeStampedModel):
         indexes = [models.Index(fields=("teacher",))]
 
     def save(self, *args, **kwargs):
-        self.combined_slot_label = self.combined_slot_label.strip()
+        self.combined_slot_label = (self.combined_slot_label or "").strip()
         self.full_clean()
         return super().save(*args, **kwargs)
 
