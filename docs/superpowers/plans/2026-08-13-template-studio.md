@@ -2163,28 +2163,34 @@ export function invoiceToDocumentData(
   branding: InstituteBranding,
   payment?: Payment,
 ): DocumentData {
+  const category: DocumentCategory = payment ? 'FEE_RECEIPT' : 'FEE_INVOICE'
+  // Blank-by-default: tokens a real document can't supply must NEVER fall back to
+  // sample values — fabricated data on a printed financial document.
+  const tokens: Record<string, string> = {}
+  for (const group of CATEGORY_CONFIG[category].tokenGroups) {
+    for (const field of group.fields) tokens[field] = ''
+  }
+  Object.assign(tokens, {
+    student_name: invoice.studentName,
+    student_id: invoice.admissionNumber,
+    class_section: invoice.className,
+    invoice_no: invoice.invoiceNumber,
+    invoice_date: invoice.issueDate ?? '',
+    due_date: invoice.dueDate,
+    payment_status: invoice.status.replace('_', ' '),
+    receipt_no: payment?.receiptNumber ?? '',
+    payment_method: payment?.method ?? '',
+    school_name: branding.name,
+  })
+  const rows = invoice.lineItems.map((item, index) => {
+    const qty = Number(item.qty) || 1
+    const rate = Number(item.amount) || 0
+    return { c1: item.description, c2: item.period, c3: qty, c4: rate, c6: qty * rate, id: `row${index}` }
+  })
   return {
-    category: payment ? 'FEE_RECEIPT' : 'FEE_INVOICE',
-    tokens: {
-      ...SAMPLE_TOKENS,
-      student_name: invoice.studentName,
-      student_id: invoice.admissionNumber,
-      class_section: invoice.className,
-      invoice_no: invoice.invoiceNumber,
-      invoice_date: invoice.issueDate ?? '',
-      due_date: invoice.dueDate,
-      payment_status: invoice.status.replace('_', ' '),
-      receipt_no: payment?.receiptNumber ?? '',
-      payment_method: payment?.method ?? '',
-      school_name: branding.name,
-      school_address: '',
-      school_gstin: '',
-    },
-    rows: invoice.lineItems.map((item, index) => ({
-      c1: item.description, c2: item.period, c3: item.qty, c4: Number(item.amount) || 0,
-      c6: (Number(item.amount) || 0) * (item.qty || 1),
-      id: `row${index}`,
-    })),
+    category,
+    tokens,
+    rows,
     images: { 'institute-logo': branding.logoUrl, 'student-photo': null, 'staff-photo': null },
     status: invoice.status,
   }
