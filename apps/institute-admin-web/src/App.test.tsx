@@ -405,4 +405,20 @@ describe('Institute Admin dashboard', () => {
     expect(localStorage.getItem('campusone.session')).toBeNull()
     expect(screen.queryByText(/access token expired|refresh token expired/i)).not.toBeInTheDocument()
   })
+
+  it('renders the public verify page from a QR fragment without a session', async () => {
+    const { encodePayload } = await import('./features/documents/engine/qrPayload')
+    const fragment = encodePayload({
+      v: 1, cat: 'FEE_INVOICE', num: 'INV-2026-0009', date: '2026-08-13',
+      inst: 'Northstar Academy', student: 'Diya Sharma · Grade 8-A',
+      items: [['Tuition fee', 15000]], totals: [['Grand total', 15000]], status: 'Pending',
+    })
+    localStorage.removeItem('campusone.session')
+    window.history.pushState({}, '', `/verify#${fragment}`)
+    render(<App />)
+
+    expect(await screen.findByText('Northstar Academy')).toBeInTheDocument()
+    expect(screen.getByText('#INV-2026-0009')).toBeInTheDocument()
+    expect(screen.getByText('Tuition fee')).toBeInTheDocument()
+  })
 })

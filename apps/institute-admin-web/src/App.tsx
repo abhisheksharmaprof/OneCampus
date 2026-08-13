@@ -33,6 +33,7 @@ import { StudentsPage } from './features/people/StudentsPage'
 import { ProfilePage } from './features/people/ProfilePages'
 import { AuditLogPage } from './features/audit/AuditLogPage'
 import TemplateStudioPage from './features/documents/TemplateStudioPage'
+import VerifyPage from './features/documents/verify/VerifyPage'
 
 import './styles/tokens.css'
 import './styles/global.css'
@@ -254,6 +255,9 @@ function RoutedApp() {
     }
     navigateWithBranch(dashboardDestinations[destination] ?? `/${destination.replace(/^\/+/, '')}`)
   }
+
+  // Public QR verification — renders purely from the URL fragment, no session required.
+  if (location.pathname === '/verify') return <VerifyPage />
 
   if (!session) {
     if (location.pathname !== '/login' && !isOnboardingRoute) {
