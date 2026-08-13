@@ -168,7 +168,7 @@ _RECEIPT_CORE = [
     _table(12, 62, 186, 30, "fee_items", [
         _col("c1", "Description", width=56),
         _col("c2", "Period", width=20),
-        _col("c4", "Amount", dtype="number", width=24, align="right"),
+        _col("c6", "Amount", dtype="number", width=24, align="right"),
     ]),
     _totals(128, 98, 70, 12, "fee_items", RECEIPT_TOTALS),
     _signature(150, 120, 48),

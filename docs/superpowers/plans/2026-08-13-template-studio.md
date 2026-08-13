@@ -951,7 +951,7 @@ _RECEIPT_CORE = [
     _table(12, 62, 186, 30, "fee_items", [
         _col("c1", "Description", width=56),
         _col("c2", "Period", width=20),
-        _col("c4", "Amount", dtype="number", width=24, align="right"),
+        _col("c6", "Amount", dtype="number", width=24, align="right"),
     ]),
     _totals(128, 98, 70, 12, "fee_items", RECEIPT_TOTALS),
     _signature(150, 120, 48),
@@ -2019,7 +2019,7 @@ describe('invoiceToDocumentData', () => {
     expect(data.tokens.invoice_no).toBe('INV-2026-0042')
     expect(data.tokens.student_name).toBe('Diya Sharma')
     expect(data.tokens.class_section).toBe('Class 8 A')
-    expect(data.rows[0]).toMatchObject({ c1: 'Tuition fee', c2: 'Term 1', c3: 2, c4: 1500.5 })
+    expect(data.rows[0]).toMatchObject({ c1: 'Tuition fee', c2: 'Term 1', c3: 2, c4: 1500.5, c6: 3001 })
     expect(data.images['institute-logo']).toBeNull()
   })
 })
@@ -2062,6 +2062,8 @@ const col = (id: string, label: string, extra: Partial<TableColumn> = {}): Table
   id, label, type: 'data', dtype: 'text', widthPct: 20, align: 'left', ...extra,
 })
 
+/** Data contract: c4 = per-unit rate; c6 = precomputed line total (rate × qty) —
+ *  receipt tables read c6 since they have no Qty/Rate columns to compute from. */
 export const FEE_ITEMS_DATASET: DatasetDef = {
   id: 'fee_items', label: 'Fee items',
   columns: [
@@ -2072,8 +2074,8 @@ export const FEE_ITEMS_DATASET: DatasetDef = {
     col('c5', 'Amount', { type: 'formula', formula: '=[Qty]*[Rate]', widthPct: 20, align: 'right' }),
   ],
   sampleRows: [
-    { c1: 'Tuition fee', c2: 'Term 1', c3: 1, c4: 15000 },
-    { c1: 'Transport fee', c2: 'Term 1', c3: 1, c4: 3000 },
+    { c1: 'Tuition fee', c2: 'Term 1', c3: 1, c4: 15000, c6: 15000 },
+    { c1: 'Transport fee', c2: 'Term 1', c3: 1, c4: 3000, c6: 3000 },
   ],
 }
 
@@ -2180,6 +2182,7 @@ export function invoiceToDocumentData(
     },
     rows: invoice.lineItems.map((item, index) => ({
       c1: item.description, c2: item.period, c3: item.qty, c4: Number(item.amount) || 0,
+      c6: (Number(item.amount) || 0) * (item.qty || 1),
       id: `row${index}`,
     })),
     images: { 'institute-logo': branding.logoUrl, 'student-photo': null, 'staff-photo': null },

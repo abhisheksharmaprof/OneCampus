@@ -31,7 +31,7 @@ describe('invoiceToDocumentData', () => {
     expect(data.tokens.invoice_no).toBe('INV-2026-0042')
     expect(data.tokens.student_name).toBe('Diya Sharma')
     expect(data.tokens.class_section).toBe('Class 8 A')
-    expect(data.rows[0]).toMatchObject({ c1: 'Tuition fee', c2: 'Term 1', c3: 2, c4: 1500.5 })
+    expect(data.rows[0]).toMatchObject({ c1: 'Tuition fee', c2: 'Term 1', c3: 2, c4: 1500.5, c6: 3001 })
     expect(data.images['institute-logo']).toBeNull()
   })
 })
