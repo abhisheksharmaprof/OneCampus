@@ -28,7 +28,9 @@ export function ComponentRail({ category, state, dispatch }: ComponentRailProps)
 
   const addToken = (token: string) => {
     if (selected?.type === 'text') {
+      // updateElement is transient — appending a token is a settled edit, so commit immediately.
       dispatch({ type: 'updateElement', id: selected.id, patch: { content: `${selected.content} {{${token}}}`.trim() } })
+      dispatch({ type: 'commit' })
       return
     }
     const element = defaultElement('text', category)

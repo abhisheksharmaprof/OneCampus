@@ -92,7 +92,7 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
         elements.map((element) => (element.id === action.id
           ? clampElement({ ...element, ...action.patch, id: element.id, type: element.type } as CanvasElement, state.layout)
           : element)))
-      return pushHistory(state, layout)
+      return { ...state, layout, dirty: true }
     }
     case 'moveElement': {
       const layout = mapElements(state.layout, state.activePage, (elements) =>
@@ -108,7 +108,12 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
           : element)))
       return { ...state, layout, dirty: true }
     }
-    case 'commit': return pushHistory(state, state.layout)
+    case 'commit': {
+      // No-op when nothing changed since the last snapshot — settle signals (blur,
+      // selection change) may fire on a clean state and must not push spurious steps.
+      if (JSON.stringify(state.layout) === state.history[state.historyIndex]) return state
+      return pushHistory(state, state.layout)
+    }
     case 'deleteElement': {
       const layout = mapElements(state.layout, state.activePage, (elements) =>
         elements.filter((element) => element.id !== action.id))
@@ -121,9 +126,9 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
       const layout = mapElements(state.layout, state.activePage, (elements) => [...elements, copy])
       return { ...pushHistory(state, layout), selectedId: copy.id }
     }
-    case 'setPage': return pushHistory(state, { ...state.layout, page: { ...state.layout.page, ...action.patch } })
-    case 'setZones': return pushHistory(state, { ...state.layout, zones: { ...state.layout.zones, ...action.patch } })
-    case 'setWatermark': return pushHistory(state, { ...state.layout, watermark: { ...state.layout.watermark, ...action.patch } })
+    case 'setPage': return { ...state, layout: { ...state.layout, page: { ...state.layout.page, ...action.patch } }, dirty: true }
+    case 'setZones': return { ...state, layout: { ...state.layout, zones: { ...state.layout.zones, ...action.patch } }, dirty: true }
+    case 'setWatermark': return { ...state, layout: { ...state.layout, watermark: { ...state.layout.watermark, ...action.patch } }, dirty: true }
     case 'undo': {
       if (state.historyIndex <= 0) return state
       const index = state.historyIndex - 1

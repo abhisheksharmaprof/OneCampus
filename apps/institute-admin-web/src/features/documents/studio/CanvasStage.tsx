@@ -101,7 +101,9 @@ export function CanvasStage({ state, dispatch, data }: CanvasStageProps) {
         && point.x >= element.x && point.x <= element.x + element.w
         && point.y >= element.y && point.y <= element.y + element.h)
       if (hit && hit.type === 'text') {
+        // updateElement is transient — a dropped token is a settled edit, so commit immediately.
         dispatch({ type: 'updateElement', id: hit.id, patch: { content: `${hit.content} {{${token}}}`.trim() } })
+        dispatch({ type: 'commit' })
       } else {
         const element = defaultElement('text', data.category)
         if (element.type === 'text') element.content = `{{${token}}}`
@@ -213,7 +215,9 @@ export function CanvasStage({ state, dispatch, data }: CanvasStageProps) {
                 autoFocus
                 defaultValue={element.content}
                 onBlur={(event) => {
+                  // updateElement is transient — inline-edit settles on blur, so commit on the same blur.
                   dispatch({ type: 'updateElement', id: element.id, patch: { content: event.target.value } })
+                  dispatch({ type: 'commit' })
                   setEditingId(null)
                 }}
               />

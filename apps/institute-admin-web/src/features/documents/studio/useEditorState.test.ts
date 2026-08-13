@@ -67,14 +67,31 @@ describe('editorReducer', () => {
     expect(texts[1].x).toBeCloseTo(texts[0].x + 4)
   })
 
-  it('page/zone/watermark edits commit; zoom and sampleMode do not', () => {
+  it('page/zone/watermark edits are transient until commit; zoom and sampleMode never enter history', () => {
     let state = loaded()
     const depth = state.history.length
     state = editorReducer(state, { type: 'setZones', patch: { headerMm: 30 } })
     expect(state.layout.zones.headerMm).toBe(30)
+    expect(state.history.length).toBe(depth)
+    state = editorReducer(state, { type: 'commit' })
     expect(state.history.length).toBe(depth + 1)
     state = editorReducer(state, { type: 'setZoom', zoom: 1.2 })
     state = editorReducer(state, { type: 'setSampleMode', on: false })
+    expect(state.history.length).toBe(depth + 1)
+  })
+
+  it('updateElement is transient until commit (properties-panel edits coalesce)', () => {
+    let state = loaded()
+    state = editorReducer(state, { type: 'addElement', element: defaultElement('text', 'FEE_INVOICE') })
+    const id = state.selectedId!
+    const depth = state.history.length
+    state = editorReducer(state, { type: 'updateElement', id, patch: { content: 'a' } })
+    state = editorReducer(state, { type: 'updateElement', id, patch: { content: 'ab' } })
+    state = editorReducer(state, { type: 'updateElement', id, patch: { content: 'abc' } })
+    expect(state.history.length).toBe(depth)
+    const element = state.layout.pages[0].elements[0]
+    expect(element.type === 'text' && element.content).toBe('abc')
+    state = editorReducer(state, { type: 'commit' })
     expect(state.history.length).toBe(depth + 1)
   })
 })
