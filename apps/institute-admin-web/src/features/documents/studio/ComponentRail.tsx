@@ -47,9 +47,17 @@ export function ComponentRail({ category, state, dispatch }: ComponentRailProps)
           <div
             key={item.type}
             className={`stu-comp${disabled ? ' is-disabled' : ''}`}
+            role="button"
+            tabIndex={disabled ? undefined : 0}
+            aria-disabled={disabled || undefined}
             draggable={!disabled}
             onDragStart={(event) => event.dataTransfer.setData('application/x-doc-element', item.type)}
             onClick={() => { if (!disabled) dispatch({ type: 'addElement', element: defaultElement(item.type, category) }) }}
+            onKeyDown={(event) => {
+              if (event.key !== 'Enter' && event.key !== ' ') return
+              if (event.key === ' ') event.preventDefault()
+              if (!disabled) dispatch({ type: 'addElement', element: defaultElement(item.type, category) })
+            }}
           >
             <span className="ic">{item.icon}</span>
             <span>{item.label}</span>
@@ -74,9 +82,16 @@ export function ComponentRail({ category, state, dispatch }: ComponentRailProps)
               <span
                 key={field}
                 className="stu-token"
+                role="button"
+                tabIndex={0}
                 draggable
                 onDragStart={(event) => event.dataTransfer.setData('application/x-doc-token', field)}
                 onClick={() => addToken(field)}
+                onKeyDown={(event) => {
+                  if (event.key !== 'Enter' && event.key !== ' ') return
+                  if (event.key === ' ') event.preventDefault()
+                  addToken(field)
+                }}
               >
                 {field}
               </span>

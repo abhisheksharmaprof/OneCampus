@@ -122,7 +122,7 @@ export function CanvasStage({ state, dispatch, data }: CanvasStageProps) {
     if (!selectedId || editingId) return
     const selected = elements.find((element) => element.id === selectedId)
     if (!selected) return
-    const step = event.shiftKey ? 5 : 1
+    const step = 1
     if (event.key === 'Delete' || event.key === 'Backspace') {
       event.preventDefault()
       dispatch({ type: 'deleteElement', id: selectedId })
@@ -132,8 +132,13 @@ export function CanvasStage({ state, dispatch, data }: CanvasStageProps) {
       event.preventDefault()
       const dx = event.key === 'ArrowLeft' ? -step : event.key === 'ArrowRight' ? step : 0
       const dy = event.key === 'ArrowUp' ? -step : event.key === 'ArrowDown' ? step : 0
-      // Transient move + debounced commit: key-repeat coalesces into one history entry (same as drag).
-      dispatch({ type: 'moveElement', id: selectedId, x: selected.x + dx, y: selected.y + dy })
+      // Transient move/resize + debounced commit: key-repeat coalesces into one history entry (same as drag).
+      if (event.shiftKey) {
+        if (selected.locked) return
+        dispatch({ type: 'resizeElement', id: selectedId, w: selected.w + dx, h: selected.h + dy })
+      } else {
+        dispatch({ type: 'moveElement', id: selectedId, x: selected.x + dx, y: selected.y + dy })
+      }
       if (nudgeTimerRef.current !== null) window.clearTimeout(nudgeTimerRef.current)
       nudgeTimerRef.current = window.setTimeout(() => {
         nudgeTimerRef.current = null
@@ -203,6 +208,7 @@ export function CanvasStage({ state, dispatch, data }: CanvasStageProps) {
         {elements.map((element) => (
           <div
             key={element.id}
+            aria-label={TYPE_LABELS[element.type]}
             data-typelabel={TYPE_LABELS[element.type]}
             className={`stu-el${element.id === selectedId ? ' is-selected' : ''}${element.locked ? ' is-locked' : ''}`}
             style={{ left: element.x * scale, top: element.y * scale, width: element.w * scale, height: element.h * scale }}
