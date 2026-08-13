@@ -1,4 +1,5 @@
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import transaction
 from django.db.models import Count, Prefetch, Q
 from django.db.models.deletion import ProtectedError
 from django.shortcuts import get_object_or_404
@@ -712,14 +713,15 @@ class SubjectTeacherAssignmentListCreateView(APIView):
             combined_slot_label=data.get("combined_slot_label", ""),
             assignment_id=None,
         )
-        assignment = _save(
-            SubjectTeacherAssignment(
-                subject=subject,
-                teacher=teacher,
-                combined_slot_label=data.get("combined_slot_label", ""),
+        with transaction.atomic():
+            assignment = _save(
+                SubjectTeacherAssignment(
+                    subject=subject,
+                    teacher=teacher,
+                    combined_slot_label=data.get("combined_slot_label", ""),
+                )
             )
-        )
-        assignment.class_sections.set(sections)
+            assignment.class_sections.set(sections)
         return _success(
             SubjectTeacherAssignmentSerializer(assignment).data,
             status.HTTP_201_CREATED,
@@ -781,11 +783,12 @@ class SubjectTeacherAssignmentDetailView(APIView):
             combined_slot_label=assignment.combined_slot_label,
             assignment_id=assignment.id,
         )
-        _save(assignment)
-        if sections is not None:
-            assignment.class_sections.set(sections)
-            # Drop the stale prefetch cache so the response reflects the new set.
-            assignment._prefetched_objects_cache = {}
+        with transaction.atomic():
+            _save(assignment)
+            if sections is not None:
+                assignment.class_sections.set(sections)
+                # Drop the stale prefetch cache so the response reflects the new set.
+                assignment._prefetched_objects_cache = {}
         return _success(SubjectTeacherAssignmentSerializer(assignment).data)
 
     def delete(self, request, assignment_id):

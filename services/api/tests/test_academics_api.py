@@ -297,6 +297,33 @@ def test_create_assignment_legacy_single_section_still_works(api_client):
     assert response.json()["data"]["classSectionIds"] == [str(section_a.id)]
 
 
+def test_patch_assignment_expands_section_set(api_client):
+    institute, section_a, section_b, _other, subject, teacher = build_assignment_fixtures()
+    authenticate_admin(api_client, institute=institute, email="admin@northstar.test")
+    created = api_client.post(
+        "/section-subject-teachers",
+        {
+            "classSectionIds": [str(section_a.id)],
+            "subjectId": str(subject.id),
+            "teacherId": str(teacher.id),
+        },
+        format="json",
+    )
+    assert created.status_code == 201
+    assignment_id = created.json()["data"]["id"]
+
+    response = api_client.patch(
+        f"/section-subject-teachers/{assignment_id}",
+        {"classSectionIds": [str(section_a.id), str(section_b.id)]},
+        format="json",
+    )
+
+    assert response.status_code == 200
+    assert sorted(response.json()["data"]["classSectionIds"]) == sorted(
+        [str(section_a.id), str(section_b.id)]
+    )
+
+
 def test_create_assignment_rejects_cross_grade(api_client):
     institute, section_a, _section_b, other_grade_section, subject, teacher = (
         build_assignment_fixtures()
