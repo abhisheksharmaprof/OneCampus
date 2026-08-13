@@ -2987,6 +2987,17 @@ describe('editorReducer', () => {
     expect(state.selectedId).toBeNull()
   })
 
+  it('undo clamps activePage to the restored snapshot page count', () => {
+    const onePage = defaultLayout('A4P', 1)
+    const twoPage = defaultLayout('CR80', 2)
+    let state = editorReducer(initialEditorState, { type: 'load', layout: onePage })
+    // Simulate history holding a later 2-page snapshot with the back page active.
+    state = { ...state, layout: twoPage, history: [...state.history, JSON.stringify(twoPage)], historyIndex: 1, activePage: 1 }
+    state = editorReducer(state, { type: 'undo' })
+    expect(state.activePage).toBe(0)
+    expect(state.layout.pages[state.activePage]).toBeDefined()
+  })
+
   it('duplicate offsets the copy and enforces the single-table rule', () => {
     let state = loaded()
     state = editorReducer(state, { type: 'addElement', element: defaultElement('table', 'FEE_INVOICE') })
@@ -3272,12 +3283,16 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
     case 'undo': {
       if (state.historyIndex <= 0) return state
       const index = state.historyIndex - 1
-      return { ...state, layout: JSON.parse(state.history[index]) as LayoutV2, historyIndex: index, selectedId: null, dirty: true }
+      const layout = JSON.parse(state.history[index]) as LayoutV2
+      const activePage = Math.min(Math.max(state.activePage, 0), layout.pages.length - 1)
+      return { ...state, layout, activePage, historyIndex: index, selectedId: null, dirty: true }
     }
     case 'redo': {
       if (state.historyIndex >= state.history.length - 1) return state
       const index = state.historyIndex + 1
-      return { ...state, layout: JSON.parse(state.history[index]) as LayoutV2, historyIndex: index, selectedId: null, dirty: true }
+      const layout = JSON.parse(state.history[index]) as LayoutV2
+      const activePage = Math.min(Math.max(state.activePage, 0), layout.pages.length - 1)
+      return { ...state, layout, activePage, historyIndex: index, selectedId: null, dirty: true }
     }
     case 'setZoom': return { ...state, zoom: Math.min(Math.max(action.zoom, 0.4), 2) }
     case 'setSampleMode': return { ...state, sampleMode: action.on }
@@ -3289,7 +3304,7 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
 - [ ] **Step 4: Verify + commit**
 
 Run: `cd apps/institute-admin-web && npx vitest run src/features/documents/studio && npm run typecheck`
-Expected: 8 PASSED (5 reducer + 3 snap), typecheck clean.
+Expected: 9 PASSED (6 reducer + 3 snap), typecheck clean.
 
 ```bash
 git add apps/institute-admin-web/src/features/documents/studio/
@@ -3310,7 +3325,7 @@ No unit tests for this task (interaction-heavy DOM component; logic lives in the
 
 ```tsx
 import {
-  useRef, useState,
+  useEffect, useRef, useState,
   type Dispatch, type DragEvent, type KeyboardEvent, type PointerEvent as ReactPointerEvent,
 } from 'react'
 import { renderElementInner, type RenderContext } from '../engine/renderHtml'
@@ -3334,8 +3349,16 @@ interface CanvasStageProps {
 
 export function CanvasStage({ state, dispatch, data }: CanvasStageProps) {
   const pageRef = useRef<HTMLDivElement>(null)
+  const dragCleanupRef = useRef<(() => void) | null>(null)
+  const nudgeTimerRef = useRef<number | null>(null)
   const [guides, setGuides] = useState<SnapGuide[]>([])
   const [editingId, setEditingId] = useState<string | null>(null)
+
+  // Unmounting mid-drag (or mid-nudge) must not leak window listeners / timers.
+  useEffect(() => () => {
+    dragCleanupRef.current?.()
+    if (nudgeTimerRef.current !== null) window.clearTimeout(nudgeTimerRef.current)
+  }, [])
   const { layout, activePage, selectedId, zoom, sampleMode } = state
   const size = PAGE_SIZES_MM[layout.page.sizeId]
   const scale = PX_PER_MM * zoom
@@ -3378,14 +3401,20 @@ export function CanvasStage({ state, dispatch, data }: CanvasStageProps) {
       }
     }
     const onUp = () => {
-      target.releasePointerCapture(event.pointerId)
+      // The captured element may have unmounted mid-drag; never let release abort cleanup.
+      if (target.hasPointerCapture(event.pointerId)) target.releasePointerCapture(event.pointerId)
       window.removeEventListener('pointermove', onMove)
       window.removeEventListener('pointerup', onUp)
+      dragCleanupRef.current = null
       setGuides([])
       dispatch({ type: 'commit' })
     }
     window.addEventListener('pointermove', onMove)
     window.addEventListener('pointerup', onUp)
+    dragCleanupRef.current = () => {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+    }
   }
 
   const onDrop = (event: DragEvent) => {
@@ -3427,7 +3456,13 @@ export function CanvasStage({ state, dispatch, data }: CanvasStageProps) {
       event.preventDefault()
       const dx = event.key === 'ArrowLeft' ? -step : event.key === 'ArrowRight' ? step : 0
       const dy = event.key === 'ArrowUp' ? -step : event.key === 'ArrowDown' ? step : 0
-      dispatch({ type: 'updateElement', id: selectedId, patch: { x: selected.x + dx, y: selected.y + dy } })
+      // Transient move + debounced commit: key-repeat coalesces into one history entry (same as drag).
+      dispatch({ type: 'moveElement', id: selectedId, x: selected.x + dx, y: selected.y + dy })
+      if (nudgeTimerRef.current !== null) window.clearTimeout(nudgeTimerRef.current)
+      nudgeTimerRef.current = window.setTimeout(() => {
+        nudgeTimerRef.current = null
+        dispatch({ type: 'commit' })
+      }, 300)
     }
   }
 

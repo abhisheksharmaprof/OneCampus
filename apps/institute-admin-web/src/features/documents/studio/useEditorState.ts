@@ -127,12 +127,16 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
     case 'undo': {
       if (state.historyIndex <= 0) return state
       const index = state.historyIndex - 1
-      return { ...state, layout: JSON.parse(state.history[index]) as LayoutV2, historyIndex: index, selectedId: null, dirty: true }
+      const layout = JSON.parse(state.history[index]) as LayoutV2
+      const activePage = Math.min(Math.max(state.activePage, 0), layout.pages.length - 1)
+      return { ...state, layout, activePage, historyIndex: index, selectedId: null, dirty: true }
     }
     case 'redo': {
       if (state.historyIndex >= state.history.length - 1) return state
       const index = state.historyIndex + 1
-      return { ...state, layout: JSON.parse(state.history[index]) as LayoutV2, historyIndex: index, selectedId: null, dirty: true }
+      const layout = JSON.parse(state.history[index]) as LayoutV2
+      const activePage = Math.min(Math.max(state.activePage, 0), layout.pages.length - 1)
+      return { ...state, layout, activePage, historyIndex: index, selectedId: null, dirty: true }
     }
     case 'setZoom': return { ...state, zoom: Math.min(Math.max(action.zoom, 0.4), 2) }
     case 'setSampleMode': return { ...state, sampleMode: action.on }

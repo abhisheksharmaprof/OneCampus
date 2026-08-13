@@ -1,5 +1,5 @@
 import {
-  useRef, useState,
+  useEffect, useRef, useState,
   type Dispatch, type DragEvent, type KeyboardEvent, type PointerEvent as ReactPointerEvent,
 } from 'react'
 import { renderElementInner, type RenderContext } from '../engine/renderHtml'
@@ -23,8 +23,16 @@ interface CanvasStageProps {
 
 export function CanvasStage({ state, dispatch, data }: CanvasStageProps) {
   const pageRef = useRef<HTMLDivElement>(null)
+  const dragCleanupRef = useRef<(() => void) | null>(null)
+  const nudgeTimerRef = useRef<number | null>(null)
   const [guides, setGuides] = useState<SnapGuide[]>([])
   const [editingId, setEditingId] = useState<string | null>(null)
+
+  // Unmounting mid-drag (or mid-nudge) must not leak window listeners / timers.
+  useEffect(() => () => {
+    dragCleanupRef.current?.()
+    if (nudgeTimerRef.current !== null) window.clearTimeout(nudgeTimerRef.current)
+  }, [])
   const { layout, activePage, selectedId, zoom, sampleMode } = state
   const size = PAGE_SIZES_MM[layout.page.sizeId]
   const scale = PX_PER_MM * zoom
@@ -67,14 +75,20 @@ export function CanvasStage({ state, dispatch, data }: CanvasStageProps) {
       }
     }
     const onUp = () => {
-      target.releasePointerCapture(event.pointerId)
+      // The captured element may have unmounted mid-drag; never let release abort cleanup.
+      if (target.hasPointerCapture(event.pointerId)) target.releasePointerCapture(event.pointerId)
       window.removeEventListener('pointermove', onMove)
       window.removeEventListener('pointerup', onUp)
+      dragCleanupRef.current = null
       setGuides([])
       dispatch({ type: 'commit' })
     }
     window.addEventListener('pointermove', onMove)
     window.addEventListener('pointerup', onUp)
+    dragCleanupRef.current = () => {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+    }
   }
 
   const onDrop = (event: DragEvent) => {
@@ -116,7 +130,13 @@ export function CanvasStage({ state, dispatch, data }: CanvasStageProps) {
       event.preventDefault()
       const dx = event.key === 'ArrowLeft' ? -step : event.key === 'ArrowRight' ? step : 0
       const dy = event.key === 'ArrowUp' ? -step : event.key === 'ArrowDown' ? step : 0
-      dispatch({ type: 'updateElement', id: selectedId, patch: { x: selected.x + dx, y: selected.y + dy } })
+      // Transient move + debounced commit: key-repeat coalesces into one history entry (same as drag).
+      dispatch({ type: 'moveElement', id: selectedId, x: selected.x + dx, y: selected.y + dy })
+      if (nudgeTimerRef.current !== null) window.clearTimeout(nudgeTimerRef.current)
+      nudgeTimerRef.current = window.setTimeout(() => {
+        nudgeTimerRef.current = null
+        dispatch({ type: 'commit' })
+      }, 300)
     }
   }
 

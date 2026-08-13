@@ -42,6 +42,17 @@ describe('editorReducer', () => {
     expect(state.selectedId).toBeNull()
   })
 
+  it('undo clamps activePage to the restored snapshot page count', () => {
+    const onePage = defaultLayout('A4P', 1)
+    const twoPage = defaultLayout('CR80', 2)
+    let state = editorReducer(initialEditorState, { type: 'load', layout: onePage })
+    // Simulate history holding a later 2-page snapshot with the back page active.
+    state = { ...state, layout: twoPage, history: [...state.history, JSON.stringify(twoPage)], historyIndex: 1, activePage: 1 }
+    state = editorReducer(state, { type: 'undo' })
+    expect(state.activePage).toBe(0)
+    expect(state.layout.pages[state.activePage]).toBeDefined()
+  })
+
   it('duplicate offsets the copy and enforces the single-table rule', () => {
     let state = loaded()
     state = editorReducer(state, { type: 'addElement', element: defaultElement('table', 'FEE_INVOICE') })
