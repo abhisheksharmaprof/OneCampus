@@ -27,10 +27,6 @@ from modules.finance.api.views import (
     FeePaymentListCreateView,
     FinanceRecordListCreateView,
 )
-from modules.finance.api.templates_views import (
-    InvoiceTemplateDetailView,
-    InvoiceTemplateListCreateView,
-)
 from modules.finance.api.plans_views import FeePlanDetailView, FeePlanListCreateView
 from modules.finance.api.insights_views import FeeDuesExportView, FeeDuesView, FeeSummaryView
 from modules.finance.api.settings_views import FinanceSettingsView
@@ -102,12 +98,6 @@ urlpatterns = [
         name="admin-fee-invoice-detail",
     ),
     path("fees/payments", FeePaymentListCreateView.as_view(), name="admin-fee-payments"),
-    path("fees/templates", InvoiceTemplateListCreateView.as_view(), name="admin-fee-templates"),
-    path(
-        "fees/templates/<uuid:template_id>",
-        InvoiceTemplateDetailView.as_view(),
-        name="admin-fee-template-detail",
-    ),
     path("fees/plans", FeePlanListCreateView.as_view(), name="admin-fee-plans"),
     path("fees/plans/<uuid:plan_id>", FeePlanDetailView.as_view(), name="admin-fee-plan-detail"),
     path("fees/summary", FeeSummaryView.as_view(), name="admin-fee-summary"),

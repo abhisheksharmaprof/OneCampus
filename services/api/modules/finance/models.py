@@ -25,35 +25,6 @@ class FinanceSettings(TimeStampedModel):
     receipt_footer = models.TextField(blank=True, default="")
 
 
-class InvoiceTemplate(TimeStampedModel):
-    class Kind(models.TextChoices):
-        INVOICE = "INVOICE", "Invoice"
-        RECEIPT = "RECEIPT", "Receipt"
-
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    institute = models.ForeignKey(
-        "institutes.Institute", on_delete=models.CASCADE, related_name="invoice_templates"
-    )
-    name = models.CharField(max_length=120)
-    kind = models.CharField(max_length=10, choices=Kind.choices, default=Kind.INVOICE)
-    layout = models.JSONField(default=dict, blank=True)
-    is_default = models.BooleanField(default=False)
-    created_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
-    )
-
-    class Meta:
-        ordering = ("name",)
-        constraints = [
-            models.UniqueConstraint(
-                fields=("institute", "kind"),
-                condition=Q(is_default=True),
-                name="uq_default_template_per_kind",
-            )
-        ]
-        indexes = [models.Index(fields=("institute", "kind"))]
-
-
 class FeePlan(TimeStampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     institute = models.ForeignKey(
@@ -109,7 +80,11 @@ class FeeInvoice(TimeStampedModel):
         FeePlan, on_delete=models.SET_NULL, null=True, blank=True, related_name="invoices"
     )
     template = models.ForeignKey(
-        InvoiceTemplate, on_delete=models.SET_NULL, null=True, blank=True, related_name="invoices"
+        "documents.DocumentTemplate",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="fee_invoices",
     )
     # Legacy column kept in sync with `total` so existing consumers (student profile fees tab)
     # keep working; new code reads/writes `total`.

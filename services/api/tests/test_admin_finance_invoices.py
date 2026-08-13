@@ -231,3 +231,43 @@ def test_writes_reject_foreign_tenant_references(api_client):
     assert create_foreign_student.status_code == 404
     assert patch_foreign_invoice.status_code == 404
     assert bad_param.status_code == 400
+
+
+@pytest.mark.django_db
+def test_invoice_accepts_document_template_and_rejects_foreign_or_wrong_category(api_client):
+    from modules.documents.models import DocumentTemplate
+
+    institute, branch, token = make_admin(api_client)
+    other_institute, _, _ = make_admin(api_client, code="OTHER")
+    student = make_student(institute, branch)
+    mine = DocumentTemplate.objects.create(
+        institute=institute, name="Mine", category="FEE_INVOICE", layout={"version": 2}
+    )
+    wrong_category = DocumentTemplate.objects.create(
+        institute=institute, name="Card", category="ID_CARD", layout={"version": 2}
+    )
+    foreign = DocumentTemplate.objects.create(
+        institute=other_institute, name="Foreign", category="FEE_INVOICE", layout={"version": 2}
+    )
+    api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
+
+    ok = api_client.post(
+        "/api/v1/admin/fees/invoices",
+        {**INVOICE_BODY, "studentId": str(student.id), "templateId": str(mine.id)},
+        format="json",
+    )
+    bad_category = api_client.post(
+        "/api/v1/admin/fees/invoices",
+        {**INVOICE_BODY, "studentId": str(student.id), "templateId": str(wrong_category.id)},
+        format="json",
+    )
+    cross_tenant = api_client.post(
+        "/api/v1/admin/fees/invoices",
+        {**INVOICE_BODY, "studentId": str(student.id), "templateId": str(foreign.id)},
+        format="json",
+    )
+
+    assert ok.status_code == 201
+    assert ok.json()["data"]["templateId"] == str(mine.id)
+    assert bad_category.status_code == 404
+    assert cross_tenant.status_code == 404

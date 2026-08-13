@@ -9,7 +9,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from modules.academics.models import Grade, StudentEnrollment
-from modules.finance.models import FeeInvoice, FeePayment, FeePlan, FinanceRecord, InvoiceTemplate
+from modules.documents.models import DocumentTemplate
+from modules.finance.models import FeeInvoice, FeePayment, FeePlan, FinanceRecord
 from modules.finance.services import compute_totals, next_document_number, resolve_status
 from modules.institutes.api.permissions import IsCurrentInstituteAdmin
 from modules.institutes.models import Branch
@@ -239,7 +240,10 @@ class FeeInvoiceListCreateView(APIView):
             template = None
             if values["templateId"]:
                 template = get_object_or_404(
-                    InvoiceTemplate, id=values["templateId"], institute=request.institute
+                    DocumentTemplate,
+                    id=values["templateId"],
+                    institute=request.institute,
+                    category=DocumentTemplate.Category.FEE_INVOICE,
                 )
             invoice = FeeInvoice(
                 institute=request.institute,
@@ -323,7 +327,10 @@ class FeeInvoiceDetailView(APIView):
                 if "templateId" in values:
                     invoice.template = (
                         get_object_or_404(
-                            InvoiceTemplate, id=values["templateId"], institute=request.institute
+                            DocumentTemplate,
+                            id=values["templateId"],
+                            institute=request.institute,
+                            category=DocumentTemplate.Category.FEE_INVOICE,
                         )
                         if values["templateId"]
                         else None
@@ -395,7 +402,10 @@ class FeeInvoiceBulkGenerateView(APIView):
             template = None
             if values["templateId"]:
                 template = get_object_or_404(
-                    InvoiceTemplate, id=values["templateId"], institute=request.institute
+                    DocumentTemplate,
+                    id=values["templateId"],
+                    institute=request.institute,
+                    category=DocumentTemplate.Category.FEE_INVOICE,
                 )
             line_items = [
                 {
