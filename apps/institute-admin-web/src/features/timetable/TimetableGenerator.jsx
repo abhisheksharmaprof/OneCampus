@@ -173,6 +173,43 @@ function allTeachingSlots(config) {
 function teacherAvailable(teacher, day, period) {
   return teacher.availableDays.includes(day) && teacher.availablePeriods.includes(period);
 }
+// Assignments may target multiple sections (classIds). Older saved bundles
+// only carry a single classId — normalize both shapes to an array.
+function assignmentClassIds(a) {
+  if (Array.isArray(a.classIds) && a.classIds.length) return a.classIds;
+  return a.classId ? [a.classId] : [];
+}
+function entryClassIds(e) {
+  if (Array.isArray(e.classIds) && e.classIds.length) return e.classIds;
+  return e.classId ? [e.classId] : [];
+}
+// Assignments sharing a non-blank combinedSlotLabel AND the exact same
+// section set are parallel options (e.g. French/Spanish) that must land on
+// the same (day, period) every week.
+function groupKeyOf(a) {
+  const label = (a.combinedSlotLabel || "").trim();
+  return label ? `${label.toLowerCase()}|${assignmentClassIds(a).slice().sort().join(",")}` : null;
+}
+// A "unit" is what the queue schedules: one plain assignment, or a labeled
+// group of parallel assignments that must land on the same slot.
+function buildUnits(assignments) {
+  const byKey = new Map();
+  const units = [];
+  for (const a of assignments) {
+    const key = groupKeyOf(a);
+    if (!key) {
+      units.push({ id: a.id, label: "", assignments: [a] });
+      continue;
+    }
+    if (!byKey.has(key)) {
+      const unit = { id: `grp_${key}`, label: (a.combinedSlotLabel || "").trim(), assignments: [] };
+      byKey.set(key, unit);
+      units.push(unit);
+    }
+    byKey.get(key).assignments.push(a);
+  }
+  return units;
+}
 function validateTimetableInput(data) {
   const errors = [];
   const { config, teachers, subjects, classes, rooms, assignments } = data;
@@ -195,21 +232,47 @@ function validateTimetableInput(data) {
   for (const a of assignments) {
     const teacher = teacherById[a.teacherId];
     const subject = subjectById[a.subjectId];
-    const cls = classById[a.classId];
-    if (!teacher || !subject || !cls) {
+    const classIds = assignmentClassIds(a);
+    const clsList = classIds.map((id) => classById[id]);
+    if (!teacher || !subject || clsList.length === 0 || clsList.some((c) => !c)) {
       errors.push("An assignment references a teacher, subject, or class that was deleted. Remove or fix it in Assignments.");
       continue;
     }
+    const clsNames = clsList.map((c) => c.name).join(" + ");
     if (subject.isDouble && a.periodsPerWeek % 2 !== 0) {
       errors.push(
-        `${teacher.name} → ${subject.name} / ${cls.name}: "${subject.name}" needs double periods, so periods/week must be an even number (currently ${a.periodsPerWeek}).`
+        `${teacher.name} → ${subject.name} / ${clsNames}: "${subject.name}" needs double periods, so periods/week must be an even number (currently ${a.periodsPerWeek}).`
       );
     }
     if (subject.requiresRoomId && !roomIds.has(subject.requiresRoomId)) {
       errors.push(`Subject "${subject.name}" needs a room that no longer exists. Fix it in Structure.`);
     }
     teacherLoad[teacher.id] = (teacherLoad[teacher.id] || 0) + a.periodsPerWeek;
-    classLoad[cls.id] = (classLoad[cls.id] || 0) + a.periodsPerWeek;
+  }
+  // Class load and parallel-group sanity checks are computed per schedulable
+  // unit: a labeled group of parallel options occupies its sections only once.
+  for (const unit of buildUnits(assignments)) {
+    const first = unit.assignments[0];
+    const classIds = assignmentClassIds(first);
+    if (!teacherById[first.teacherId] || !subjectById[first.subjectId] || classIds.some((id) => !classById[id])) continue;
+    for (const cid of classIds) classLoad[cid] = (classLoad[cid] || 0) + first.periodsPerWeek;
+    if (unit.assignments.length > 1) {
+      const label = unit.label;
+      if (new Set(unit.assignments.map((x) => x.periodsPerWeek)).size > 1) {
+        errors.push(`Parallel options under "${label}" must all have the same periods/week.`);
+      }
+      const teacherIds = unit.assignments.map((x) => x.teacherId);
+      if (new Set(teacherIds).size !== teacherIds.length) {
+        errors.push(`Parallel options under "${label}" share the same teacher — one teacher can't run two options at once.`);
+      }
+      const requiredRooms = unit.assignments.map((x) => subjectById[x.subjectId]?.requiresRoomId).filter(Boolean);
+      if (new Set(requiredRooms).size !== requiredRooms.length) {
+        errors.push(`Parallel options under "${label}" require the same room — two options can't share one room at the same time.`);
+      }
+      if (new Set(unit.assignments.map((x) => !!subjectById[x.subjectId]?.isDouble)).size > 1) {
+        errors.push(`Parallel options under "${label}" mix double-period and single-period subjects — they must match.`);
+      }
+    }
   }
   for (const [teacherId, load] of Object.entries(teacherLoad)) {
     const teacher = teacherById[teacherId];
@@ -237,21 +300,28 @@ function buildTaskQueue(data, rng, lockedEntries = [], generateScope = "all") {
   for (const e of lockedEntries) {
     lockedCount[e.assignmentId] = (lockedCount[e.assignmentId] || 0) + e.periods.length;
   }
-  const withSlack = data.assignments.map((a) => {
-    const subject = subjectById[a.subjectId];
-    const teacher = teacherById[a.teacherId];
-    const availableSlots = allTeachingSlots(data.config).filter((s) => teacherAvailable(teacher, s.day, s.period)).length;
-    return { assignment: a, subject, slack: availableSlots - a.periodsPerWeek };
+  const withSlack = buildUnits(data.assignments).map((unit) => {
+    const first = unit.assignments[0];
+    const subject = subjectById[first.subjectId];
+    // A joint unit is only as schedulable as its most constrained teacher.
+    const availableSlots = Math.min(
+      ...unit.assignments.map((a) => {
+        const teacher = teacherById[a.teacherId];
+        return allTeachingSlots(data.config).filter((s) => teacherAvailable(teacher, s.day, s.period)).length;
+      })
+    );
+    return { unit, subject, slack: availableSlots - first.periodsPerWeek };
   });
   const priorityOrder = shuffle(withSlack, rng).sort((x, y) => x.slack - y.slack);
-  const remaining = priorityOrder.map(({ assignment, subject }) => {
-    if (generateScope !== "all" && assignment.classId !== generateScope) {
-      return { assignmentId: assignment.id, unitsLeft: 0, unitType: "single" };
+  const remaining = priorityOrder.map(({ unit, subject }) => {
+    const first = unit.assignments[0];
+    if (generateScope !== "all" && !assignmentClassIds(first).includes(generateScope)) {
+      return { unit, unitsLeft: 0, unitType: "single" };
     }
-    const lockedP = lockedCount[assignment.id] || 0;
-    const needed = Math.max(0, assignment.periodsPerWeek - lockedP);
+    const lockedP = lockedCount[first.id] || 0;
+    const needed = Math.max(0, first.periodsPerWeek - lockedP);
     return {
-      assignmentId: assignment.id,
+      unit,
       unitsLeft: subject.isDouble ? Math.floor(needed / 2) : needed,
       unitType: subject.isDouble ? "double" : "single",
     };
@@ -262,7 +332,7 @@ function buildTaskQueue(data, rng, lockedEntries = [], generateScope = "all") {
     any = false;
     for (const r of remaining) {
       if (r.unitsLeft > 0) {
-        queue.push({ assignmentId: r.assignmentId, unitType: r.unitType });
+        queue.push({ unit: r.unit, unitType: r.unitType });
         r.unitsLeft -= 1;
         any = true;
       }
@@ -280,29 +350,47 @@ function initSolverState(data) {
 function slotKey(day, period) {
   return `${day}-${period}`;
 }
+// Every assignment in the unit (a plain assignment, or each parallel option
+// of a labeled group) must fit the slot: teacher available/free/day-cap ok
+// and its room free; every participating class must be free too.
+function unitPlacements(task, data) {
+  return task.unit.assignments.map((a) => ({
+    assignment: a,
+    teacher: data.teachers.find((t) => t.id === a.teacherId),
+    roomId: data.subjects.find((s) => s.id === a.subjectId).requiresRoomId || null,
+  }));
+}
+function placementsFit(placements, classIds, day, periods, state) {
+  const keys = periods.map((p) => slotKey(day, p));
+  for (const cid of classIds) {
+    if (keys.some((k) => state.classBusy[cid][k])) return false;
+  }
+  for (const pl of placements) {
+    if (periods.some((p) => !teacherAvailable(pl.teacher, day, p))) return false;
+    if (keys.some((k) => state.teacherBusy[pl.teacher.id][k])) return false;
+    if (pl.roomId && keys.some((k) => (state.roomBusy[pl.roomId] || {})[k])) return false;
+    const dayCount = state.teacherDayCount[pl.teacher.id]?.[day] || 0;
+    if (dayCount + periods.length > pl.teacher.maxPeriodsPerDay) return false;
+  }
+  return true;
+}
 function getSingleCandidates(task, data, state) {
-  const assignment = data.assignments.find((a) => a.id === task.assignmentId);
-  const teacher = data.teachers.find((t) => t.id === assignment.teacherId);
-  const subject = data.subjects.find((s) => s.id === assignment.subjectId);
-  const roomId = subject.requiresRoomId || null;
+  const placements = unitPlacements(task, data);
+  const classIds = assignmentClassIds(task.unit.assignments[0]);
   const candidates = [];
   for (const slot of allTeachingSlots(data.config)) {
-    if (!teacherAvailable(teacher, slot.day, slot.period)) continue;
-    const k = slotKey(slot.day, slot.period);
-    if (state.teacherBusy[teacher.id][k]) continue;
-    if (state.classBusy[assignment.classId][k]) continue;
-    if (roomId && (state.roomBusy[roomId] || {})[k]) continue;
-    const dayCount = state.teacherDayCount[teacher.id]?.[slot.day] || 0;
-    if (dayCount >= teacher.maxPeriodsPerDay) continue;
-    candidates.push({ day: slot.day, periods: [slot.period], teacherId: teacher.id, roomId });
+    if (!placementsFit(placements, classIds, slot.day, [slot.period], state)) continue;
+    candidates.push({
+      day: slot.day,
+      periods: [slot.period],
+      placements: placements.map((pl) => ({ assignment: pl.assignment, roomId: pl.roomId })),
+    });
   }
   return candidates;
 }
 function getDoubleCandidates(task, data, state) {
-  const assignment = data.assignments.find((a) => a.id === task.assignmentId);
-  const teacher = data.teachers.find((t) => t.id === assignment.teacherId);
-  const subject = data.subjects.find((s) => s.id === assignment.subjectId);
-  const roomId = subject.requiresRoomId || null;
+  const placements = unitPlacements(task, data);
+  const classIds = assignmentClassIds(task.unit.assignments[0]);
   const byDay = teachingPeriodsPerDay(data.config);
   const candidates = [];
   for (const day of data.config.workingDays) {
@@ -310,20 +398,18 @@ function getDoubleCandidates(task, data, state) {
     for (let i = 0; i < periods.length - 1; i++) {
       const p1 = periods[i], p2 = periods[i + 1];
       if (p2 !== p1 + 1) continue;
-      if (!teacherAvailable(teacher, day, p1) || !teacherAvailable(teacher, day, p2)) continue;
-      const k1 = slotKey(day, p1), k2 = slotKey(day, p2);
-      if (state.teacherBusy[teacher.id][k1] || state.teacherBusy[teacher.id][k2]) continue;
-      if (state.classBusy[assignment.classId][k1] || state.classBusy[assignment.classId][k2]) continue;
-      if (roomId && ((state.roomBusy[roomId] || {})[k1] || (state.roomBusy[roomId] || {})[k2])) continue;
-      const dayCount = state.teacherDayCount[teacher.id]?.[day] || 0;
-      if (dayCount + 2 > teacher.maxPeriodsPerDay) continue;
-      candidates.push({ day, periods: [p1, p2], teacherId: teacher.id, roomId });
+      if (!placementsFit(placements, classIds, day, [p1, p2], state)) continue;
+      candidates.push({
+        day,
+        periods: [p1, p2],
+        placements: placements.map((pl) => ({ assignment: pl.assignment, roomId: pl.roomId })),
+      });
     }
   }
   return candidates;
 }
 function scoreCandidate(candidate, task, data, state, rng) {
-  const assignment = data.assignments.find((a) => a.id === task.assignmentId);
+  const assignment = task.unit.assignments[0];
   let score = 0;
   const dayRepeats = state.assignmentDayCount[assignment.id]?.[candidate.day] || 0;
   if (assignment.avoidRepeatSameDay) score += dayRepeats * 6;
@@ -337,42 +423,81 @@ function scoreCandidate(candidate, task, data, state, rng) {
     const matchingPeriods = candidate.periods.reduce((count, period) => count + (periodCounts[period] || 0), 0);
     score += (candidate.periods.length * preferredPeriodCount - matchingPeriods) * 8;
   }
-  score += (state.teacherDayCount[candidate.teacherId]?.[candidate.day] || 0) * 1.2;
+  for (const pl of candidate.placements) {
+    score += (state.teacherDayCount[pl.assignment.teacherId]?.[candidate.day] || 0) * 1.2;
+  }
   score += rng() * 0.75;
   return score;
 }
 function placeCandidate(candidate, task, data, state) {
-  const assignment = data.assignments.find((a) => a.id === task.assignmentId);
+  const classIds = assignmentClassIds(task.unit.assignments[0]);
+  // A labeled group of parallel options is one joint block; its entries share
+  // a slotGroupId so the UI/local-search treat them as inseparable.
+  const slotGroupId = task.unit.assignments.length > 1 ? uid("slot") : null;
   for (const p of candidate.periods) {
     const k = slotKey(candidate.day, p);
-    state.teacherBusy[candidate.teacherId][k] = true;
-    state.classBusy[assignment.classId][k] = true;
-    if (candidate.roomId) {
-      state.roomBusy[candidate.roomId] = state.roomBusy[candidate.roomId] || {};
-      state.roomBusy[candidate.roomId][k] = true;
+    for (const cid of classIds) state.classBusy[cid][k] = true;
+  }
+  for (const placement of candidate.placements) {
+    const assignment = placement.assignment;
+    for (const p of candidate.periods) {
+      const k = slotKey(candidate.day, p);
+      state.teacherBusy[assignment.teacherId][k] = true;
+      if (placement.roomId) {
+        state.roomBusy[placement.roomId] = state.roomBusy[placement.roomId] || {};
+        state.roomBusy[placement.roomId][k] = true;
+      }
+    }
+    state.teacherDayCount[assignment.teacherId] = state.teacherDayCount[assignment.teacherId] || {};
+    state.teacherDayCount[assignment.teacherId][candidate.day] =
+      (state.teacherDayCount[assignment.teacherId][candidate.day] || 0) + candidate.periods.length;
+    state.assignmentDayCount[assignment.id] = state.assignmentDayCount[assignment.id] || {};
+    state.assignmentDayCount[assignment.id][candidate.day] =
+      (state.assignmentDayCount[assignment.id][candidate.day] || 0) + 1;
+    state.assignmentPeriodCount[assignment.id] = state.assignmentPeriodCount[assignment.id] || {};
+    for (const p of candidate.periods) {
+      state.assignmentPeriodCount[assignment.id][p] = (state.assignmentPeriodCount[assignment.id][p] || 0) + 1;
+    }
+    state.entries.push({
+      assignmentId: assignment.id, teacherId: assignment.teacherId, subjectId: assignment.subjectId,
+      classIds: classIds.slice(), classId: classIds[0], slotGroupId,
+      day: candidate.day, periods: candidate.periods.slice(), roomId: placement.roomId,
+    });
+  }
+}
+// Locked entries are replayed directly from their own fields (they already
+// know their teacher/room/classes) instead of going through the unit path.
+function placeLockedEntry(e, data, state) {
+  const classIds = entryClassIds(e);
+  for (const p of e.periods) {
+    const k = slotKey(e.day, p);
+    if (state.teacherBusy[e.teacherId]) state.teacherBusy[e.teacherId][k] = true;
+    for (const cid of classIds) if (state.classBusy[cid]) state.classBusy[cid][k] = true;
+    if (e.roomId) {
+      state.roomBusy[e.roomId] = state.roomBusy[e.roomId] || {};
+      state.roomBusy[e.roomId][k] = true;
     }
   }
-  state.teacherDayCount[candidate.teacherId] = state.teacherDayCount[candidate.teacherId] || {};
-  state.teacherDayCount[candidate.teacherId][candidate.day] =
-    (state.teacherDayCount[candidate.teacherId][candidate.day] || 0) + candidate.periods.length;
-  state.assignmentDayCount[assignment.id] = state.assignmentDayCount[assignment.id] || {};
-  state.assignmentDayCount[assignment.id][candidate.day] =
-    (state.assignmentDayCount[assignment.id][candidate.day] || 0) + 1;
-  state.assignmentPeriodCount[assignment.id] = state.assignmentPeriodCount[assignment.id] || {};
-  for (const p of candidate.periods) {
-    state.assignmentPeriodCount[assignment.id][p] = (state.assignmentPeriodCount[assignment.id][p] || 0) + 1;
+  state.teacherDayCount[e.teacherId] = state.teacherDayCount[e.teacherId] || {};
+  state.teacherDayCount[e.teacherId][e.day] = (state.teacherDayCount[e.teacherId][e.day] || 0) + e.periods.length;
+  state.assignmentDayCount[e.assignmentId] = state.assignmentDayCount[e.assignmentId] || {};
+  state.assignmentDayCount[e.assignmentId][e.day] = (state.assignmentDayCount[e.assignmentId][e.day] || 0) + 1;
+  state.assignmentPeriodCount[e.assignmentId] = state.assignmentPeriodCount[e.assignmentId] || {};
+  for (const p of e.periods) {
+    state.assignmentPeriodCount[e.assignmentId][p] = (state.assignmentPeriodCount[e.assignmentId][p] || 0) + 1;
   }
   state.entries.push({
-    assignmentId: assignment.id, teacherId: assignment.teacherId, subjectId: assignment.subjectId,
-    classId: assignment.classId, day: candidate.day, periods: candidate.periods, roomId: candidate.roomId,
+    assignmentId: e.assignmentId, teacherId: e.teacherId, subjectId: e.subjectId,
+    classIds, classId: classIds[0], slotGroupId: e.slotGroupId || null,
+    day: e.day, periods: e.periods.slice(), roomId: e.roomId || null,
+    isLocked: e.isLocked, // Keep the lock state
   });
 }
 function greedyConstruct(data, seed, lockedEntries = [], generateScope = "all") {
   const rng = makeRng(seed);
   const state = initSolverState(data);
   for (const e of lockedEntries) {
-    placeCandidate(e, { assignmentId: e.assignmentId }, data, state);
-    state.entries[state.entries.length - 1].isLocked = e.isLocked; // Keep the lock state
+    placeLockedEntry(e, data, state);
   }
   const queue = buildTaskQueue(data, rng, lockedEntries, generateScope);
   const missing = [];
@@ -432,11 +557,14 @@ function computeCost(entries, data) {
 function canPlaceAt(entry, day, period, data, entries) {
   const teacher = data.teachers.find((t) => t.id === entry.teacherId);
   if (!teacher || !teacherAvailable(teacher, day, period)) return false;
+  const classIds = entryClassIds(entry);
   for (const other of entries) {
     if (other === entry) continue;
     if (!other.periods.includes(period) || other.day !== day) continue;
+    // Siblings of the same joint block are supposed to share the slot.
+    if (entry.slotGroupId && other.slotGroupId === entry.slotGroupId) continue;
     if (other.teacherId === entry.teacherId) return false;
-    if (other.classId === entry.classId) return false;
+    if (entryClassIds(other).some((c) => classIds.includes(c))) return false;
     if (entry.roomId && other.roomId === entry.roomId) return false;
   }
   const dayLoad = entries.filter((e) => e !== entry && e.teacherId === entry.teacherId && e.day === day).reduce((s, e) => s + e.periods.length, 0);
@@ -448,7 +576,7 @@ function localSearchImprove(entries, data, iterations, seed) {
   let current = entries.map((e) => ({ ...e, periods: e.periods.slice() }));
   let currentCost = computeCost(current, data);
   for (let iter = 0; iter < iterations; iter++) {
-    const idxs = current.map((e, i) => i).filter((i) => current[i].periods.length === 1 && !current[i].isLocked);
+    const idxs = current.map((e, i) => i).filter((i) => current[i].periods.length === 1 && !current[i].isLocked && !current[i].slotGroupId);
     if (idxs.length < 2) break;
     const i = idxs[Math.floor(rng() * idxs.length)];
     const j = idxs[Math.floor(rng() * idxs.length)];
@@ -494,11 +622,15 @@ export function generateTimetable(data, options = {}) {
   const teacherById = Object.fromEntries(data.teachers.map((t) => [t.id, t]));
   const classById = Object.fromEntries(data.classes.map((c) => [c.id, c]));
   const missingSummary = {};
-  for (const m of best.missing) missingSummary[m.assignmentId] = (missingSummary[m.assignmentId] || 0) + 1;
+  for (const m of best.missing) {
+    const id = m.unit.assignments[0].id;
+    missingSummary[id] = (missingSummary[id] || 0) + 1;
+  }
   const diagnostics = Object.entries(missingSummary).map(([assignmentId, count]) => {
     const a = data.assignments.find((x) => x.id === assignmentId);
-    const t = teacherById[a.teacherId], s = subjectById[a.subjectId], c = classById[a.classId];
-    return `Could not place ${count} of ${a.periodsPerWeek} period(s)/week for ${t.name} → ${s.name} (${c.name}). Try relaxing availability, raising max periods/day, or lowering the weekly requirement.`;
+    const t = teacherById[a.teacherId], s = subjectById[a.subjectId];
+    const clsNames = assignmentClassIds(a).map((id) => classById[id]?.name).filter(Boolean).join(" + ");
+    return `Could not place ${count} of ${a.periodsPerWeek} period(s)/week for ${t.name} → ${s.name} (${clsNames}). Try relaxing availability, raising max periods/day, or lowering the weekly requirement.`;
   });
   return { feasible: false, diagnostics, entries: best.entries };
 }
@@ -629,7 +761,7 @@ function importAssignmentsRows(existingAssignments, refs, rows) {
     if (!periodsPerWeek || periodsPerWeek < 1) { errors.push(`Assignments row ${i + 2}: Periods/Week must be a positive number.`); return; }
     const existing = assignments.find((a) => a.teacherId === teacher.id && a.subjectId === subject.id && a.classId === cls.id);
     if (existing) { existing.periodsPerWeek = periodsPerWeek; existing.avoidRepeatSameDay = avoidRepeatSameDay; updated++; }
-    else { assignments.push({ id: uid("asg"), teacherId: teacher.id, subjectId: subject.id, classId: cls.id, periodsPerWeek, avoidRepeatSameDay }); added++; }
+    else { assignments.push({ id: uid("asg"), teacherId: teacher.id, subjectId: subject.id, classIds: [cls.id], classId: cls.id, periodsPerWeek, avoidRepeatSameDay }); added++; }
   });
   return { assignments, added, updated, errors };
 }
@@ -804,23 +936,23 @@ function sampleBundle() {
     { id: "t_das", name: "Mr. Das", maxPeriodsPerDay: 4, maxPeriodsPerWeek: 8, availableDays: ["TUE", "THU"], availablePeriods: allPeriods },
   ];
   const assignments = [
-    { id: uid("asg"), teacherId: "t_sharma", subjectId: "sub_sci", classId: "cls_6a", periodsPerWeek: 5, avoidRepeatSameDay: true },
-    { id: uid("asg"), teacherId: "t_sharma", subjectId: "sub_eng", classId: "cls_6b", periodsPerWeek: 5, avoidRepeatSameDay: true },
-    { id: uid("asg"), teacherId: "t_verma", subjectId: "sub_math", classId: "cls_6a", periodsPerWeek: 6, avoidRepeatSameDay: true },
-    { id: uid("asg"), teacherId: "t_verma", subjectId: "sub_math", classId: "cls_6b", periodsPerWeek: 6, avoidRepeatSameDay: true },
-    { id: uid("asg"), teacherId: "t_verma", subjectId: "sub_math", classId: "cls_7a", periodsPerWeek: 6, avoidRepeatSameDay: true },
-    { id: uid("asg"), teacherId: "t_iyer", subjectId: "sub_art", classId: "cls_6a", periodsPerWeek: 2, avoidRepeatSameDay: true },
-    { id: uid("asg"), teacherId: "t_iyer", subjectId: "sub_art", classId: "cls_7a", periodsPerWeek: 2, avoidRepeatSameDay: true },
-    { id: uid("asg"), teacherId: "t_khan", subjectId: "sub_pe", classId: "cls_6a", periodsPerWeek: 2, avoidRepeatSameDay: true },
-    { id: uid("asg"), teacherId: "t_khan", subjectId: "sub_pe", classId: "cls_6b", periodsPerWeek: 2, avoidRepeatSameDay: true },
-    { id: uid("asg"), teacherId: "t_khan", subjectId: "sub_pe", classId: "cls_7a", periodsPerWeek: 2, avoidRepeatSameDay: true },
-    { id: uid("asg"), teacherId: "t_rao", subjectId: "sub_lab", classId: "cls_7a", periodsPerWeek: 4, avoidRepeatSameDay: true },
-    { id: uid("asg"), teacherId: "t_nair", subjectId: "sub_cs", classId: "cls_6a", periodsPerWeek: 2, avoidRepeatSameDay: true },
-    { id: uid("asg"), teacherId: "t_nair", subjectId: "sub_cs", classId: "cls_6b", periodsPerWeek: 2, avoidRepeatSameDay: true },
-    { id: uid("asg"), teacherId: "t_nair", subjectId: "sub_cs", classId: "cls_7a", periodsPerWeek: 2, avoidRepeatSameDay: true },
-    { id: uid("asg"), teacherId: "t_nair", subjectId: "sub_soc", classId: "cls_7a", periodsPerWeek: 4, avoidRepeatSameDay: true },
-    { id: uid("asg"), teacherId: "t_das", subjectId: "sub_soc", classId: "cls_6a", periodsPerWeek: 3, avoidRepeatSameDay: true },
-    { id: uid("asg"), teacherId: "t_das", subjectId: "sub_soc", classId: "cls_6b", periodsPerWeek: 3, avoidRepeatSameDay: true },
+    { id: uid("asg"), teacherId: "t_sharma", subjectId: "sub_sci", classIds: ["cls_6a"], classId: "cls_6a", periodsPerWeek: 5, avoidRepeatSameDay: true },
+    { id: uid("asg"), teacherId: "t_sharma", subjectId: "sub_eng", classIds: ["cls_6b"], classId: "cls_6b", periodsPerWeek: 5, avoidRepeatSameDay: true },
+    { id: uid("asg"), teacherId: "t_verma", subjectId: "sub_math", classIds: ["cls_6a"], classId: "cls_6a", periodsPerWeek: 6, avoidRepeatSameDay: true },
+    { id: uid("asg"), teacherId: "t_verma", subjectId: "sub_math", classIds: ["cls_6b"], classId: "cls_6b", periodsPerWeek: 6, avoidRepeatSameDay: true },
+    { id: uid("asg"), teacherId: "t_verma", subjectId: "sub_math", classIds: ["cls_7a"], classId: "cls_7a", periodsPerWeek: 6, avoidRepeatSameDay: true },
+    { id: uid("asg"), teacherId: "t_iyer", subjectId: "sub_art", classIds: ["cls_6a"], classId: "cls_6a", periodsPerWeek: 2, avoidRepeatSameDay: true },
+    { id: uid("asg"), teacherId: "t_iyer", subjectId: "sub_art", classIds: ["cls_7a"], classId: "cls_7a", periodsPerWeek: 2, avoidRepeatSameDay: true },
+    { id: uid("asg"), teacherId: "t_khan", subjectId: "sub_pe", classIds: ["cls_6a"], classId: "cls_6a", periodsPerWeek: 2, avoidRepeatSameDay: true },
+    { id: uid("asg"), teacherId: "t_khan", subjectId: "sub_pe", classIds: ["cls_6b"], classId: "cls_6b", periodsPerWeek: 2, avoidRepeatSameDay: true },
+    { id: uid("asg"), teacherId: "t_khan", subjectId: "sub_pe", classIds: ["cls_7a"], classId: "cls_7a", periodsPerWeek: 2, avoidRepeatSameDay: true },
+    { id: uid("asg"), teacherId: "t_rao", subjectId: "sub_lab", classIds: ["cls_7a"], classId: "cls_7a", periodsPerWeek: 4, avoidRepeatSameDay: true },
+    { id: uid("asg"), teacherId: "t_nair", subjectId: "sub_cs", classIds: ["cls_6a"], classId: "cls_6a", periodsPerWeek: 2, avoidRepeatSameDay: true },
+    { id: uid("asg"), teacherId: "t_nair", subjectId: "sub_cs", classIds: ["cls_6b"], classId: "cls_6b", periodsPerWeek: 2, avoidRepeatSameDay: true },
+    { id: uid("asg"), teacherId: "t_nair", subjectId: "sub_cs", classIds: ["cls_7a"], classId: "cls_7a", periodsPerWeek: 2, avoidRepeatSameDay: true },
+    { id: uid("asg"), teacherId: "t_nair", subjectId: "sub_soc", classIds: ["cls_7a"], classId: "cls_7a", periodsPerWeek: 4, avoidRepeatSameDay: true },
+    { id: uid("asg"), teacherId: "t_das", subjectId: "sub_soc", classIds: ["cls_6a"], classId: "cls_6a", periodsPerWeek: 3, avoidRepeatSameDay: true },
+    { id: uid("asg"), teacherId: "t_das", subjectId: "sub_soc", classIds: ["cls_6b"], classId: "cls_6b", periodsPerWeek: 3, avoidRepeatSameDay: true },
   ];
   return { config, teachers, subjects, classes, rooms, assignments, lastResult: null };
 }
@@ -869,12 +1001,17 @@ function normalizeBundle(raw) {
     : [];
   const assignments = Array.isArray(raw.assignments)
     ? raw.assignments
-        .filter((a) => a && a.id && a.teacherId && a.subjectId && a.classId)
-        .map((a) => ({
-          id: a.id, curriculumId: a.curriculumId || null, teacherId: a.teacherId, subjectId: a.subjectId, classId: a.classId,
-          periodsPerWeek: Number.isFinite(Number(a.periodsPerWeek)) && Number(a.periodsPerWeek) > 0 ? Number(a.periodsPerWeek) : 1,
-          avoidRepeatSameDay: a.avoidRepeatSameDay !== false,
-        }))
+        .filter((a) => a && a.id && a.teacherId && a.subjectId && (a.classIds?.length || a.classId))
+        .map((a) => {
+          const classIds = assignmentClassIds(a);
+          return {
+            id: a.id, curriculumId: a.curriculumId || null, teacherId: a.teacherId, subjectId: a.subjectId,
+            classIds, classId: classIds[0],
+            combinedSlotLabel: typeof a.combinedSlotLabel === "string" ? a.combinedSlotLabel : "",
+            periodsPerWeek: Number.isFinite(Number(a.periodsPerWeek)) && Number(a.periodsPerWeek) > 0 ? Number(a.periodsPerWeek) : 1,
+            avoidRepeatSameDay: a.avoidRepeatSameDay !== false,
+          };
+        })
     : [];
   const curriculum = Array.isArray(raw.curriculum) ? raw.curriculum.filter((item) => item?.id && item?.classId && item?.subjectId) : [];
   return {
