@@ -37,6 +37,7 @@ def test_fee_collections_validate_branch_scope_and_prevent_overpayment(api_clien
         branch=branch,
         student=student,
         amount=Decimal("100.00"),
+        total=Decimal("100.00"),
         due_date=date.today(),
     )
     login = api_client.post(

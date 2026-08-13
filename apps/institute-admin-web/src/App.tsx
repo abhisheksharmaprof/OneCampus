@@ -20,8 +20,8 @@ import { signOut, type SessionData } from './features/auth/auth.api'
 import { CalendarPage } from './features/calendar/CalendarPage'
 import { DashboardPage } from './features/dashboard/DashboardPage'
 import { getDashboard, type DashboardData } from './features/dashboard/dashboard.api'
-import { FinanceOverviewPage } from './features/finance/FinanceOverviewPage'
-import { FinanceFeesPage, FinanceOperationsPage } from './features/finance/FinanceWorkspacePage'
+import FinanceSuitePage, { type FinanceSection } from './features/finance/FinanceSuitePage'
+import { FinanceModulePage } from './features/finance/FinanceModulePage'
 import { InstituteProfilePage } from './features/institute/InstituteProfilePage'
 import { BrandingPage } from './features/institute/BrandingPage'
 import { SubscriptionPage } from './features/institute/SubscriptionPage'
@@ -32,6 +32,8 @@ import { ParentsPage } from './features/people/ParentsPage'
 import { StudentsPage } from './features/people/StudentsPage'
 import { ProfilePage } from './features/people/ProfilePages'
 import { AuditLogPage } from './features/audit/AuditLogPage'
+import TemplateStudioPage from './features/documents/TemplateStudioPage'
+import VerifyPage from './features/documents/verify/VerifyPage'
 
 import './styles/tokens.css'
 import './styles/global.css'
@@ -44,6 +46,15 @@ import './styles/students-form.css'
 import './styles/auth-responsive.css'
 
 const TimetablePage = lazy(() => import('./features/timetable/TimetablePage').then((module) => ({ default: module.TimetablePage })))
+
+const financeSectionByRoute: Record<string, FinanceSection> = {
+  FH1: 'overview',
+  FIN1: 'invoices',
+  FPY1: 'payments',
+  FDU1: 'dues',
+  FFS1: 'plans',
+  FST1: 'settings',
+}
 
 export function App() {
   return <BrowserRouter><ToastProvider><RoutedApp /></ToastProvider></BrowserRouter>
@@ -244,6 +255,9 @@ function RoutedApp() {
     navigateWithBranch(dashboardDestinations[destination] ?? `/${destination.replace(/^\/+/, '')}`)
   }
 
+  // Public QR verification — renders purely from the URL fragment, no session required.
+  if (location.pathname === '/verify') return <VerifyPage />
+
   if (!session) {
     if (location.pathname !== '/login' && !isOnboardingRoute) {
       return <Navigate to="/login" replace state={{ from: `${location.pathname}${location.search}` }} />
@@ -290,9 +304,12 @@ function RoutedApp() {
       {route?.view === 'enquiries' && <EnquiriesPage accessToken={session.accessToken} branches={visibleBranches} selectedBranch={selectedBranch} />}
       {route?.view === 'admissions-funnel' && <AdmissionsFunnelPage data={dashboard} error={dashboardError} />}
       {attendanceInitialTab && <AttendancePage initialTab={attendanceInitialTab} onTabChange={handleAttendanceTabChange} accessToken={session.accessToken} selectedBranch={selectedBranch} selectedDate={attendanceDate} onDateChange={(date) => updateQuery('date', date)} />}
-      {route?.id === 'FH1' && <FinanceOverviewPage accessToken={session.accessToken} selectedBranch={selectedBranch} onNavigate={handleNavigate} />}
-      {route?.id === 'FF1' && <FinanceFeesPage accessToken={session.accessToken} branches={visibleBranches} selectedBranch={selectedBranch} initialTab={location.pathname === '/fees/structure' ? 'structure' : 'collections'} />}
-      {route?.id === 'FO1' && <FinanceOperationsPage accessToken={session.accessToken} branches={visibleBranches} selectedBranch={selectedBranch} initialTab={location.pathname === '/finance/payroll' ? 'payroll' : location.pathname === '/finance/budget' ? 'budget' : location.pathname === '/finance/reports' ? 'reports' : 'expenses'} />}
+      {route?.id && financeSectionByRoute[route.id] && <FinanceSuitePage accessToken={session.accessToken} branches={visibleBranches} selectedBranch={selectedBranch} section={financeSectionByRoute[route.id]} onNavigate={navigateWithBranch} />}
+      {route?.id === 'FEX1' && <FinanceModulePage accessToken={session.accessToken} branches={visibleBranches} selectedBranch={selectedBranch} module="expenses" />}
+      {route?.id === 'FPR1' && <FinanceModulePage accessToken={session.accessToken} branches={visibleBranches} selectedBranch={selectedBranch} module="payroll" />}
+      {route?.id === 'FBU1' && <FinanceModulePage accessToken={session.accessToken} branches={visibleBranches} selectedBranch={selectedBranch} module="budget" />}
+      {route?.id === 'FRP1' && <FinanceModulePage accessToken={session.accessToken} branches={visibleBranches} selectedBranch={selectedBranch} module="reports" />}
+      {route?.view === 'template-studio' && <TemplateStudioPage accessToken={session.accessToken} />}
       {route?.id === 'AL1' && <AuditLogPage accessToken={session.accessToken} selectedBranch={selectedBranch} />}
       {(route?.view === 'calendar' || route?.id === 'HC1') && <CalendarPage accessToken={session.accessToken} branches={visibleBranches} selectedBranch={selectedBranch} />}
       {route?.view === 'timetable' && <Suspense fallback={<PageSkeleton name="timetable-route" label="Loading timetable" variant="form" />}><TimetablePage mode={route.id === 'TTG1' ? 'generate' : 'view'} accessToken={session.accessToken} branches={visibleBranches} selectedBranch={selectedBranch} onNavigate={navigateWithBranch} /></Suspense>}

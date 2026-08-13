@@ -38,6 +38,7 @@ LOCAL_APPS = [
     "modules.admin_console.apps.AdminConsoleConfig",
     "modules.academics.apps.AcademicsConfig",
     "modules.file_storage.apps.FileStorageConfig",
+    "modules.documents.apps.DocumentsConfig",
 ]
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 

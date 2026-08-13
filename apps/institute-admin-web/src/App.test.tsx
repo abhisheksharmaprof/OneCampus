@@ -298,28 +298,31 @@ describe('Institute Admin dashboard', () => {
     expect(screen.getByLabelText('Attendance date')).toHaveValue('2026-07-21')
   })
 
-  it('restores the fee collections screen with live invoice data', async () => {
-    window.history.pushState({}, '', '/fees/collections')
-    vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => Promise.resolve({
+  it('renders the finance suite shell with its sub-sidebar', async () => {
+    window.history.pushState({}, '', '/finance/invoices')
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => String(input).includes('fees/invoices')
-        ? { success: true, data: { items: [{ id: 'invoice-1', studentId: 'student-1', studentName: 'Diya Patel', amount: '1200.00', due_date: '2026-07-31', totalPaid: '200.00' }] } }
-        : String(input).includes('screens/FN4')
-          ? { success: true, data: { screen: { id: 'FN4' }, records: { items: [{ id: 'refund-1', title: 'Diya Patel', status: 'Pending', data: { amount: '100.00', reason: 'Duplicate payment' } }] } } }
-        : String(input).includes('/students')
-          ? { success: true, data: { items: [] } }
-          : dashboardResponse,
-    })))
+      json: async () => dashboardResponse,
+    }))
 
     render(<App />)
 
-    expect(await screen.findByRole('heading', { name: 'Fee Collections' })).toBeInTheDocument()
-    expect(await screen.findByText('Diya Patel')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /record payment/i })).toBeInTheDocument()
+    const financeNav = await screen.findByRole('navigation', { name: 'Finance sections' })
+    expect(within(financeNav).getByRole('button', { name: /payments & receipts/i })).toBeInTheDocument()
+    expect(within(financeNav).getByRole('button', { name: /^invoices$/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /new invoice/i })).toBeInTheDocument()
 
-    await userEvent.click(screen.getByRole('tab', { name: 'Refunds' }))
-    expect(await screen.findByText('Duplicate payment')).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Refund requests (1)' })).toBeInTheDocument()
+    await userEvent.click(within(financeNav).getByRole('button', { name: /payments & receipts/i }))
+    expect(await screen.findByRole('button', { name: /record payment/i })).toBeInTheDocument()
+  })
+
+  it('renders the template studio category home', async () => {
+    window.history.pushState({}, '', '/template-studio')
+    render(<App />)
+
+    expect(await screen.findByRole('heading', { name: 'Template Studio' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /fee invoice/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /id card/i })).toBeInTheDocument()
   })
 
   it('restores the staff screen with API-backed staff accounts', async () => {
@@ -401,5 +404,21 @@ describe('Institute Admin dashboard', () => {
     expect(window.location.pathname).toBe('/login')
     expect(localStorage.getItem('campusone.session')).toBeNull()
     expect(screen.queryByText(/access token expired|refresh token expired/i)).not.toBeInTheDocument()
+  })
+
+  it('renders the public verify page from a QR fragment without a session', async () => {
+    const { encodePayload } = await import('./features/documents/engine/qrPayload')
+    const fragment = encodePayload({
+      v: 1, cat: 'FEE_INVOICE', num: 'INV-2026-0009', date: '2026-08-13',
+      inst: 'Northstar Academy', student: 'Diya Sharma · Grade 8-A',
+      items: [['Tuition fee', 15000]], totals: [['Grand total', 15000]], status: 'Pending',
+    })
+    localStorage.removeItem('campusone.session')
+    window.history.pushState({}, '', `/verify#${fragment}`)
+    render(<App />)
+
+    expect(await screen.findByText('Northstar Academy')).toBeInTheDocument()
+    expect(screen.getByText('#INV-2026-0009')).toBeInTheDocument()
+    expect(screen.getByText('Tuition fee')).toBeInTheDocument()
   })
 })

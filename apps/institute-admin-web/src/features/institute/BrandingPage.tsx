@@ -17,7 +17,7 @@ interface InstituteProfile {
   id: string
   name?: string
   displayName?: string
-  primaryColor?: string
+  brandColor?: string
 }
 
 interface LogoAsset {
@@ -48,7 +48,7 @@ export function BrandingPage({ accessToken }: { accessToken: string }) {
       try {
         const profile = await adminRequest<InstituteProfile>(accessToken, 'institute')
         setInstituteName(profile.displayName || profile.name || 'Institute Name')
-        if (profile.primaryColor) setPrimary(profile.primaryColor)
+        if (profile.brandColor) setPrimary(profile.brandColor)
         const assets = await adminRequest<LogoAsset[]>(accessToken, `files?ownerType=INSTITUTE&ownerId=${encodeURIComponent(profile.id)}&assetType=LOGO`)
         const asset = assets[0]
         if (asset) {

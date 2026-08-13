@@ -2,7 +2,7 @@ export type AdminView =
   | 'dashboard' | 'branches' | 'institute-profile' | 'branding' | 'staff' | 'students'
   | 'parents' | 'enquiries' | 'admissions-funnel' | 'attendance'
   | 'fee-collections' | 'calendar' | 'timetable' | 'operational' | 'coming-soon'
-  | 'academic-operations' | 'academics' | 'finance'
+  | 'academic-operations' | 'academics' | 'finance' | 'template-studio'
 
 export type NavigationIcon =
   | 'dashboard' | 'institute' | 'roles' | 'people' | 'admissions'
@@ -73,11 +73,11 @@ export const adminNavigation: AdminNavigationItem[] = [
     route('CM1', 'Circulars', '/communication/circulars', 'Communication'),
     route('CM2', 'Templates', '/communication/templates', 'Communication'),
   ] },
-  { label: 'Finance', icon: 'fees', children: [
-    route('FH1', 'Finance Overview', '/finance', 'Finance', 'finance'),
-    route('FF1', 'Fees & Collections', '/finance/fees', 'Finance', 'finance'),
-    route('FO1', 'Operations & Reports', '/finance/operations', 'Finance', 'finance'),
-  ] },
+  // Finance is a single sidebar entry: the suite itself (FinanceSuitePage) renders its own
+  // left sub-sidebar for Overview/Invoices/Payments/Dues/Fee plans/Templates/Settings/Operations,
+  // so those aren't duplicated here as expandable children (see auxiliaryRoutes below).
+  { label: 'Finance', icon: 'fees', route: route('FH1', 'Finance', '/finance', 'Finance', 'finance') },
+  { label: 'Template Studio', icon: 'reports', route: route('TS1', 'Template Studio', '/template-studio', 'Template Studio', 'template-studio') },
   { label: 'Timetable', icon: 'calendar', children: [
     route('TT1', 'View Timetable', '/timetable', 'Timetable', 'timetable'),
     route('TTG1', 'Generate Timetable', '/timetable/generate', 'Timetable', 'timetable'),
@@ -117,6 +117,17 @@ export const auxiliaryRoutes: AdminRoute[] = [
   route('STP1', 'Staff Profile', '/staff/profile', 'People'),
   route('SDP1', 'Student Profile', '/students/profile', 'People'),
   route('PDP1', 'Parent Profile', '/parents/profile', 'People'),
+  // Finance suite sections: reachable via FinanceSuitePage's own sub-sidebar (onNavigate),
+  // not rendered as sidebar children — see the single 'Finance' entry above.
+  route('FFS1', 'Fee plans', '/finance/fee-structure', 'Finance', 'finance'),
+  route('FIN1', 'Invoices', '/finance/invoices', 'Finance', 'finance'),
+  route('FPY1', 'Payments', '/finance/payments', 'Finance', 'finance'),
+  route('FDU1', 'Dues', '/finance/dues', 'Finance', 'finance'),
+  route('FST1', 'Finance Settings', '/finance/settings', 'Finance', 'finance'),
+  route('FEX1', 'Expenses', '/finance/expenses', 'Finance', 'finance'),
+  route('FPR1', 'Payroll', '/finance/payroll', 'Finance', 'finance'),
+  route('FBU1', 'Budget', '/finance/budget', 'Finance', 'finance'),
+  route('FRP1', 'Finance Reports', '/finance/reports', 'Finance', 'finance'),
 ]
 
 export const allAdminRoutes = [...adminRoutes, ...auxiliaryRoutes, ...globalRoutes]
@@ -149,12 +160,10 @@ const legacyPaths = new Map<string, AdminRoute>([
   ['/academics/assessments', adminRoutes.find((item) => item.id === 'AAR1')!],
   ['/academics/common-tests', adminRoutes.find((item) => item.id === 'AAR1')!],
   ['/academics/report-cards', adminRoutes.find((item) => item.id === 'AAR1')!],
-  ['/fees/structure', adminRoutes.find((item) => item.id === 'FF1')!],
-  ['/fees/collections', adminRoutes.find((item) => item.id === 'FF1')!],
-  ['/finance/expenses', adminRoutes.find((item) => item.id === 'FO1')!],
-  ['/finance/payroll', adminRoutes.find((item) => item.id === 'FO1')!],
-  ['/finance/budget', adminRoutes.find((item) => item.id === 'FO1')!],
-  ['/finance/reports', adminRoutes.find((item) => item.id === 'FO1')!],
+  ['/fees/structure', allAdminRoutes.find((item) => item.id === 'FFS1')!],
+  ['/fees/collections', allAdminRoutes.find((item) => item.id === 'FIN1')!],
+  ['/finance/fees', allAdminRoutes.find((item) => item.id === 'FIN1')!],
+  ['/finance/operations', allAdminRoutes.find((item) => item.id === 'FEX1')!],
 ])
 
 const routesByLabel = new Map(allAdminRoutes.map((item) => [item.label, item]))
@@ -184,14 +193,9 @@ const actionAliases: Record<string, string> = {
   'Marks & Report Cards': 'Assessment & Results',
   'Branches List': 'Branches',
   'Attendance Dashboard': 'Overview',
-  'Collection Dashboard & Invoices': 'Collections',
-  'Collections': 'Fees & Collections',
-  'Fee Structure': 'Fees & Collections',
-  'Expenses': 'Operations & Reports',
-  'Payroll': 'Operations & Reports',
-  'Budget': 'Operations & Reports',
-  'Reports': 'Operations & Reports',
-  'Finance Reports': 'Operations & Reports',
+  'Collection Dashboard & Invoices': 'Invoices',
+  'Collections': 'Payments',
+  'Reports': 'Finance Reports',
   'Enquiries Inbox': 'Enquiries',
 }
 

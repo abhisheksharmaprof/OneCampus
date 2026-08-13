@@ -20,7 +20,16 @@ from modules.attendance.api.views import (
     LowAttendanceNotifyView,
     AttendanceNotificationActionView,
 )
-from modules.finance.api.views import FeeInvoiceListCreateView, FeePaymentCreateView, FinanceRecordListCreateView
+from modules.finance.api.views import (
+    FeeInvoiceBulkGenerateView,
+    FeeInvoiceDetailView,
+    FeeInvoiceListCreateView,
+    FeePaymentListCreateView,
+    FinanceRecordListCreateView,
+)
+from modules.finance.api.plans_views import FeePlanDetailView, FeePlanListCreateView
+from modules.finance.api.insights_views import FeeDuesExportView, FeeDuesView, FeeSummaryView
+from modules.finance.api.settings_views import FinanceSettingsView
 from modules.people.api.parents import ParentListCreateView, ParentStudentLinkView
 from modules.people.api.staff import StaffDetailView, StaffListCreateView
 from modules.people.api.views import StudentBulkDeleteView, StudentDetailView, StudentListCreateView
@@ -78,8 +87,24 @@ urlpatterns = [
     path("attendance/leave-balances", LeaveBalancesView.as_view(), name="admin-attendance-leave-balances"),
     path("attendance/leave-quotas", LeaveBalancesView.as_view(), name="admin-attendance-leave-quotas"),
     path("fees/invoices", FeeInvoiceListCreateView.as_view(), name="admin-fee-invoices"),
-    path("fees/payments", FeePaymentCreateView.as_view(), name="admin-fee-payments"),
+    path(
+        "fees/invoices/bulk-generate",
+        FeeInvoiceBulkGenerateView.as_view(),
+        name="admin-fee-invoices-bulk-generate",
+    ),
+    path(
+        "fees/invoices/<uuid:invoice_id>",
+        FeeInvoiceDetailView.as_view(),
+        name="admin-fee-invoice-detail",
+    ),
+    path("fees/payments", FeePaymentListCreateView.as_view(), name="admin-fee-payments"),
+    path("fees/plans", FeePlanListCreateView.as_view(), name="admin-fee-plans"),
+    path("fees/plans/<uuid:plan_id>", FeePlanDetailView.as_view(), name="admin-fee-plan-detail"),
+    path("fees/summary", FeeSummaryView.as_view(), name="admin-fee-summary"),
+    path("fees/dues/export", FeeDuesExportView.as_view(), name="admin-fee-dues-export"),
+    path("fees/dues", FeeDuesView.as_view(), name="admin-fee-dues"),
     path("finance/records", FinanceRecordListCreateView.as_view(), name="admin-finance-records"),
+    path("finance/settings", FinanceSettingsView.as_view(), name="admin-finance-settings"),
     path("calendar/events", CalendarEventListCreateView.as_view(), name="admin-calendar-events"),
     path("institute", CurrentInstituteView.as_view(), name="admin-current-institute"),
     path("branches", BranchListCreateView.as_view(), name="admin-branch-list-create"),
