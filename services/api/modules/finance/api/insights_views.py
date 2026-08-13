@@ -204,7 +204,7 @@ class FeeDuesExportView(APIView):
         filter_serializer = DuesFilterSerializer(data=request.data)
         filter_serializer.is_valid(raise_exception=True)
         filters = filter_serializer.validated_data
-        branch_id = filters.get("branchId")
+        branch_id = validated_branch_id(request, filters.get("branchId"))
         class_id = filters.get("classId")
         audit_mutation(
             request=request,

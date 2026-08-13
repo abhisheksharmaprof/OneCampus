@@ -145,6 +145,21 @@ def test_dues_export_writes_audit_event(api_client, context):
     )
 
     assert response.status_code == 201
-    assert AuditEvent.objects.filter(
+    event = AuditEvent.objects.get(
         institute=context["institute"], target_type="fee_dues_export"
-    ).exists()
+    )
+    assert event.metadata["minDaysOverdue"] == 5
+
+
+@pytest.mark.django_db
+def test_dues_export_rejects_foreign_branch(api_client, context):
+    other = Institute.objects.create(name="Other Academy", code="OTHER")
+    other_branch = Branch.objects.create(
+        institute=other, name="Other Campus", code="OTHER-MAIN", is_head_office=True
+    )
+
+    response = api_client.post(
+        "/api/v1/admin/fees/dues/export", {"branchId": str(other_branch.id)}, format="json"
+    )
+
+    assert response.status_code == 404
