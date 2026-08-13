@@ -1,0 +1,47 @@
+<h2>Finance suite layout — which structure works better?</h2>
+<p class="subtitle">Both keep all finance features in one tab. The difference is how sections are organized and how much room the work area gets.</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Grouped pill nav (evolution of current)</h3>
+      <p>One horizontal nav, but sections grouped by workflow: <b>Collect</b> (Overview · Invoices · Payments &amp; Receipts · Dues) | <b>Setup</b> (Fee Plans · Templates · Settings) | <b>Operations</b> (Expenses · Payroll · Budget · Reports, unchanged). Full width for tables.</p>
+      <div class="mockup">
+        <div class="mockup-header">Finance — Option A</div>
+        <div class="mockup-body">
+          <div class="mock-nav" style="font-size:12px">Overview · Invoices · Payments · Dues &nbsp;|&nbsp; Fee Plans · Templates · Settings &nbsp;|&nbsp; Operations ▾</div>
+          <div style="display:flex;gap:8px;margin:10px 0">
+            <div class="placeholder" style="flex:1;padding:14px">₹ Collected (month)</div>
+            <div class="placeholder" style="flex:1;padding:14px">Outstanding dues</div>
+            <div class="placeholder" style="flex:1;padding:14px">Overdue invoices</div>
+            <div class="placeholder" style="flex:1;padding:14px">Receipts today</div>
+          </div>
+          <div class="placeholder" style="padding:40px">Full-width work area (invoice table / editor)</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Left sub-sidebar inside Finance</h3>
+      <p>A slim vertical menu inside the finance tab listing all sections with icons and badge counts (e.g., "Dues · 34"). Work area sits to the right. More scannable with 10+ sections, but costs horizontal space for wide invoice tables.</p>
+      <div class="mockup">
+        <div class="mockup-header">Finance — Option B</div>
+        <div class="mockup-body" style="display:flex;gap:10px">
+          <div class="mock-sidebar" style="width:150px;font-size:12px">Overview<br/><br/>Invoices<br/><br/>Payments<br/><br/>Dues <b>34</b><br/><br/>Fee Plans<br/><br/>Templates<br/><br/>Settings<br/><br/>Operations ▾</div>
+          <div style="flex:1">
+            <div style="display:flex;gap:8px;margin-bottom:10px">
+              <div class="placeholder" style="flex:1;padding:12px">KPI</div>
+              <div class="placeholder" style="flex:1;padding:12px">KPI</div>
+              <div class="placeholder" style="flex:1;padding:12px">KPI</div>
+            </div>
+            <div class="placeholder" style="padding:34px">Work area (narrower)</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

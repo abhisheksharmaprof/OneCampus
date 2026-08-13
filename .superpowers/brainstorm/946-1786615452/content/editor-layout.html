@@ -1,0 +1,143 @@
+<h2>The canvas editor — proposed layout</h2>
+<p class="subtitle">This replaces the middle+right panes of Template Studio. Gallery stays on the far left as today. Everything below is one mockup — tell me what you'd change.</p>
+
+<div class="mockup">
+  <div class="mockup-header">Template Studio — "Classic letterhead" open on canvas</div>
+  <div class="mockup-body" style="padding:0;background:#f1f5f9">
+
+    <!-- Toolbar -->
+    <div style="display:flex;align-items:center;gap:8px;background:#ffffff;border-bottom:1px solid #e2e8f0;padding:8px 12px;font-size:12px">
+      <strong style="font-size:13px">Classic letterhead</strong>
+      <span style="background:#eef2ff;color:#4338ca;border-radius:99px;padding:2px 8px;font-size:10px;font-weight:700">INVOICE</span>
+      <span style="width:1px;height:18px;background:#e2e8f0"></span>
+      <button class="mock-button" style="padding:4px 10px;font-size:11px">↶ Undo</button>
+      <button class="mock-button" style="padding:4px 10px;font-size:11px">↷ Redo</button>
+      <span style="width:1px;height:18px;background:#e2e8f0"></span>
+      <button class="mock-button" style="padding:4px 10px;font-size:11px">100% ▾</button>
+      <label style="display:flex;align-items:center;gap:5px;font-size:11px;color:#475569"><input type="checkbox" checked /> Sample data</label>
+      <span style="flex:1"></span>
+      <button class="mock-button" style="padding:4px 12px;font-size:11px">Preview print</button>
+      <button class="mock-button" style="padding:4px 12px;font-size:11px;background:#1d4ed8;color:#fff;border-color:#1d4ed8">Save</button>
+    </div>
+
+    <div style="display:flex;min-height:430px">
+
+      <!-- Palette -->
+      <div style="width:150px;background:#ffffff;border-right:1px solid #e2e8f0;padding:10px;display:flex;flex-direction:column;gap:6px">
+        <div class="label" style="font-size:9px">DRAG ONTO PAGE</div>
+        <div style="border:1px solid #e2e8f0;border-radius:8px;padding:7px;font-size:11px;display:flex;gap:7px;align-items:center;cursor:grab;background:#fafafa">✏️ Text</div>
+        <div style="border:1px solid #e2e8f0;border-radius:8px;padding:7px;font-size:11px;display:flex;gap:7px;align-items:center;cursor:grab;background:#fafafa">🖼️ Image / logo</div>
+        <div style="border:1px solid #e2e8f0;border-radius:8px;padding:7px;font-size:11px;display:flex;gap:7px;align-items:center;background:#f8fafc;color:#94a3b8">▦ Items table <span style="font-size:9px;margin-left:auto">added ✓</span></div>
+        <div style="border:1px solid #e2e8f0;border-radius:8px;padding:7px;font-size:11px;display:flex;gap:7px;align-items:center;cursor:grab;background:#fafafa">Σ Totals</div>
+        <div style="border:1px solid #e2e8f0;border-radius:8px;padding:7px;font-size:11px;display:flex;gap:7px;align-items:center;cursor:grab;background:#fafafa">▭ Shape / band</div>
+        <div style="border:1px solid #e2e8f0;border-radius:8px;padding:7px;font-size:11px;display:flex;gap:7px;align-items:center;cursor:grab;background:#fafafa">— Divider line</div>
+        <div style="border:1px solid #e2e8f0;border-radius:8px;padding:7px;font-size:11px;display:flex;gap:7px;align-items:center;cursor:grab;background:#fafafa">🖊 Signature</div>
+        <div style="border:1px solid #e2e8f0;border-radius:8px;padding:7px;font-size:11px;display:flex;gap:7px;align-items:center;cursor:grab;background:#fafafa">⬛ QR code</div>
+        <div class="label" style="font-size:9px;margin-top:8px">PLACEHOLDERS</div>
+        <div style="display:flex;flex-wrap:wrap;gap:4px">
+          <span style="background:#fef3c7;border:1px solid #f59e0b;border-radius:99px;padding:2px 7px;font-size:9px;cursor:grab">student_name</span>
+          <span style="background:#fef3c7;border:1px solid #f59e0b;border-radius:99px;padding:2px 7px;font-size:9px;cursor:grab">invoice_no</span>
+          <span style="background:#fef3c7;border:1px solid #f59e0b;border-radius:99px;padding:2px 7px;font-size:9px;cursor:grab">due_date</span>
+          <span style="background:#fef3c7;border:1px solid #f59e0b;border-radius:99px;padding:2px 7px;font-size:9px;cursor:grab">class_section</span>
+          <span style="background:#fef3c7;border:1px solid #f59e0b;border-radius:99px;padding:2px 7px;font-size:9px;cursor:grab">+ 5 more</span>
+        </div>
+      </div>
+
+      <!-- Canvas -->
+      <div style="flex:1;display:flex;align-items:flex-start;justify-content:center;padding:18px;overflow:auto">
+        <div style="width:330px;height:400px;background:#fff;box-shadow:0 10px 30px rgba(2,6,23,.15);position:relative;border-radius:2px">
+          <!-- brand band -->
+          <div style="position:absolute;top:0;left:0;right:0;height:7px;background:#143f5c"></div>
+          <!-- logo -->
+          <div style="position:absolute;top:18px;left:16px;width:42px;height:42px;background:#143f5c;border-radius:6px;color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800">ST</div>
+          <!-- institute name -->
+          <div style="position:absolute;top:22px;left:68px;font-size:13px;font-weight:800;color:#143f5c">Step Next Academy</div>
+          <!-- SELECTED element: invoice no -->
+          <div style="position:absolute;top:20px;right:16px;width:96px;padding:3px;border:1.5px solid #2563eb;background:#eff6ff;font-size:9px;text-align:right;border-radius:2px">
+            FEE INVOICE<br/><strong>#INV-2026-0001</strong>
+            <span style="position:absolute;left:-4px;top:-4px;width:7px;height:7px;background:#fff;border:1.5px solid #2563eb;border-radius:99px"></span>
+            <span style="position:absolute;right:-4px;top:-4px;width:7px;height:7px;background:#fff;border:1.5px solid #2563eb;border-radius:99px"></span>
+            <span style="position:absolute;left:-4px;bottom:-4px;width:7px;height:7px;background:#fff;border:1.5px solid #2563eb;border-radius:99px"></span>
+            <span style="position:absolute;right:-4px;bottom:-4px;width:7px;height:7px;background:#fff;border:1.5px solid #2563eb;border-radius:99px"></span>
+          </div>
+          <!-- alignment guide -->
+          <div style="position:absolute;top:0;bottom:0;right:16px;width:1px;background:#f43f5e;opacity:.7"></div>
+          <!-- bill to -->
+          <div style="position:absolute;top:84px;left:16px;font-size:9px;color:#475569">BILL TO<br/><strong style="color:#0f172a">Aarav Sharma</strong><br/>ADM-1042 · Grade 8-A</div>
+          <!-- table -->
+          <div style="position:absolute;top:135px;left:16px;right:16px;height:110px;border:1px dashed #16a34a;border-radius:3px">
+            <div style="background:#143f5c;color:#fff;font-size:8px;display:flex;padding:4px 6px"><span style="flex:2">Fee description</span><span style="flex:1">Period</span><span style="width:26px;text-align:center">Qty</span><span style="flex:1;text-align:right">Amount</span></div>
+            <div style="font-size:8px;display:flex;padding:5px 6px;border-bottom:1px solid #f1f5f9"><span style="flex:2">Tuition fee</span><span style="flex:1">Term 1</span><span style="width:26px;text-align:center">1</span><span style="flex:1;text-align:right">15,000.00</span></div>
+            <div style="font-size:8px;display:flex;padding:5px 6px;border-bottom:1px solid #f1f5f9"><span style="flex:2">Transport fee</span><span style="flex:1">Term 1</span><span style="width:26px;text-align:center">1</span><span style="flex:1;text-align:right">3,000.00</span></div>
+            <div style="font-size:7px;color:#16a34a;text-align:center;padding-top:8px">↕ grows with real rows — elements below shift down</div>
+          </div>
+          <!-- totals -->
+          <div style="position:absolute;top:258px;right:16px;width:110px;font-size:8px;color:#0f172a">
+            <div style="display:flex;justify-content:space-between;padding:2px 0"><span>Subtotal</span><strong>18,000.00</strong></div>
+            <div style="display:flex;justify-content:space-between;padding:2px 0"><span>Discount</span><strong>−500.00</strong></div>
+            <div style="display:flex;justify-content:space-between;border-top:1.5px solid #16a085;padding:3px 0;color:#143f5c"><span><strong>Grand total</strong></span><strong>17,500.00</strong></div>
+          </div>
+          <!-- qr + signature -->
+          <div style="position:absolute;bottom:26px;left:16px;width:34px;height:34px;background:repeating-conic-gradient(#0f172a 0 25%,#fff 0 50%);background-size:8px 8px;border:1px solid #e2e8f0"></div>
+          <div style="position:absolute;bottom:30px;right:16px;width:90px;border-top:1px solid #94a3b8;font-size:7px;text-align:center;padding-top:2px;color:#475569">Authorised signature</div>
+        </div>
+      </div>
+
+      <!-- Properties panel -->
+      <div style="width:170px;background:#ffffff;border-left:1px solid #e2e8f0;padding:10px;font-size:11px;display:flex;flex-direction:column;gap:8px">
+        <div class="label" style="font-size:9px">SELECTED: TEXT</div>
+        <div><div style="color:#64748b;font-size:9px;margin-bottom:2px">Content</div>
+          <div style="border:1px solid #cbd5e1;border-radius:6px;padding:5px;font-size:10px;background:#f8fafc">FEE INVOICE<br/>#{{invoice_no}}</div>
+          <div style="font-size:9px;color:#2563eb;margin-top:3px">+ insert placeholder ▾</div>
+        </div>
+        <div style="display:flex;gap:6px">
+          <div style="flex:1"><div style="color:#64748b;font-size:9px">Size</div><div style="border:1px solid #cbd5e1;border-radius:6px;padding:4px;text-align:center">12</div></div>
+          <div style="flex:1"><div style="color:#64748b;font-size:9px">Colour</div><div style="border:1px solid #cbd5e1;border-radius:6px;padding:4px;display:flex;justify-content:center"><span style="width:14px;height:14px;background:#143f5c;border-radius:3px"></span></div></div>
+        </div>
+        <div style="display:flex;gap:4px">
+          <button class="mock-button" style="flex:1;padding:4px;font-weight:800">B</button>
+          <button class="mock-button" style="flex:1;padding:4px;font-style:italic">I</button>
+          <button class="mock-button" style="flex:1;padding:4px">⬅</button>
+          <button class="mock-button" style="flex:1;padding:4px">↔</button>
+          <button class="mock-button" style="flex:1;padding:4px">➡</button>
+        </div>
+        <div><div style="color:#64748b;font-size:9px">Position &amp; size (mm)</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:2px">
+            <div style="border:1px solid #cbd5e1;border-radius:5px;padding:3px;text-align:center;font-size:10px">X 152</div>
+            <div style="border:1px solid #cbd5e1;border-radius:5px;padding:3px;text-align:center;font-size:10px">Y 15</div>
+            <div style="border:1px solid #cbd5e1;border-radius:5px;padding:3px;text-align:center;font-size:10px">W 48</div>
+            <div style="border:1px solid #cbd5e1;border-radius:5px;padding:3px;text-align:center;font-size:10px">H 14</div>
+          </div>
+        </div>
+        <div style="margin-top:auto;display:flex;gap:4px">
+          <button class="mock-button" style="flex:1;padding:4px;font-size:10px">Duplicate</button>
+          <button class="mock-button" style="flex:1;padding:4px;font-size:10px;color:#b42318">Delete</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Built-in friendliness (all included)</h3>
+  <ul style="font-size:13px;line-height:1.7">
+    <li><strong>Drag from palette → drop on page</strong>; placeholder chips drop as ready-made text elements or into an existing text box</li>
+    <li><strong>Snap + alignment guides</strong> (the red line above) against page margins, centre, and other elements' edges</li>
+    <li><strong>Sample data toggle</strong> — design with realistic values ("Aarav Sharma") or raw tokens ("{{student_name}}")</li>
+    <li><strong>Undo/redo</strong> (Ctrl+Z / Ctrl+Y), arrow-key nudge (1mm, Shift = 5mm), Delete key, click-drag to move, handles to resize</li>
+    <li><strong>Double-click a text element to edit inline</strong> right on the canvas</li>
+    <li><strong>Can't-break-it guardrails</strong> — elements clamp to the printable page, minimum sizes enforced</li>
+    <li><strong>Preview print</strong> — exact popup output before saving</li>
+  </ul>
+</div>
+
+<div class="options">
+  <div class="option" data-choice="looks-good" onclick="toggleSelect(this)">
+    <div class="letter">✓</div>
+    <div class="content"><h3>Looks right — continue</h3><p>This layout and feature set match what I pictured</p></div>
+  </div>
+  <div class="option" data-choice="changes" onclick="toggleSelect(this)">
+    <div class="letter">✎</div>
+    <div class="content"><h3>I'd change some things</h3><p>Select this and tell me what in the terminal</p></div>
+  </div>
+</div>

@@ -1,8 +1,13 @@
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.contrib.auth.tokens import default_token_generator
 from django.core.mail import send_mail
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
+from django.utils.encoding import force_bytes
+from django.utils.http import urlsafe_base64_encode
+import logging
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.exceptions import AuthenticationFailed
@@ -15,7 +20,7 @@ from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from modules.identity.models import OtpChallenge
-from modules.institutes.models import Institute
+from modules.institutes.models import Institute, InstituteMembership
 from modules.identity.services import (
     eligible_session_memberships,
     issue_session_tokens,
@@ -33,7 +38,11 @@ from .serializers import (
     SessionLogoutSuccessSerializer,
     SessionRefreshSerializer,
     SessionSuccessSerializer,
+    PasswordResetRequestSerializer,
+    PasswordResetConfirmSerializer,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def deliver_otp_code(*, user, code):
@@ -45,6 +54,87 @@ def deliver_otp_code(*, user, code):
         recipient_list=[user.email],
         fail_silently=False,
     )
+
+
+def deliver_password_reset(*, user, reset_url):
+    logger.info(
+        "password-reset smtp-send-start recipient=%s host=%s port=%s user=%s from=%s",
+        _masked_email(user.email), settings.EMAIL_HOST, settings.EMAIL_PORT,
+        settings.EMAIL_HOST_USER, settings.DEFAULT_FROM_EMAIL,
+    )
+    try:
+        sent = send_mail(
+            subject="Reset your CampusOne password",
+            message=(
+                "Use this link to choose a new CampusOne password:\n\n"
+                f"{reset_url}\n\nThis link expires in 24 hours."
+            ),
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[user.email],
+            fail_silently=False,
+        )
+    except Exception:
+        logger.exception("password-reset smtp-send-failed recipient=%s", _masked_email(user.email))
+        raise
+    logger.info("password-reset smtp-send-success recipient=%s messages=%s", _masked_email(user.email), sent)
+
+
+class PasswordResetRequestView(APIView):
+    permission_classes = (AllowAny,)
+    authentication_classes = ()
+    throttle_classes = (DynamicScopedRateThrottle,)
+    throttle_scope = "password-reset"
+
+    def post(self, request):
+        serializer = PasswordResetRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        requested_email = serializer.validated_data["email"].lower()
+        User = get_user_model()
+        now = timezone.now()
+        matching_user = User.objects.filter(email__iexact=requested_email).first()
+        active_user = User.objects.filter(email__iexact=requested_email, is_active=True).first()
+        admin_membership = InstituteMembership.objects.filter(
+            user__email__iexact=requested_email,
+            user__is_active=True,
+            is_active=True,
+            institute__is_active=True,
+            role__in=(InstituteMembership.Role.INSTITUTE_ADMIN, InstituteMembership.Role.BRANCH_ADMIN),
+        ).filter(Q(valid_until__isnull=True) | Q(valid_until__gt=now)).first()
+        user = active_user if admin_membership else None
+        logger.info(
+            "password-reset request email=%s user_exists=%s user_active=%s admin_membership=%s account_found=%s frontend_url=%s",
+            _masked_email(requested_email), bool(matching_user), bool(active_user),
+            bool(admin_membership), bool(user), settings.PASSWORD_RESET_URL,
+        )
+        if user:
+            uid = urlsafe_base64_encode(force_bytes(user.pk))
+            token = default_token_generator.make_token(user)
+            reset_base = settings.PASSWORD_RESET_URL.rstrip("/")
+            deliver_password_reset(user=user, reset_url=f"{reset_base}?uid={uid}&token={token}")
+        return Response({"success": True, "data": {"message": "If an account exists for that email, a reset link has been sent."}})
+
+
+class PasswordResetConfirmView(APIView):
+    permission_classes = (AllowAny,)
+    authentication_classes = ()
+    throttle_classes = (DynamicScopedRateThrottle,)
+    throttle_scope = "password-reset"
+
+    def post(self, request):
+        uid = str(request.data.get("uid", ""))
+        try:
+            from django.utils.http import urlsafe_base64_decode
+            user_id = urlsafe_base64_decode(uid).decode()
+            user = get_user_model().objects.get(pk=user_id, is_active=True)
+        except (TypeError, ValueError, OverflowError, get_user_model().DoesNotExist):
+            return Response({"success": False, "error": {"code": "RESET_LINK_INVALID", "message": "This password reset link is invalid or expired."}}, status=status.HTTP_400_BAD_REQUEST)
+        if not default_token_generator.check_token(user, request.data.get("token", "")):
+            return Response({"success": False, "error": {"code": "RESET_LINK_INVALID", "message": "This password reset link is invalid or expired."}}, status=status.HTTP_400_BAD_REQUEST)
+        serializer = PasswordResetConfirmSerializer(data=request.data, context={"user": user})
+        serializer.is_valid(raise_exception=True)
+        user.set_password(serializer.validated_data["password"])
+        user.save(update_fields=("password", "updated_at"))
+        return Response({"success": True, "data": {"message": "Your password has been reset. You can now sign in."}})
 
 
 def _masked_email(email):

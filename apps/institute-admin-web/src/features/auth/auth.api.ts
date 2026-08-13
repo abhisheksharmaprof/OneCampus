@@ -114,6 +114,14 @@ export function signIn(email: string, password: string) {
   })
 }
 
+export function requestPasswordReset(email: string) {
+  return post<{ message: string }>('/api/v1/identity/password-reset/request', { email })
+}
+
+export function confirmPasswordReset(uid: string, token: string, password: string, confirmPassword: string) {
+  return post<{ message: string }>('/api/v1/identity/password-reset/confirm', { uid, token, password, confirmPassword })
+}
+
 export function verifyOtp(challengeId: string, code: string) {
   return post<SessionData>('/api/v1/identity/sessions/otp', { challengeId, code })
 }

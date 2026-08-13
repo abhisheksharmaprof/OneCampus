@@ -1,8 +1,11 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { ArrowLeft, Check, GraduationCap } from 'lucide-react'
 import {
   ApiError,
   createInstitute,
+  requestPasswordReset,
+  confirmPasswordReset,
   resendOtp,
   signIn,
   verifyOtp,
@@ -61,6 +64,10 @@ function Field({
 }
 
 export function AuthPage({ mode, onboardingStep, onNavigate, onAuthenticated }: AuthPageProps) {
+  const [searchParams] = useSearchParams()
+  const resetUid = searchParams.get('uid') ?? ''
+  const resetToken = searchParams.get('token') ?? ''
+  const [authView, setAuthView] = useState<'login' | 'forgot' | 'reset'>(resetUid && resetToken ? 'reset' : 'login')
   const [step, setStep] = useState(1)
   const [values, setValues] = useState({
     instituteName: '',
@@ -79,6 +86,7 @@ export function AuthPage({ mode, onboardingStep, onNavigate, onAuthenticated }: 
   const [otpNotice, setOtpNotice] = useState('')
   const [resending, setResending] = useState(false)
   const [instituteBrand, setInstituteBrand] = useState<PublicInstituteConfig | null>(null)
+  const [resetNotice, setResetNotice] = useState('')
 
   useEffect(() => {
     if (mode !== 'login') return
@@ -114,7 +122,30 @@ export function AuthPage({ mode, onboardingStep, onNavigate, onAuthenticated }: 
     setOtpNotice('')
     setErrors({})
     setServerError('')
+    setResetNotice('')
+    setAuthView('login')
     onNavigate('/login')
+  }
+
+  const submitForgotPassword = async (event: FormEvent) => {
+    event.preventDefault()
+    if (!emailPattern.test(values.email.trim())) { setErrors({ email: 'Enter a valid email address.' }); return }
+    setSubmitting(true); setServerError('')
+    try { setResetNotice((await requestPasswordReset(values.email.trim())).message) }
+    catch (error) { setServerError(error instanceof ApiError ? error.message : 'Unable to request a password reset.') }
+    finally { setSubmitting(false) }
+  }
+
+  const submitResetPassword = async (event: FormEvent) => {
+    event.preventDefault()
+    const nextErrors: FieldErrors = {}
+    if (values.password.length < 8) nextErrors.password = 'Use at least 8 characters.'
+    if (values.password !== values.confirmPassword) nextErrors.confirmPassword = 'Passwords do not match.'
+    setErrors(nextErrors); if (Object.keys(nextErrors).length) return
+    setSubmitting(true); setServerError('')
+    try { setResetNotice((await confirmPasswordReset(resetUid, resetToken, values.password, values.confirmPassword)).message); setAuthView('login') }
+    catch (error) { setServerError(error instanceof ApiError ? error.message : 'Unable to reset your password.') }
+    finally { setSubmitting(false) }
   }
 
   const continueOnboarding = () => {
@@ -293,7 +324,7 @@ export function AuthPage({ mode, onboardingStep, onNavigate, onAuthenticated }: 
                 </button>
               </div>
             </>
-          ) : mode === 'login' ? (
+          ) : mode === 'login' && authView === 'login' ? (
             <>
               <div className="auth-heading">
                 {instituteBrand?.logoUrl ? <img className="auth-institute-logo" src={instituteBrand.logoUrl} alt={`${instituteBrand.name} logo`} /> : null}
@@ -309,10 +340,23 @@ export function AuthPage({ mode, onboardingStep, onNavigate, onAuthenticated }: 
                   {submitting ? 'Signing in…' : 'Sign in'}
                 </button>
               </form>
+              <button className="auth-link-button" type="button" onClick={() => { setAuthView('forgot'); setServerError(''); setErrors({}); setResetNotice('') }}>Forgot password?</button>
               <div className="auth-switch">
                 <span>New to CampusOne?</span>
                 <button type="button" onClick={openOnboarding}>Create your institute</button>
               </div>
+            </>
+          ) : authView === 'forgot' ? (
+            <>
+              <button className="auth-back" type="button" onClick={openLogin}><ArrowLeft aria-hidden="true" /> Back to sign in</button>
+              <div className="auth-heading"><p className="auth-eyebrow">Account recovery</p><h1>Forgot your password?</h1><p>Enter your work email and we’ll send you a reset link.</p></div>
+              <form className="auth-form" onSubmit={submitForgotPassword} noValidate><Field label="Work email" name="email" type="email" autoComplete="email" value={values.email} error={errors.email} onChange={(value) => update('email', value)} />{serverError ? <div className="auth-global-error" role="alert">{serverError}</div> : null}{resetNotice ? <p className="auth-helper" role="status">{resetNotice}</p> : null}<button className="auth-primary-button" type="submit" disabled={submitting}>{submitting ? 'Sending…' : 'Send reset link'}</button></form>
+            </>
+          ) : authView === 'reset' ? (
+            <>
+              <button className="auth-back" type="button" onClick={openLogin}><ArrowLeft aria-hidden="true" /> Back to sign in</button>
+              <div className="auth-heading"><p className="auth-eyebrow">Account recovery</p><h1>Set a new password</h1><p>Choose a new password for your CampusOne account.</p></div>
+              <form className="auth-form" onSubmit={submitResetPassword} noValidate><Field label="New password" name="password" type="password" autoComplete="new-password" value={values.password} error={errors.password} onChange={(value) => update('password', value)} /><Field label="Confirm password" name="confirmPassword" type="password" autoComplete="new-password" value={values.confirmPassword} error={errors.confirmPassword} onChange={(value) => update('confirmPassword', value)} />{serverError ? <div className="auth-global-error" role="alert">{serverError}</div> : null}<button className="auth-primary-button" type="submit" disabled={submitting}>{submitting ? 'Updating…' : 'Update password'}</button></form>
             </>
           ) : (
             <>

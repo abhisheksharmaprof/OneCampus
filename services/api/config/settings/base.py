@@ -2,6 +2,7 @@ from datetime import timedelta
 from pathlib import Path
 
 import environ
+from django.core.exceptions import ImproperlyConfigured
 
 BASE_DIR = Path(__file__).resolve().parents[2]
 env = environ.Env()
@@ -9,6 +10,16 @@ environ.Env.read_env(BASE_DIR / ".env")
 
 SECRET_KEY = env("DJANGO_SECRET_KEY", default="local-development-only")
 DEBUG = env.bool("DJANGO_DEBUG", default=False)
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {"campusone": {"format": "[{levelname}] {name}: {message}", "style": "{"}},
+    "handlers": {"console": {"class": "logging.StreamHandler", "formatter": "campusone"}},
+    "loggers": {
+        "modules.identity.api": {"handlers": ["console"], "level": "INFO", "propagate": False},
+    },
+}
 ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=["localhost", "127.0.0.1"])
 
 DJANGO_APPS = [
@@ -79,6 +90,11 @@ if USE_SQLITE:
     }
 else:
     DATABASES = {"default": env.db("DATABASE_URL")}
+    if DATABASES["default"]["ENGINE"] == "django.db.backends.sqlite3":
+        raise ImproperlyConfigured(
+            "DJANGO_USE_SQLITE=false requires a PostgreSQL DATABASE_URL. "
+            "Replace DATABASE_URL=sqlite:///db.sqlite3 in services/api/.env with the cloud database URL."
+        )
     # Persistent connections are useful in production, but they easily exhaust
     # small hosted Postgres plans during local Django development/reloads.
     default_conn_max_age = 0 if DEBUG else 60
@@ -122,6 +138,12 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 AUTH_USER_MODEL = "identity.User"
 
 CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS", default=["http://localhost:5173"])
+# Vite may move to the next available port when another dev server is running.
+# Keep this convenience limited to local development; production still uses the
+# explicit CORS_ALLOWED_ORIGINS list above.
+CORS_ALLOWED_ORIGIN_REGEXES = (
+    [r"^https?://(localhost|127\.0\.0\.1):\d+$"] if DEBUG else []
+)
 CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=["http://localhost:5173"])
 
 REST_FRAMEWORK = {
@@ -134,9 +156,11 @@ REST_FRAMEWORK = {
     "DEFAULT_THROTTLE_RATES": {
         "identity-login": env("IDENTITY_LOGIN_RATE", default="10/minute"),
         "identity-refresh": env("IDENTITY_REFRESH_RATE", default="30/minute"),
+        "password-reset": env("PASSWORD_RESET_RATE", default="5/hour"),
         "institute-onboarding": env("INSTITUTE_ONBOARDING_RATE", default="5/hour"),
     },
 }
+PASSWORD_RESET_URL = env("PASSWORD_RESET_URL", default="http://localhost:5175/login")
 SPECTACULAR_SETTINGS = {
     "TITLE": "CampusOne API",
     "DESCRIPTION": "Multi-tenant school CRM API",

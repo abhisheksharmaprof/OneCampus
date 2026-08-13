@@ -1,0 +1,286 @@
+===== services/api/modules/identity/api/views.py =====
+0009: from rest_framework.permissions import AllowAny
+0014: from rest_framework_simplejwt.serializers import TokenRefreshSerializer
+0015: from rest_framework_simplejwt.tokens import RefreshToken
+0017: from modules.identity.models import OtpChallenge
+0020:     eligible_session_memberships,
+0021:     issue_session_tokens,
+0022:     resolve_session_context,
+0026: from .errors import SessionContextInactive
+0028:     OtpChallengeSerializer,
+0029:     OtpResendSerializer,
+0030:     SessionCreateSerializer,
+0031:     SessionCurrentSuccessSerializer,
+0032:     SessionLogoutSerializer,
+0033:     SessionLogoutSuccessSerializer,
+0034:     SessionRefreshSerializer,
+0035:     SessionSuccessSerializer,
+0039: def deliver_otp_code(*, user, code):
+0064: def _with_onboarding_state(session_data, institute_id):
+0067:         return session_data
+0072:         session_data["onboarding"] = {
+0080:     return session_data
+0083: def _otp_error(code, message, *, http_status, details=None):
+0090: def _issue_challenge(*, user, client, institute_id=None):
+0093:         # Use select_for_update() to prevent concurrent OTP issuance from
+0094:         # creating multiple valid challenges for the same (user, client).
+0095:         OtpChallenge.objects.select_for_update().filter(
+0097:             client=client,
+0100:         challenge, code = OtpChallenge.issue(
+0102:             client=client,
+0105:         deliver_otp_code(user=user, code=code)
+0109: class SessionCreateView(APIView):
+0110:     permission_classes = (AllowAny,)
+0116:         request=SessionCreateSerializer,
+0117:         responses={status.HTTP_200_OK: SessionSuccessSerializer},
+0120:         serializer = SessionCreateSerializer(data=request.data, context={"request": request})
+0123:         client = serializer.validated_data["client"]
+0126:         if client == "platform-admin":
+0127:             context = resolve_session_context(user=user, client=client)
+0129:                 return Response({"success": False, "error": {"code": "ROLE_NOT_ALLOWED_FOR_CLIENT", "message": "This account cannot sign in to the platform console."}}, status=status.HTTP_403_FORBIDDEN)
+0130:             return Response({"success": True, "data": issue_session_tokens(user=user, context=context, client=client)})
+0132:         eligible = eligible_session_memberships(user=user, client=client)
+0154:         context = resolve_session_context(user=user, client=client, institute_id=institute_id)
+0160:                         "code": "ROLE_NOT_ALLOWED_FOR_CLIENT",
+0161:                         "message": "This account cannot sign in to this application.",
+0167:         if user.otp_required:
+0170:                 client=client,
+0173:             return _otp_error(
+0174:                 "OTP_REQUIRED",
+0184:                     issue_session_tokens(user=user, context=context, client=client),
+0191: class SessionOtpVerifyView(APIView):
+0192:     permission_classes = (AllowAny,)
+0198:         request=OtpChallengeSerializer,
+0199:         responses={status.HTTP_200_OK: SessionSuccessSerializer},
+0202:         serializer = OtpChallengeSerializer(data=request.data)
+0207:                 OtpChallenge.objects.select_for_update()
+0213:                 return _otp_error(
+0214:                     "OTP_CHALLENGE_INVALID",
+0219:                 return _otp_error(
+0220:                     "OTP_CHALLENGE_CONSUMED",
+0225:                 return _otp_error(
+0226:                     "OTP_CHALLENGE_EXPIRED",
+0231:                 return _otp_error(
+0232:                     "OTP_ATTEMPTS_EXCEEDED",
+0241:                     return _otp_error(
+0242:                         "OTP_ATTEMPTS_EXCEEDED",
+0246:                 return _otp_error(
+0247:                     "OTP_INVALID_CODE",
+0255:                 resolve_session_context(
+0257:                     client=challenge.client,
+0264:                 return _otp_error(
+0265:                     "SESSION_CONTEXT_INACTIVE",
+0266:                     "This account can no longer sign in to this application.",
+0271:             session_data = _with_onboarding_state(
+0272:                 issue_session_tokens(user=user, context=context, client=challenge.client),
+0276:         return Response({"success": True, "data": session_data})
+0279: class SessionOtpResendView(APIView):
+0280:     permission_classes = (AllowAny,)
+0285:     @extend_schema(request=OtpResendSerializer)
+0287:         serializer = OtpResendSerializer(data=request.data)
+0292:                 OtpChallenge.objects.select_for_update()
+0298:                 return _otp_error(
+0299:                     "OTP_CHALLENGE_INVALID",
+0303:             if not challenge.user.is_active or not challenge.user.otp_required:
+0304:                 return _otp_error(
+0305:                     "OTP_CHALLENGE_INVALID",
+0311:                 client=challenge.client,
+0318: class SessionRefreshView(APIView):
+0319:     permission_classes = (AllowAny,)
+0322:     throttle_scope = "identity-refresh"
+0325:         request=SessionRefreshSerializer,
+0326:         responses={status.HTTP_200_OK: SessionSuccessSerializer},
+0329:         request_serializer = SessionRefreshSerializer(data=request.data)
+0331:         raw_refresh = request_serializer.validated_data["refreshToken"]
+0333:             refresh = RefreshToken(raw_refresh)
+0335:             raise AuthenticationFailed("Refresh token is invalid or expired.") from exc
+0337:         user = get_user_model().objects.filter(id=refresh.get("user_id"), is_active=True).first()
+0339:             resolve_session_context(
+0341:                 client=refresh.get("client"),
+0342:                 membership_id=refresh.get("membership_id"),
+0344:             if user and refresh.get("client") and (refresh.get("membership_id") or refresh.get("client") == "platform-admin")
+0348:             raise SessionContextInactive()
+0350:         token_serializer = TokenRefreshSerializer(data={"refresh": raw_refresh})
+0358:                     "refreshToken": tokens.get("refresh", raw_refresh),
+0365: class SessionCurrentView(APIView):
+0366:     @extend_schema(responses={status.HTTP_200_OK: SessionCurrentSuccessSerializer})
+0368:         if request.auth.get("client") == "platform-admin":
+0369:             context = resolve_session_context(user=request.user, client="platform-admin")
+0371:                 raise SessionContextInactive()
+0373:         if not request.auth.get("client") or not request.auth.get("membership_id"):
+0374:             raise SessionContextInactive()
+0375:         context = resolve_session_context(
+0377:             client=request.auth.get("client"),
+0381:             raise SessionContextInactive()
+0385:         request=SessionLogoutSerializer,
+0386:         responses={status.HTTP_200_OK: SessionLogoutSuccessSerializer},
+0389:         serializer = SessionLogoutSerializer(data=request.data)
+0392:             refresh = RefreshToken(serializer.validated_data["refreshToken"])
+0394:             raise AuthenticationFailed("Refresh token is invalid or expired.") from exc
+0395:         if str(refresh.get("user_id")) != str(request.user.id):
+0396:             raise AuthenticationFailed("Refresh token does not belong to this session.")
+0397:         refresh.blacklist()
+
+===== services/api/modules/identity/api/serializers.py =====
+0005: class SessionCreateSerializer(serializers.Serializer):
+0008:     client = serializers.ChoiceField(choices=("admin-web", "parent-mobile", "staff-mobile", "platform-admin"))
+0023: class OtpChallengeSerializer(serializers.Serializer):
+0028: class OtpResendSerializer(serializers.Serializer):
+0032: class SessionUserSerializer(serializers.Serializer):
+0041: class SessionDataSerializer(serializers.Serializer):
+0043:     refreshToken = serializers.CharField()
+0044:     user = SessionUserSerializer()
+0047: class SessionSuccessSerializer(serializers.Serializer):
+0049:     data = SessionDataSerializer()
+0052: class SessionRefreshSerializer(serializers.Serializer):
+0053:     refreshToken = serializers.CharField(trim_whitespace=False, write_only=True)
+0056: class SessionCurrentDataSerializer(serializers.Serializer):
+0057:     user = SessionUserSerializer()
+0060: class SessionCurrentSuccessSerializer(serializers.Serializer):
+0062:     data = SessionCurrentDataSerializer()
+0065: class SessionLogoutSerializer(serializers.Serializer):
+0066:     refreshToken = serializers.CharField(trim_whitespace=False, write_only=True)
+0069: class SessionLogoutSuccessSerializer(serializers.Serializer):
+
+===== services/api/modules/identity/services.py =====
+0008: CLIENT_ROLES = {
+0009:     "admin-web": {
+0015:     "platform-admin": set(),
+0020: class SessionContext:
+0025: def eligible_session_memberships(*, user, client=None, membership_id=None, institute_id=None):
+0041:     if client:
+0043:             membership for membership in accepted if membership.role in CLIENT_ROLES[client]
+0048: def resolve_session_context(*, user, client=None, membership_id=None, institute_id=None):
+0049:     if client == "platform-admin" and user and (user.is_superuser or user.user_type == "platform_admin"):
+0050:         return SessionContext(
+0061:     accepted = eligible_session_memberships(
+0063:         client=client,
+0084:     # Keep the client-side shell aligned with the same server-side permission
+0093:     return SessionContext(
+0107: def issue_session_tokens(*, user, context, client):
+0108:     from rest_framework_simplejwt.tokens import RefreshToken
+0110:     refresh = RefreshToken.for_user(user)
+0112:         refresh["membership_id"] = str(context.membership.id)
+0113:     refresh["client"] = client
+0115:         "accessToken": str(refresh.access_token),
+0116:         "refreshToken": str(refresh),
+
+===== services/api/modules/identity/models.py =====
+0047:     otp_required = models.BooleanField(default=False)
+0065: class OtpChallenge(models.Model):
+0071:     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="otp_challenges")
+0073:     client = models.CharField(max_length=20)
+0088:     def issue(cls, *, user, client, institute_id=None):
+0092:             client=client,
+0105:             raise ValueError("Cannot hash OTP before the challenge is saved (id is None).")
+0107:             "identity.otp-challenge",
+
+===== services/api/modules/identity/api/urls.py =====
+0004:     SessionCreateView,
+0005:     SessionCurrentView,
+0006:     SessionOtpResendView,
+0007:     SessionOtpVerifyView,
+0008:     SessionRefreshView,
+0012:     path("sessions", SessionCreateView.as_view(), name="session-create"),
+0013:     path("sessions/otp", SessionOtpVerifyView.as_view(), name="session-otp-verify"),
+0014:     path("sessions/otp/resend", SessionOtpResendView.as_view(), name="session-otp-resend"),
+0015:     path("sessions/refresh", SessionRefreshView.as_view(), name="session-refresh"),
+0016:     path("sessions/current", SessionCurrentView.as_view(), name="session-current"),
+
+===== services/api/tests/test_identity_sessions.py =====
+0013: def test_admin_login_returns_role_aware_session_profile(api_client):
+0028:     response = api_client.post(
+0029:         "/api/v1/identity/sessions",
+0030:         {"email": user.email, "password": "StrongPass123!", "client": "admin-web"},
+0038:     assert payload["data"]["refreshToken"]
+0050: def test_admin_credentials_are_rejected_from_staff_mobile(api_client):
+0059:     response = api_client.post(
+0060:         "/api/v1/identity/sessions",
+0061:         {"email": user.email, "password": "StrongPass123!", "client": "staff-mobile"},
+0066:     assert response.json()["error"]["code"] == "ROLE_NOT_ALLOWED_FOR_CLIENT"
+0070: def test_multi_institute_admin_must_select_an_authorized_institute(api_client):
+0085:     response = api_client.post(
+0086:         "/api/v1/identity/sessions",
+0087:         {"email": user.email, "password": "StrongPass123!", "client": "admin-web"},
+0098:     response = api_client.post(
+0099:         "/api/v1/identity/sessions",
+0103:             "client": "admin-web",
+0120: def test_login_is_rate_limited(api_client):
+0125:         "client": "admin-web",
+0128:     assert api_client.post("/api/v1/identity/sessions", payload, format="json").status_code == 400
+0129:     assert api_client.post("/api/v1/identity/sessions", payload, format="json").status_code == 400
+0130:     response = api_client.post("/api/v1/identity/sessions", payload, format="json")
+0136: def test_refresh_tokens_expire_after_one_day():
+0137:     assert settings.SIMPLE_JWT["REFRESH_TOKEN_LIFETIME"] == timedelta(days=1)
+
+===== services/api/tests/test_identity_otp.py =====
+0008: from modules.identity.models import OtpChallenge, User
+0015: def otp_user():
+0016:     institute = Institute.objects.create(name="OTP Academy", code="OTP")
+0021:         otp_required=True,
+0038:     monkeypatch.setattr("modules.identity.api.views.deliver_otp_code", capture)
+0042: def request_challenge(api_client, user):
+0043:     return api_client.post(
+0044:         "/api/v1/identity/sessions",
+0045:         {"email": user.email, "password": PASSWORD, "client": "admin-web"},
+0051: def test_password_login_requests_otp_without_exposing_raw_code(
+0052:     api_client, otp_user, delivered_codes
+0054:     response = request_challenge(api_client, otp_user)
+0058:     assert payload["error"]["code"] == "OTP_REQUIRED"
+0062:     challenge = OtpChallenge.objects.get(id=details["challengeId"])
+0071: def test_correct_otp_issues_session_and_challenge_cannot_be_reused(
+0072:     api_client, otp_user, delivered_codes
+0074:     challenge_response = request_challenge(api_client, otp_user).json()
+0078:     response = api_client.post(
+0079:         "/api/v1/identity/sessions/otp",
+0086:     assert response.json()["data"]["user"]["id"] == str(otp_user.id)
+0087:     assert OtpChallenge.objects.get(id=challenge_id).consumed_at is not None
+0089:     replay = api_client.post(
+0090:         "/api/v1/identity/sessions/otp",
+0095:     assert replay.json()["error"]["code"] == "OTP_CHALLENGE_CONSUMED"
+0099: def test_incorrect_otp_counts_attempts_and_locks_challenge(api_client, otp_user, delivered_codes):
+0100:     challenge_id = request_challenge(api_client, otp_user).json()["error"]["details"]["challengeId"]
+0105:         response = api_client.post(
+0106:             "/api/v1/identity/sessions/otp",
+0111:         assert response.json()["error"]["code"] == "OTP_INVALID_CODE"
+0114:     locked = api_client.post(
+0115:         "/api/v1/identity/sessions/otp",
+0120:     assert locked.json()["error"]["code"] == "OTP_ATTEMPTS_EXCEEDED"
+0122:     correct_after_lock = api_client.post(
+0123:         "/api/v1/identity/sessions/otp",
+0128:     assert OtpChallenge.objects.get(id=challenge_id).attempts == 5
+0132: def test_expired_otp_is_rejected(api_client, otp_user, delivered_codes):
+0133:     challenge_id = request_challenge(api_client, otp_user).json()["error"]["details"]["challengeId"]
+0134:     OtpChallenge.objects.filter(id=challenge_id).update(
+0138:     response = api_client.post(
+0139:         "/api/v1/identity/sessions/otp",
+0145:     assert response.json()["error"]["code"] == "OTP_CHALLENGE_EXPIRED"
+0149: def test_resend_consumes_old_challenge_and_delivers_new_code(api_client, otp_user, delivered_codes):
+0150:     first = request_challenge(api_client, otp_user).json()["error"]["details"]
+0152:     response = api_client.post(
+0153:         "/api/v1/identity/sessions/otp/resend",
+0162:     assert OtpChallenge.objects.get(id=first["challengeId"]).consumed_at is not None
+0164:     old_response = api_client.post(
+0165:         "/api/v1/identity/sessions/otp",
+0170:     assert old_response.json()["error"]["code"] == "OTP_CHALLENGE_CONSUMED"
+0172:     verified = api_client.post(
+0173:         "/api/v1/identity/sessions/otp",
+0187: def test_otp_verification_is_rate_limited(api_client):
+0194:     first = api_client.post("/api/v1/identity/sessions/otp", payload, format="json")
+0195:     second = api_client.post("/api/v1/identity/sessions/otp", payload, format="json")
+0198:     response = api_client.post("/api/v1/identity/sessions/otp", payload, format="json")
+
+===== services/api/config/settings/base.py =====
+0018:     "django.contrib.sessions",
+0049:     "django.contrib.sessions.middleware.SessionMiddleware",
+0071: WSGI_APPLICATION = "config.wsgi.application"
+0072: ASGI_APPLICATION = "config.asgi.application"
+0135:         "identity-refresh": env("IDENTITY_REFRESH_RATE", default="30/minute"),
+0151:     "REFRESH_TOKEN_LIFETIME": timedelta(days=1),
+0152:     "ROTATE_REFRESH_TOKENS": True,
+0165: # Transactional email (OTP and operational notifications). Production values
+0177: CALENDAR_GOOGLE_CLIENT_ID = env("CALENDAR_GOOGLE_CLIENT_ID", default="")
+0178: CALENDAR_GOOGLE_CLIENT_SECRET = env("CALENDAR_GOOGLE_CLIENT_SECRET", default="")
+0179: CALENDAR_MICROSOFT_CLIENT_ID = env("CALENDAR_MICROSOFT_CLIENT_ID", default="")
+0180: CALENDAR_MICROSOFT_CLIENT_SECRET = env("CALENDAR_MICROSOFT_CLIENT_SECRET", default="")
+

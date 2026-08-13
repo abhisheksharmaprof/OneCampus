@@ -1,0 +1,164 @@
+{
+  "version": "2.1.0",
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "Strix",
+          "informationUri": "https://strix.ai",
+          "rules": [
+            {
+              "id": "CWE-287",
+              "name": "OAuth callback state is not bound to the initiating user in calendar integration",
+              "shortDescription": {
+                "text": "OAuth callback state is not bound to the initiating user in calendar integration"
+              },
+              "fullDescription": {
+                "text": "The calendar OAuth callback accepts any request that presents a live `state` value and provider `code`, then binds the resulting calendar connection to the victim institute without verifying that the callback caller is the same authenticated administrator who initiated the flow. This allows cross-session callback completion and unauthorized provider-account binding if an attacker obtains a live `state` value before it is consumed."
+              },
+              "defaultConfiguration": {
+                "level": "note"
+              },
+              "help": {
+                "text": "The calendar OAuth callback accepts any request that presents a live `state` value and provider `code`, then binds the resulting calendar connection to the victim institute without verifying that the callback caller is the same authenticated administrator who initiated the flow. This allows cross-session callback completion and unauthorized provider-account binding if an attacker obtains a live `state` value before it is consumed.\n\nAn attacker who learns a valid in-flight calendar OAuth `state` value can complete the callback from a different browser session, including an unauthenticated one, and attach the attacker's Google or Microsoft calendar account to the victim institute's integration context. Because the callback marks `used_at` only after token exchange, connection update, and sync, there is also a replay/race window before the state is finalized.\n\n1. Require the callback to complete in the same authenticated application session that initiated the OAuth flow, rather than treating possession of the opaque `state` value as sufficient authorization.\n2. Compare the authenticated callback principal to `CalendarOAuthState.user` before exchanging the provider `code` or updating any institute connection.\n3. Consume the state atomically before token exchange and synchronization so concurrent callbacks cannot reuse the same live state.\n4. Fail closed when the callback is unauthenticated, when the authenticated user does not match the recorded initiator, or when the state has already been consumed.\n5. Consider binding the state to a signed nonce stored in the user's authenticated session in addition to the database row.",
+                "markdown": "The calendar OAuth callback accepts any request that presents a live `state` value and provider `code`, then binds the resulting calendar connection to the victim institute without verifying that the callback caller is the same authenticated administrator who initiated the flow. This allows cross-session callback completion and unauthorized provider-account binding if an attacker obtains a live `state` value before it is consumed.\n\nAn attacker who learns a valid in-flight calendar OAuth `state` value can complete the callback from a different browser session, including an unauthenticated one, and attach the attacker's Google or Microsoft calendar account to the victim institute's integration context. Because the callback marks `used_at` only after token exchange, connection update, and sync, there is also a replay/race window before the state is finalized.\n\n1. Require the callback to complete in the same authenticated application session that initiated the OAuth flow, rather than treating possession of the opaque `state` value as sufficient authorization.\n2. Compare the authenticated callback principal to `CalendarOAuthState.user` before exchanging the provider `code` or updating any institute connection.\n3. Consume the state atomically before token exchange and synchronization so concurrent callbacks cannot reuse the same live state.\n4. Fail closed when the callback is unauthenticated, when the authenticated user does not match the recorded initiator, or when the state has already been consumed.\n5. Consider binding the state to a signed nonce stored in the user's authenticated session in addition to the database row."
+              },
+              "properties": {
+                "security-severity": "3.7",
+                "tags": [
+                  "security",
+                  "CWE-287",
+                  "stride:S"
+                ]
+              },
+              "helpUri": "https://cwe.mitre.org/data/definitions/287.html"
+            }
+          ],
+          "version": "1.5.3"
+        }
+      },
+      "results": [
+        {
+          "ruleId": "CWE-287",
+          "ruleIndex": 0,
+          "level": "note",
+          "message": {
+            "text": "OAuth callback state is not bound to the initiating user in calendar integration\n\nThe calendar OAuth callback accepts any request that presents a live `state` value and provider `code`, then binds the resulting calendar connection to the victim institute without verifying that the callback caller is the same authenticated administrator who initiated the flow. This allows cross-session callback completion and unauthorized provider-account binding if an attacker obtains a live `state` value before it is consumed."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "services/api/modules/school_calendar/api/views.py"
+                },
+                "region": {
+                  "startLine": 91,
+                  "endLine": 98,
+                  "snippet": {
+                    "text": "class CalendarOAuthStartView(APIView):\n    permission_classes = (IsCurrentInstituteAdmin,)\n\n    def post(self, request):\n        provider = request.data.get(\"provider\")\n        state = secrets.token_urlsafe(32)\n        CalendarOAuthState.objects.create(\n            state=state,\n            institute=request.institute,\n            user=request.user,"
+                  }
+                }
+              },
+              "message": {
+                "text": "State creation records the initiating user"
+              }
+            },
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "services/api/modules/school_calendar/api/views.py"
+                },
+                "region": {
+                  "startLine": 106,
+                  "endLine": 126,
+                  "snippet": {
+                    "text": "class CalendarOAuthCallbackView(APIView):\n    permission_classes = (AllowAny,)\n\n    def get(self, request):\n        state = CalendarOAuthState.objects.filter(\n            state=request.query_params.get(\"state\", \"\"),\n            used_at__isnull=True,\n        ).select_related(\"institute\").first()\n        if not state or state.expires_at < timezone.now() or not request.query_params.get(\"code\"):\n            return redirect(...)\n        tokens = exchange_code(state.provider, request.query_params[\"code\"])\n        connection, _ = CalendarIntegrationConnection.objects.update_or_create(\n            institute=state.institute,\n            provider=state.provider,\n            defaults={...},\n        )\n        sync_connection(connection)\n        state.used_at = timezone.now()\n        state.save(update_fields=(\"used_at\",))"
+                  }
+                }
+              },
+              "message": {
+                "text": "Callback trusts only opaque state and consumes it non-atomically"
+              }
+            },
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "services/api/modules/school_calendar/models.py"
+                },
+                "region": {
+                  "startLine": 45,
+                  "endLine": 69,
+                  "snippet": {
+                    "text": "class CalendarIntegrationConnection(models.Model):\n    ...\n    class Meta:\n        constraints = [\n            models.UniqueConstraint(fields=(\"institute\", \"provider\"), name=\"uniq_calendar_connection_provider\"),\n        ]\n\nclass CalendarOAuthState(models.Model):\n    state = models.CharField(max_length=128, unique=True)\n    institute = models.ForeignKey(\"institutes.Institute\", on_delete=models.CASCADE)\n    user = models.ForeignKey(\"identity.User\", on_delete=models.CASCADE)\n    provider = models.CharField(max_length=24, choices=CalendarIntegrationConnection.Provider.choices)\n    expires_at = models.DateTimeField()\n    used_at = models.DateTimeField(null=True, blank=True)"
+                  }
+                }
+              },
+              "message": {
+                "text": "Recorded initiator is available and connection scope is institute/provider unique"
+              }
+            },
+            {
+              "logicalLocations": [
+                {
+                  "fullyQualifiedName": "/api/v1/admin/calendar/oauth/callback",
+                  "kind": "endpoint"
+                }
+              ]
+            }
+          ],
+          "fixes": [
+            {
+              "artifactChanges": [
+                {
+                  "artifactLocation": {
+                    "uri": "services/api/modules/school_calendar/api/views.py"
+                  },
+                  "replacements": [
+                    {
+                      "deletedRegion": {
+                        "startLine": 106,
+                        "endLine": 126
+                      },
+                      "insertedContent": {
+                        "text": "class CalendarOAuthCallbackView(APIView):\n    permission_classes = (IsAuthenticated,)\n\n    def get(self, request):\n        state = CalendarOAuthState.objects.select_for_update().filter(\n            state=request.query_params.get(\"state\", \"\"),\n            used_at__isnull=True,\n            user=request.user,\n        ).select_related(\"institute\").first()\n        if not state or state.expires_at < timezone.now() or not request.query_params.get(\"code\"):\n            return redirect(...)\n\n        state.used_at = timezone.now()\n        state.save(update_fields=(\"used_at\",))\n\n        tokens = exchange_code(state.provider, request.query_params[\"code\"])\n        connection, _ = CalendarIntegrationConnection.objects.update_or_create(\n            institute=state.institute,\n            provider=state.provider,\n            defaults={...},\n        )\n        sync_connection(connection)"
+                      }
+                    }
+                  ]
+                }
+              ],
+              "description": {
+                "text": "1. Require the callback to complete in the same authenticated application session that initiated the OAuth flow, rather than treating possession of the opaque `state` value as sufficient authorization.\n2. Compare the authenticated callback principal to `CalendarOAuthState.user` before exchanging the provider `code` or updating any institute connection.\n3. Consume the state atomically before token exchange and synchronization so concurrent callbacks cannot reuse the same live state.\n4. Fail closed when the callback is unauthenticated, when the authenticated user does not match the recorded initiator, or when the state has already been consumed.\n5. Consider binding the state to a signed nonce stored in the user's authenticated session in addition to the database row.",
+                "markdown": "1. Require the callback to complete in the same authenticated application session that initiated the OAuth flow, rather than treating possession of the opaque `state` value as sufficient authorization.\n2. Compare the authenticated callback principal to `CalendarOAuthState.user` before exchanging the provider `code` or updating any institute connection.\n3. Consume the state atomically before token exchange and synchronization so concurrent callbacks cannot reuse the same live state.\n4. Fail closed when the callback is unauthenticated, when the authenticated user does not match the recorded initiator, or when the state has already been consumed.\n5. Consider binding the state to a signed nonce stored in the user's authenticated session in addition to the database row."
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "primaryLocationLineHash": "95a9cac6be299c97917938ecd7f221f6b2569e37c4274a9d1928c24ec60aef66"
+          },
+          "properties": {
+            "security-severity": "3.7",
+            "strix_vuln_class_hash": "42722d51c013f47c784cddb29960ade73138a73352ced4726b8541e25dbb1601",
+            "strix": {
+              "id": "vuln-0001",
+              "severity": "low",
+              "cvss": 3.7,
+              "timestamp": "2026-08-12 05:57:03 UTC",
+              "target": "/workspace/CampusOne",
+              "endpoint": "/api/v1/admin/calendar/oauth/callback",
+              "method": "GET",
+              "cwe": "CWE-287",
+              "impact": "An attacker who learns a valid in-flight calendar OAuth `state` value can complete the callback from a different browser session, including an unauthenticated one, and attach the attacker's Google or Microsoft calendar account to the victim institute's integration context. Because the callback marks `used_at` only after token exchange, connection update, and sync, there is also a replay/race window before the state is finalized.",
+              "technical_analysis": "The OAuth start endpoint records the initiating administrator in `CalendarOAuthState.user` together with the target institute and provider. However, the callback endpoint is explicitly exposed with `AllowAny` and resolves the pending OAuth transaction only by the opaque `state` value and `used_at__isnull=True`.\n\nThe callback then exchanges the supplied provider `code` using `state.provider` and persists the resulting connection by `state.institute`, with no authentication check and no comparison between the callback caller and `CalendarOAuthState.user`.\n\nRelevant behavior:\n\n```python\nstate = CalendarOAuthState.objects.filter(\n    state=request.query_params.get(\"state\", \"\"),\n    used_at__isnull=True,\n).select_related(\"institute\").first()\n```\n\n```python\ntokens = exchange_code(state.provider, request.query_params[\"code\"])\n```\n\n```python\nconnection, _ = CalendarIntegrationConnection.objects.update_or_create(\n    institute=state.institute,\n    provider=state.provider,\n    defaults={...},\n)\n```\n\nThe callback never checks `request.user`, `request.auth`, or whether `request.user == state.user`. As a result, possession of a live `state` value is sufficient to authorize the connection finalization. The state is only marked used after exchange, update/create, and sync, which leaves a race window for concurrent completion attempts.\n\nBecause `CalendarIntegrationConnection` is unique per `institute` and `provider`, a successful unauthorized callback binds or overwrites that institute/provider integration with attacker-controlled provider credentials.",
+              "remediation_steps": "1. Require the callback to complete in the same authenticated application session that initiated the OAuth flow, rather than treating possession of the opaque `state` value as sufficient authorization.\n2. Compare the authenticated callback principal to `CalendarOAuthState.user` before exchanging the provider `code` or updating any institute connection.\n3. Consume the state atomically before token exchange and synchronization so concurrent callbacks cannot reuse the same live state.\n4. Fail closed when the callback is unauthenticated, when the authenticated user does not match the recorded initiator, or when the state has already been consumed.\n5. Consider binding the state to a signed nonce stored in the user's authenticated session in addition to the database row.",
+              "poc": {
+                "description": "1. Authenticate as an institute administrator and initiate a calendar OAuth connection for a provider, causing the server to create a `CalendarOAuthState` row containing the victim `user`, `institute`, `provider`, and a live `state` value.\n2. Capture the generated `state` value before it is consumed.\n3. In a different browser session, or with no authenticated application session at all, send a request to `/api/v1/admin/calendar/oauth/callback` with that same live `state` value and a valid provider authorization `code` for the attacker's provider account.\n4. Observe that the callback succeeds even though the callback caller is not the initiating administrator.\n5. Confirm that the resulting `CalendarIntegrationConnection` is created or updated for the victim institute and chosen provider.\n6. Repeat the callback concurrently before `used_at` is written to observe the replay/race window caused by marking the state as used only after token exchange, update/create, and sync.",
+                "script_available": true
+              }
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
