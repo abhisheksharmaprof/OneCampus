@@ -954,10 +954,10 @@ function StaffProfilePage({ id, accessToken, onBack }: { id?: string; accessToke
 
   useEffect(() => {
     if (!staffUserId) return
-    type AssignmentRow = { id: string; teacher?: { id?: string }; subject?: { id: string; name: string }; classSectionId: string; classSection?: { label?: string }; classSectionLabel?: string }
+    type AssignmentRow = { id: string; teacher?: { id?: string }; subject?: { id: string; name: string }; classSectionId: string; classSectionLabel?: string }
     const mapAssignments = (items: AssignmentRow[]) => items
       .filter((item) => !item.teacher?.id || item.teacher.id === staffUserId || item.teacher.id === String(id))
-      .map((item) => ({ id: item.id, classSectionId: item.classSectionId, sectionLabel: item.classSection?.label ?? item.classSectionLabel ?? item.classSectionId, subjectId: item.subject?.id ?? '', subjectName: item.subject?.name ?? 'Subject', academicYear: '—' }))
+      .map((item) => ({ id: item.id, classSectionId: item.classSectionId, sectionLabel: item.classSectionLabel ?? item.classSectionId, subjectId: item.subject?.id ?? '', subjectName: item.subject?.name ?? 'Subject', academicYear: '—' }))
     void adminRequest<{ items: AssignmentRow[] }>(accessToken, `academics/section-subject-teachers?teacherId=${encodeURIComponent(staffUserId)}&page=1&pageSize=100`)
       .then((result) => result.items.length ? setAssignments(mapAssignments(result.items)) : adminRequest<{ items: AssignmentRow[] }>(accessToken, 'academics/section-subject-teachers?page=1&pageSize=100').then((all) => setAssignments(mapAssignments(all.items))))
       .catch(() => undefined)
