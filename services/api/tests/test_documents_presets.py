@@ -37,6 +37,17 @@ def test_every_preset_layout_is_valid():
             ]
             assert len(ids) == len(set(ids)), f"duplicate element ids in {preset['name']}"
 
+            CONTENT_TYPES = {"text", "table", "totals", "signature", "qr", "image"}
+            for page in preset["layout"]["pages"]:
+                content = [e for e in page["elements"] if e["type"] in CONTENT_TYPES]
+                for i, a in enumerate(content):
+                    for b in content[i + 1:]:
+                        overlap_w = min(a["x"] + a["w"], b["x"] + b["w"]) - max(a["x"], b["x"])
+                        overlap_h = min(a["y"] + a["h"], b["y"] + b["h"]) - max(a["y"], b["y"])
+                        assert overlap_w <= 0.5 or overlap_h <= 0.5, (
+                            f"{preset['name']}: elements {a['id']} and {b['id']} overlap"
+                        )
+
 
 @pytest.mark.django_db
 def test_first_list_seeds_presets_per_category(api_client):

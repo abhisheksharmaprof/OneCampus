@@ -5,6 +5,9 @@ CR80=86x54, A4P_HALF_TOP/BOTTOM=210x148.5).
 
 Contract: each category's list must contain EXACTLY ONE preset with is_default=True —
 the per-category default unique constraint is what makes concurrent seeding safe.
+
+Builder outputs are shallow-copied per layout; treat shared blocks (FEE_COLUMNS etc.)
+as immutable — never mutate a preset's nested structures after construction.
 """
 
 INK = "#16212E"
@@ -124,7 +127,7 @@ _INVOICE_BODY = [
     _totals(128, 122, 70, 32, "fee_items", FEE_TOTALS),
     _qr(12, 122),
     _signature(150, 252, 48),
-    _text(12, 274, 186, 6, "{{school_name}} · {{school_address}}", size=8, align="center", color=SOFT),
+    _text(12, 288, 186, 6, "{{school_name}} · {{school_address}}", size=8, align="center", color=SOFT),
 ]
 
 PRESET_FEE_INVOICE = [
@@ -140,7 +143,7 @@ PRESET_FEE_INVOICE = [
             _image(12, 6, 22, 22),
             _text(38, 8, 100, 9, "{{school_name}}", size=16, bold=True, color="#FFFFFF"),
             _text(38, 18, 100, 6, "{{school_address}}", size=8, color="#DCE6F2"),
-            _text(140, 8, 58, 18, "FEE INVOICE\n#{{invoice_no}}", size=12, bold=True, align="right", color="#FFFFFF"),
+            _text(140, 8, 58, 18, "FEE INVOICE\n#{{invoice_no}}\n{{invoice_date}}", size=12, bold=True, align="right", color="#FFFFFF"),
             *_INVOICE_BODY,
         ], header=36, footer=14, repeat_header=True, repeat_footer=True),
     },
@@ -165,7 +168,7 @@ _RECEIPT_CORE = [
     _table(12, 62, 186, 30, "fee_items", [
         _col("c1", "Description", width=56),
         _col("c2", "Period", width=20),
-        _col("c5", "Amount", dtype="number", width=24, align="right"),
+        _col("c4", "Amount", dtype="number", width=24, align="right"),
     ]),
     _totals(128, 98, 70, 12, "fee_items", RECEIPT_TOTALS),
     _signature(150, 120, 48),
@@ -193,13 +196,13 @@ PRESET_FEE_RECEIPT = [
     {
         "name": "Formal", "is_default": False,
         "layout": _layout([
-            _image(94, 8, 22, 22),
-            _text(12, 32, 186, 7, "{{school_name}}", size=14, bold=True, align="center", color=BRAND),
-            _text(12, 39, 186, 5, "{{school_address}} · GSTIN {{school_gstin}}", size=8, align="center", color=SOFT),
-            _divider(12, 48, 186, BRAND),
+            _image(94, 6, 20, 20),
+            _text(12, 27, 186, 6, "{{school_name}}", size=13, bold=True, align="center", color=BRAND),
+            _text(12, 33, 186, 5, "{{school_address}} · GSTIN {{school_gstin}}", size=8, align="center", color=SOFT),
+            _divider(12, 37.5, 186, BRAND),
             *_RECEIPT_CORE,
             _qr(12, 108, 18),
-        ], header=50, footer=12),
+        ], header=38, footer=12),
     },
 ]
 
