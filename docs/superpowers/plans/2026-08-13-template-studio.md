@@ -598,6 +598,8 @@ class DocumentTemplateDetailView(APIView):
             if "layout" in values:
                 validate_layout(values["layout"], category=new_category)
                 template.layout = values["layout"]
+            elif new_category != template.category:
+                validate_layout(template.layout, category=new_category)
             template.name = values.get("name", template.name)
             template.category = new_category
             if values.get("isDefault"):
@@ -641,7 +643,11 @@ class DocumentTemplateDetailView(APIView):
 Create `services/api/modules/documents/presets.py` (stub for now — Tasks 3/4 fill it):
 
 ```python
-"""Seeded preset templates per category. Populated by the preset tasks."""
+"""Seeded preset templates per category. Populated by the preset tasks.
+
+Contract: each category's list must contain EXACTLY ONE preset with is_default=True —
+the per-category default unique constraint is what makes concurrent seeding safe.
+"""
 
 PRESETS: dict[str, list[dict]] = {}
 ```

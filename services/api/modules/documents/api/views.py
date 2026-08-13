@@ -155,6 +155,8 @@ class DocumentTemplateDetailView(APIView):
             if "layout" in values:
                 validate_layout(values["layout"], category=new_category)
                 template.layout = values["layout"]
+            elif new_category != template.category:
+                validate_layout(template.layout, category=new_category)
             template.name = values.get("name", template.name)
             template.category = new_category
             if values.get("isDefault"):

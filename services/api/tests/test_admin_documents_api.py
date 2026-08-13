@@ -107,3 +107,20 @@ def test_layout_validation_delete_rules_and_tenant_isolation(api_client):
     assert foreign_get.status_code == 404
     assert foreign_delete.status_code == 404
     assert DocumentTemplate.objects.filter(id=foreign.id).exists()
+
+
+@pytest.mark.django_db
+def test_category_change_revalidates_stored_layout(api_client):
+    institute, token = make_admin(api_client)
+    api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
+    card = DocumentTemplate.objects.create(
+        institute=institute, name="Card", category="ID_CARD", layout=valid_layout(pages=2)
+    )
+
+    response = api_client.patch(
+        f"/api/v1/admin/documents/templates/{card.id}", {"category": "FEE_INVOICE"}, format="json"
+    )
+
+    assert response.status_code == 400
+    card.refresh_from_db()
+    assert card.category == "ID_CARD"
