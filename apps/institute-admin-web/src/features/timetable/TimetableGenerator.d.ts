@@ -5,7 +5,7 @@ export interface TimetableBundle {
   classes: Array<{ id: string; gradeId?: string; name: string }>
   rooms: Array<{ id: string; name: string }>
   curriculum?: Array<{ id: string; classId: string; subjectId: string; periodsPerWeek: number }>
-  assignments: Array<{ id: string; curriculumId?: string; teacherId: string; subjectId: string; classId: string; periodsPerWeek: number; avoidRepeatSameDay: boolean }>
+  assignments: Array<{ id: string; curriculumId?: string; teacherId: string; subjectId: string; classIds?: string[]; classId?: string; combinedSlotLabel?: string; periodsPerWeek: number; avoidRepeatSameDay: boolean }>
   lastResult: unknown
 }
 
@@ -21,7 +21,7 @@ export function IntegratedTimetableGenerator(props: {
   createSubject?: (input: Record<string, unknown>) => Promise<unknown>
   createSection?: (input: Record<string, unknown>) => Promise<unknown>
   createRoom?: (input: Record<string, unknown>) => Promise<unknown>
-  saveAssignment?: (input: { id?: string; classSectionId: string; gradeId: string; subjectId: string; teacherId: string; periodsPerWeek: number }) => Promise<unknown>
+  saveAssignment?: (input: { id?: string; classSectionIds: string[]; gradeId: string; subjectId: string; teacherId: string; periodsPerWeek: number; combinedSlotLabel?: string }) => Promise<unknown>
   deleteAssignment?: (id: string) => Promise<unknown>
   saveTimetable?: (bundle: TimetableBundle, status: 'DRAFT' | 'PUBLISHED') => Promise<unknown>
   onNavigate?: (path: string) => void

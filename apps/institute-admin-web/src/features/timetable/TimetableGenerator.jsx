@@ -1391,7 +1391,7 @@ function AssignmentsTab({ bundle, onNavigate }) {
   const goToMappings = () => onNavigate?.("/setup/subjects-curriculum?tab=teacher-mapping");
   const teacherName = (id) => teachers.find((t) => t.id === id)?.name || "—";
   const subjectName = (id) => subjects.find((s) => s.id === id)?.name || "—";
-  const className = (id) => classes.find((c) => c.id === id)?.name || "—";
+  const className = (ids) => ids.map((id) => classes.find((c) => c.id === id)?.name || "—").join(", ") || "—";
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -1410,7 +1410,7 @@ function AssignmentsTab({ bundle, onNavigate }) {
               <thead>
                 <tr style={{ textAlign: "left", color: COLORS.inkFaint, fontSize: 11.5, fontWeight: 700 }}>
                   <th style={thStyle}>TEACHER</th><th style={thStyle}>SUBJECT</th><th style={thStyle}>CLASS</th>
-                  <th style={thStyle}>PERIODS/WEEK</th>
+                  <th style={thStyle}>COMBINED SLOT</th><th style={thStyle}>PERIODS/WEEK</th>
                 </tr>
               </thead>
               <tbody>
@@ -1418,7 +1418,8 @@ function AssignmentsTab({ bundle, onNavigate }) {
                   <tr key={a.id} style={{ borderTop: `1px solid ${COLORS.border}` }}>
                     <td style={tdStyle}>{teacherName(a.teacherId)}</td>
                     <td style={tdStyle}>{subjectName(a.subjectId)}</td>
-                    <td style={tdStyle}>{className(a.classId)}</td>
+                    <td style={tdStyle}>{className(assignmentClassIds(a))}</td>
+                    <td style={tdStyle}>{a.combinedSlotLabel || "—"}</td>
                     <td style={tdStyle}>{a.periodsPerWeek}</td>
                   </tr>
                 ))}
@@ -1769,7 +1770,7 @@ function TimetableTab({ bundle, updateBundle, readOnly = false, saveTimetable })
     if (!result?.feasible) return;
     const payloadStr = e.dataTransfer.getData("application/json");
     if (!payloadStr) return;
-    const { id, oldDay, oldPeriods, classId, teacherId } = JSON.parse(payloadStr);
+    const { id, oldDay, oldPeriods, classIds, teacherId } = JSON.parse(payloadStr);
     if (oldDay === targetDay && oldPeriods[0] === targetPeriod) return; // No change
 
     const newPeriods = oldPeriods.length === 2 ? [targetPeriod, targetPeriod + 1] : [targetPeriod];
@@ -1782,7 +1783,10 @@ function TimetableTab({ bundle, updateBundle, readOnly = false, saveTimetable })
       if (entry.day === targetDay) {
         const overlap = entry.periods.some(p => newPeriods.includes(p));
         if (overlap) {
-          if (entry.teacherId === teacherId || entry.classId === classId || (requiresRoomId && entry.roomId === requiresRoomId)) {
+          if (entry.teacherId === teacherId || entryClassIds(entry).some((c) => classIds.includes(c)) || (requiresRoomId && entry.roomId === requiresRoomId)) {
+            // Joint blocks (slotGroupId) can only move by regenerating; refusing
+            // the drop keeps the group's entries locked/unlocked together.
+            if (entry.slotGroupId) return;
             conflictingIds.add(entry.assignmentId);
           }
         }
@@ -1795,16 +1799,17 @@ function TimetableTab({ bundle, updateBundle, readOnly = false, saveTimetable })
       if (conflictingIds.has(entry.assignmentId) && !entry.isLocked) continue; // let it be rescheduled
       lockedEntries.push({ ...entry }); // lock it for this generation run
     }
-    
+
     lockedEntries.push({
       assignmentId: id,
       teacherId,
-      classId,
+      classIds,
+      classId: classIds[0],
       subjectId,
       roomId: requiresRoomId,
       day: targetDay,
       periods: newPeriods,
-      isLocked: true 
+      isLocked: true
     });
     
     setGenerating(true);
@@ -1822,9 +1827,14 @@ function TimetableTab({ bundle, updateBundle, readOnly = false, saveTimetable })
 
   const toggleLock = (e, entry) => {
     e.stopPropagation();
-    const newEntries = result.entries.map(ent => 
-      (ent.assignmentId === entry.assignmentId && ent.day === entry.day && ent.periods[0] === entry.periods[0])
-        ? { ...ent, isLocked: !ent.isLocked }
+    const nextLocked = !entry.isLocked;
+    // Joint blocks (shared slotGroupId) must be locked/unlocked together: the
+    // regenerate-with-locks path assumes group-atomic locking, and a partial
+    // lock can silently drop or duplicate a parallel option.
+    const newEntries = result.entries.map(ent =>
+      ((ent.assignmentId === entry.assignmentId && ent.day === entry.day && ent.periods[0] === entry.periods[0]) ||
+       (entry.slotGroupId && ent.slotGroupId === entry.slotGroupId))
+        ? { ...ent, isLocked: nextLocked }
         : ent
     );
     updateBundle({ ...bundle, lastResult: { ...result, entries: newEntries } });
@@ -1834,9 +1844,9 @@ function TimetableTab({ bundle, updateBundle, readOnly = false, saveTimetable })
     if (!result?.feasible || !focusId) return null;
     const cell = {};
     for (const e of result.entries) {
-      const matches = view === "class" ? e.classId === focusId : e.teacherId === focusId;
+      const matches = view === "class" ? entryClassIds(e).includes(focusId) : e.teacherId === focusId;
       if (!matches) continue;
-      for (const p of e.periods) cell[`${e.day}-${p}`] = e;
+      for (const p of e.periods) (cell[`${e.day}-${p}`] = cell[`${e.day}-${p}`] || []).push(e);
     }
     return cell;
   }, [result, focusId, view]);
@@ -1848,7 +1858,7 @@ function TimetableTab({ bundle, updateBundle, readOnly = false, saveTimetable })
     const classById = Object.fromEntries(bundle.classes.map((c) => [c.id, c]));
     const rows = [["Day", "Period", "Class", "Subject", "Teacher"]];
     const sorted = [...result.entries].sort((a, b) => a.day.localeCompare(b.day) || a.periods[0] - b.periods[0]);
-    for (const e of sorted) for (const p of e.periods) rows.push([e.day, p, classById[e.classId]?.name, subjectById[e.subjectId]?.name, teacherById[e.teacherId]?.name]);
+    for (const e of sorted) for (const cid of entryClassIds(e)) for (const p of e.periods) rows.push([e.day, p, classById[cid]?.name, subjectById[e.subjectId]?.name, teacherById[e.teacherId]?.name]);
     const csv = rows.map((r) => r.map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
@@ -1961,11 +1971,11 @@ function TimetableTab({ bundle, updateBundle, readOnly = false, saveTimetable })
                       if (p.type === "break") {
                         return <td key={d} style={{ ...gridCellStyle, background: COLORS.breakBg, color: COLORS.inkFaint, fontSize: 12, textAlign: "center", fontStyle: "italic" }}>Lunch</td>;
                       }
-                      const entry = grid?.[`${d}-${p.number}`];
-                      if (!entry) {
+                      const entries = grid?.[`${d}-${p.number}`];
+                      if (!entries?.length) {
                         return (
                           <td
-                            key={d} 
+                            key={d}
                             style={gridCellStyle}
                             onDragOver={!readOnly ? (e) => e.preventDefault() : undefined}
                             onDrop={!readOnly ? (e) => handleDrop(e, d, p.number) : undefined}
@@ -1974,29 +1984,35 @@ function TimetableTab({ bundle, updateBundle, readOnly = false, saveTimetable })
                           </td>
                         );
                       }
+                      // Entries sharing a slotGroupId form one joint block: they move
+                      // and lock together, so they are neither draggable nor a drop target.
+                      const entry = entries[0];
+                      const isJoint = Boolean(entry.slotGroupId);
+                      const canDrag = !readOnly && !isJoint;
                       const subject = bundle.subjects.find((s) => s.id === entry.subjectId);
-                      const other = view === "class" ? bundle.teachers.find((t) => t.id === entry.teacherId) : bundle.classes.find((c) => c.id === entry.classId);
+                      const classNames = bundle.classes.filter((c) => entryClassIds(entry).includes(c.id)).map((c) => c.name).join(", ");
+                      const other = view === "class" ? bundle.teachers.find((t) => t.id === entry.teacherId)?.name : classNames;
                       const color = colorForSubject(entry.subjectId, bundle.subjects);
                       return (
                         <td
-                          key={d} 
+                          key={d}
                           style={gridCellStyle}
-                          onDragOver={!readOnly ? (e) => e.preventDefault() : undefined}
-                          onDrop={!readOnly ? (e) => handleDrop(e, d, p.number) : undefined}
+                          onDragOver={canDrag ? (e) => e.preventDefault() : undefined}
+                          onDrop={canDrag ? (e) => handleDrop(e, d, p.number) : undefined}
                         >
                           <div
-                            draggable={!readOnly}
+                            draggable={canDrag}
                             onDragStart={(e) => {
-                              if (readOnly) return;
+                              if (!canDrag) return;
                               e.dataTransfer.setData("application/json", JSON.stringify({
-                                id: entry.assignmentId, oldDay: entry.day, oldPeriods: entry.periods, classId: entry.classId, teacherId: entry.teacherId
+                                id: entry.assignmentId, oldDay: entry.day, oldPeriods: entry.periods, classIds: entryClassIds(entry), teacherId: entry.teacherId
                               }));
                             }}
-                            style={{ background: `${color}18`, borderLeft: `3px solid ${color}`, borderRadius: 6, padding: "6px 8px", cursor: readOnly ? "default" : "grab", position: "relative" }}
+                            style={{ background: `${color}18`, borderLeft: `3px solid ${color}`, borderRadius: 6, padding: "6px 8px", cursor: canDrag ? "grab" : "default", position: "relative" }}
                           >
                             {!readOnly && <button
                               {...tooltipProps(entry.isLocked ? "Unlock this timetable period" : "Lock this timetable period")}
-                              onClick={(e) => toggleLock(e, entry)} 
+                              onClick={(e) => toggleLock(e, entry)}
                               style={{ position: "absolute", top: 4, right: 4, background: "none", border: "none", cursor: "pointer", color: entry.isLocked ? COLORS.warn : COLORS.inkFaint, opacity: entry.isLocked ? 1 : 0.4 }}
                             >
                               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -2007,8 +2023,23 @@ function TimetableTab({ bundle, updateBundle, readOnly = false, saveTimetable })
                                 )}
                               </svg>
                             </button>}
-                            <div style={{ fontWeight: 700, fontSize: 12.5, color: COLORS.ink, paddingRight: readOnly ? 0 : 16 }}>{subject?.name}</div>
-                            <div style={{ fontSize: 11.5, color: COLORS.inkMuted }}>{other?.name}</div>
+                            {isJoint ? (
+                              <>
+                                <div style={{ marginBottom: 3, paddingRight: readOnly ? 0 : 16 }}><Badge tone="accent">Combined</Badge></div>
+                                {entries.map((jointEntry) => (
+                                  <div key={jointEntry.assignmentId} style={{ fontWeight: 700, fontSize: 12.5, color: COLORS.ink }}>
+                                    {bundle.subjects.find((s) => s.id === jointEntry.subjectId)?.name} — {bundle.teachers.find((t) => t.id === jointEntry.teacherId)?.name}
+                                  </div>
+                                ))}
+                                <div style={{ fontSize: 11.5, color: COLORS.inkMuted }}>{classNames}</div>
+                              </>
+                            ) : (
+                              <>
+                                <div style={{ fontWeight: 700, fontSize: 12.5, color: COLORS.ink, paddingRight: readOnly ? 0 : 16 }}>{subject?.name}</div>
+                                <div style={{ fontSize: 11.5, color: COLORS.inkMuted }}>{other}</div>
+                                {view === "class" && entryClassIds(entry).length > 1 && <div style={{ fontSize: 11, color: COLORS.inkFaint }}>{classNames}</div>}
+                              </>
+                            )}
                           </div>
                         </td>
                       );
