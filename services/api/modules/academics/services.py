@@ -3,7 +3,13 @@ from django.db import transaction
 
 from modules.institutes.models import Institute
 
-from .models import AcademicYear, ClassSection, StudentEnrollment
+from .models import (
+    AcademicYear,
+    ClassSection,
+    StudentEnrollment,
+    SubjectTeacherAssignment,
+    _validate_teacher,
+)
 
 
 class AcademicsValidationError(Exception):
@@ -129,3 +135,41 @@ def update_enrollment(
     except DjangoValidationError as exc:
         raise AcademicsValidationError(_field_errors(exc)) from exc
     return locked
+
+
+def validate_assignment_sections(*, sections, subject, teacher, combined_slot_label, assignment_id):
+    """Set-level rules for SubjectTeacherAssignment that clean() can't express (M2M).
+
+    Raises a Django ValidationError with a field-keyed dict.
+    """
+    if not sections:
+        raise DjangoValidationError({"classSectionIds": "Select at least one section."})
+    grades = {s.grade_id for s in sections}
+    branches = {s.branch_id for s in sections}
+    years = {s.academic_year_id for s in sections}
+    if len(grades) > 1 or len(branches) > 1 or len(years) > 1:
+        raise DjangoValidationError(
+            {"classSectionIds": "All sections must belong to the same class, branch, and academic year."}
+        )
+    institute_id = sections[0].branch.institute_id
+    if subject.institute_id != institute_id:
+        raise DjangoValidationError({"subjectId": "Subject must belong to the sections' institute."})
+    _validate_teacher(
+        teacher=teacher,
+        institute_id=institute_id,
+        branch_id=sections[0].branch_id,
+        field_name="teacherId",
+    )
+    # One teacher per subject per exact section set ("already mapped" rule).
+    target = {s.id for s in sections}
+    candidates = (
+        SubjectTeacherAssignment.objects.filter(subject=subject, class_sections__in=list(target))
+        .exclude(id=assignment_id)
+        .prefetch_related("class_sections")
+        .distinct()
+    )
+    for other in candidates:
+        if {s.id for s in other.class_sections.all()} == target:
+            raise DjangoValidationError(
+                {"subjectId": "This subject is already mapped for the selected sections."}
+            )
