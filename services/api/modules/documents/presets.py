@@ -206,15 +206,29 @@ PRESET_FEE_RECEIPT = [
     },
 ]
 
+def _grade_formula(source_label):
+    return (
+        f'=IF([{source_label}]>=91,"A1",IF([{source_label}]>=81,"A2",'
+        f'IF([{source_label}]>=71,"B1",IF([{source_label}]>=61,"B2",'
+        f'IF([{source_label}]>=51,"C1",IF([{source_label}]>=41,"C2",'
+        f'IF([{source_label}]>=33,"D","E")))))))'
+    )
+
+
 MARKS_COLUMNS = [
-    _col("c1", "Subject", width=30),
+    _col("c1", "Subject", width=54),
     _col("c2", "Max marks", dtype="number", width=16, align="right"),
     _col("c3", "Marks", dtype="number", width=16, align="right"),
     _col("c4", "Grade", ctype="formula", width=14, align="center",
-         formula='=IF([Marks]>=91,"A1",IF([Marks]>=81,"A2",IF([Marks]>=71,"B1",IF([Marks]>=61,"B2",IF([Marks]>=51,"C1","C2")))))'),
+         formula=_grade_formula("Marks")),
 ]
 
-MARKS_COLUMNS_DETAILED = MARKS_COLUMNS + [
+MARKS_COLUMNS_DETAILED = [
+    _col("c1", "Subject", width=34),
+    _col("c2", "Max marks", dtype="number", width=14, align="right"),
+    _col("c3", "Marks", dtype="number", width=14, align="right"),
+    _col("c4", "Grade", ctype="formula", width=14, align="center",
+         formula=_grade_formula("Marks")),
     _col("c5", "Rank", ctype="formula", formula="=RANK([Marks])", width=12, align="center"),
     _col("c6", "Percentile", ctype="formula", formula="=PERCENTILE([Marks])", width=12, align="center"),
 ]
@@ -224,7 +238,7 @@ RESULT_TOTALS = [
     _trow("r2", "Out of", "formula", formula='=SUM_TABLE("Max marks")'),
     _trow("r3", "Percentage", "formula", formula="=ROUND([Total]/[Out of]*100,2)"),
     _trow("r4", "Overall grade", "formula", emphasize=True,
-          formula='=IF([Percentage]>=91,"A1",IF([Percentage]>=81,"A2",IF([Percentage]>=71,"B1",IF([Percentage]>=61,"B2",IF([Percentage]>=51,"C1","C2")))))'),
+          formula=_grade_formula("Percentage")),
 ]
 
 _MARKSHEET_HEADER = [
