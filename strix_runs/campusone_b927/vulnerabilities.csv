@@ -1,0 +1,2 @@
+id,title,severity,timestamp,file
+vuln-0001,OAuth callback state is not bound to the initiating user in calendar integration,LOW,2026-08-12 05:57:03 UTC,vulnerabilities/vuln-0001.md

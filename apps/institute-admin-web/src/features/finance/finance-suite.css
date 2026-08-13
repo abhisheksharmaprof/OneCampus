@@ -66,7 +66,11 @@
 .fin-token-list > div { display: flex; flex-wrap: wrap; gap: 6px; }
 .fin-token-chip { padding: 4px 8px; font-size: 11px; }
 .fin-row--column { grid-template-columns: 28px 1fr 110px 72px 64px; }
+.fin-row--header-field { grid-template-columns: minmax(0, 1fr) 110px; }
+.fin-row--header-field input { width: 100%; min-width: 0; min-height: 2.75rem; padding: 8px 10px; }
+.fin-row--header-field .fin-btn { min-height: 2.75rem; }
 .fin-hint { font-size: 12px; color: #667085; margin: -4px 0 8px; }
 .fin-row__checkbox { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #475467; }
 .fin-row__reorder { display: flex; gap: 4px; }
+@media (max-width: 520px) { .fin-row--header-field { grid-template-columns: 1fr; } }
 @media (max-width: 1100px) { .fin-editor, .fin-gallery { grid-template-columns: 1fr; } .fin-editor__preview { position: static; height: 480px; } }

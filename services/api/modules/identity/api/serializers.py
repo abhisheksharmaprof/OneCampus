@@ -1,4 +1,5 @@
 from django.contrib.auth import authenticate
+from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
 
 
@@ -17,6 +18,24 @@ class SessionCreateSerializer(serializers.Serializer):
         if user is None or not user.is_active:
             raise serializers.ValidationError({"credentials": ["Email or password is incorrect."]})
         attrs["user"] = user
+        return attrs
+
+
+class PasswordResetRequestSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+
+class PasswordResetConfirmSerializer(serializers.Serializer):
+    uid = serializers.CharField()
+    token = serializers.CharField()
+    password = serializers.CharField(write_only=True, trim_whitespace=False)
+    confirmPassword = serializers.CharField(write_only=True, trim_whitespace=False)
+
+    def validate(self, attrs):
+        if attrs["password"] != attrs["confirmPassword"]:
+            raise serializers.ValidationError({"confirmPassword": ["Passwords do not match."]})
+        user = self.context.get("user")
+        validate_password(attrs["password"], user=user)
         return attrs
 
 

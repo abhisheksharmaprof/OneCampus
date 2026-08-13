@@ -1,0 +1,70 @@
+<h2>What kind of "drag and drop" do you have in mind?</h2>
+<p class="subtitle">All three let you drag things around visually and insert placeholders/tables by dragging — they differ in how free the layout is. This matters because invoices/receipts still have to print cleanly on A4 paper.</p>
+
+<div class="cards">
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="mockup" style="transform:scale(0.9)">
+        <div class="mockup-header">A. Free canvas (like Figma/Canva)</div>
+        <div class="mockup-body" style="position:relative;height:220px;background:#fff;border:1px dashed #cbd5e1">
+          <div style="position:absolute;top:10px;left:20px;width:120px;height:30px;background:#e0e7ff;border:1px solid #6366f1;font-size:11px;display:flex;align-items:center;justify-content:center">Logo</div>
+          <div style="position:absolute;top:15px;left:200px;width:90px;height:20px;background:#fef3c7;border:1px solid #d97706;font-size:10px;display:flex;align-items:center;justify-content:center">{{invoice_no}}</div>
+          <div style="position:absolute;top:70px;left:40px;width:260px;height:60px;background:#f0fdf4;border:1px solid #16a34a;font-size:10px;display:flex;align-items:center;justify-content:center">[ Line items table ]</div>
+          <div style="position:absolute;top:150px;left:180px;width:120px;height:24px;background:#fef3c7;border:1px solid #d97706;font-size:10px;display:flex;align-items:center;justify-content:center">{{grand_total}}</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>Free canvas</h3>
+      <p>Drag anything anywhere on the page, resize freely, stack elements, pixel-level control. Most powerful, but easiest to accidentally break print layout (overlapping text, content running off the page) and the most work to build well.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="mockup" style="transform:scale(0.9)">
+        <div class="mockup-header">B. Structured drag-and-drop (zones)</div>
+        <div class="mockup-body" style="height:220px;background:#fff;display:flex;flex-direction:column;gap:6px;padding:8px">
+          <div style="border:1px dashed #6366f1;background:#e0e7ff;border-radius:4px;padding:6px;font-size:10px;display:flex;gap:6px;align-items:center">
+            <span style="background:#fff;border:1px solid #6366f1;border-radius:3px;padding:2px 6px">Logo</span>
+            <span style="background:#fff;border:1px solid #6366f1;border-radius:3px;padding:2px 6px">{{invoice_no}}</span>
+            <span style="margin-left:auto;color:#6366f1">HEADER zone</span>
+          </div>
+          <div style="border:1px dashed #16a34a;background:#f0fdf4;border-radius:4px;padding:10px;font-size:10px;flex:1;display:flex;align-items:center;justify-content:center;color:#16a34a">
+            [ Line items TABLE — drag columns to reorder, drag a token onto a column ] <br/>BODY zone
+          </div>
+          <div style="border:1px dashed #d97706;background:#fef3c7;border-radius:4px;padding:6px;font-size:10px;display:flex;gap:6px;align-items:center">
+            <span style="background:#fff;border:1px solid #d97706;border-radius:3px;padding:2px 6px">{{grand_total}}</span>
+            <span style="margin-left:auto;color:#d97706">FOOTER zone</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>Structured zones</h3>
+      <p>The page has fixed zones (header / items table / totals / footer). Within each zone you drag to reorder blocks, drag placeholder tokens onto fields or table columns, and drag to add/remove/reorder table columns. Layout always stays print-safe. Less "anything goes," but hard to break.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="mockup" style="transform:scale(0.9)">
+        <div class="mockup-header">C. Grid canvas (snap-to-grid)</div>
+        <div class="mockup-body" style="position:relative;height:220px;background:
+          linear-gradient(#f8fafc 1px, transparent 1px), linear-gradient(90deg, #f8fafc 1px, transparent 1px);
+          background-size:20px 20px;border:1px solid #e2e8f0">
+          <div style="position:absolute;top:20px;left:20px;width:100px;height:40px;background:#e0e7ff;border:1px solid #6366f1;font-size:10px;display:flex;align-items:center;justify-content:center">Logo</div>
+          <div style="position:absolute;top:20px;left:220px;width:80px;height:20px;background:#fef3c7;border:1px solid #d97706;font-size:10px;display:flex;align-items:center;justify-content:center">{{invoice_no}}</div>
+          <div style="position:absolute;top:80px;left:20px;width:280px;height:80px;background:#f0fdf4;border:1px solid #16a34a;font-size:10px;display:flex;align-items:center;justify-content:center">[ Table — snaps to grid ]</div>
+          <div style="position:absolute;top:180px;left:180px;width:120px;height:20px;background:#fef3c7;border:1px solid #d97706;font-size:10px;display:flex;align-items:center;justify-content:center">{{grand_total}}</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>Grid canvas</h3>
+      <p>Middle ground: free positioning like option A, but elements snap to an invisible grid and to each other's edges, with guardrails against elements overlapping or running off the printable page. More freedom than B, safer than A.</p>
+    </div>
+  </div>
+</div>
+
+<p class="subtitle">Click the one that matches what you pictured — or tell me in the terminal if you want a mix.</p>

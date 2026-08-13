@@ -1,0 +1,66 @@
+<h2>The two key workspaces</h2>
+<p class="subtitle">These are drafts of the invoice creation flow and the template studio. Select the one(s) that look right, or tell me in the terminal what to change.</p>
+
+<div class="options" data-multiselect>
+  <div class="option" data-choice="invoice-flow" onclick="toggleSelect(this)">
+    <div class="letter">1</div>
+    <div class="content">
+      <h3>New Invoice — split editor + live preview</h3>
+      <p>Left: pick student (search) → their class fee plan auto-fills line items; edit rows, toggle discount/tax rows, pick template. Right: live A4 preview with institute logo &amp; branding auto-imported, placeholders like student name filled in real time. Actions: <b>Save draft · Save &amp; Print · Save &amp; New</b>.</p>
+      <div class="mockup">
+        <div class="mockup-header">Finance ▸ Invoices ▸ New Invoice</div>
+        <div class="mockup-body" style="display:flex;gap:12px">
+          <div style="flex:1.1;font-size:12px">
+            <input class="mock-input" placeholder="🔍 Search student — Aarav Sharma, Class 8-B" style="width:100%"/>
+            <div class="placeholder" style="margin-top:8px;padding:8px;text-align:left">
+              Fee plan: <b>Class 8 — Term 2</b> (auto-filled)<br/><br/>
+              ┌ Tuition Fee ……… ₹12,000 ┐<br/>
+              │ Lab Fee ………………… ₹1,500 │<br/>
+              │ Transport ……………… ₹2,200 │ <i>✎ edit / ✕ remove / + add row</i><br/>
+              └ Discount 10% ▸ −₹1,570 ┘<br/>
+              <b>Total ₹14,130</b> &nbsp; Due date: [15 Sep 2026]
+            </div>
+            <div style="margin-top:8px">Template: <b>Classic ▾</b> &nbsp; <button class="mock-button">Save &amp; Print</button></div>
+          </div>
+          <div style="flex:1">
+            <div class="placeholder" style="padding:10px;min-height:160px;background:#fff;border:1px solid #ccc;text-align:left;font-size:11px">
+              <b>[LOGO] Sunrise Public School</b> — from Branding setup<br/>
+              <span style="float:right">INV-2026-0142</span><br/><hr/>
+              Bill to: <b>Aarav Sharma</b> · Class 8-B · Adm #1023<br/><br/>
+              <i>live A4 preview updates as you type…</i>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="template-studio" onclick="toggleSelect(this)">
+    <div class="letter">2</div>
+    <div class="content">
+      <h3>Template Studio — gallery + editor + preview</h3>
+      <p>Left: template gallery (presets + your saved ones, "set default", duplicate, delete). Middle: structured editor — branding pulled from Institute Setup (logo/letterhead/brand color, with override option), column manager (show/hide/rename/reorder), computed rows (subtotal, discount, tax, total), placeholder picker ({{student_name}}, {{class}}, {{admission_no}}, {{invoice_no}}, {{due_date}}…), footer/notes/signature line. Right: live preview with sample data.</p>
+      <div class="mockup">
+        <div class="mockup-header">Finance ▸ Templates</div>
+        <div class="mockup-body" style="display:flex;gap:10px;font-size:12px">
+          <div class="mock-sidebar" style="width:110px">Classic ★<br/><br/>Modern<br/><br/>Compact<br/><br/>+ New</div>
+          <div style="flex:1.2;text-align:left">
+            <div class="placeholder" style="padding:8px;text-align:left">
+              <b>Branding</b> — ⦿ Use institute branding (logo + color) ○ Custom<br/><br/>
+              <b>Columns</b> — ☑ # ☑ Description ☑ Period ☑ Amount &nbsp;<i>↕ reorder</i><br/><br/>
+              <b>Computed rows</b> — ☑ Subtotal ☑ Discount % ☑ Tax % ☑ Grand total<br/><br/>
+              <b>Header fields</b> — insert placeholder ▾ {{student_name}} {{class_section}} {{admission_no}}<br/><br/>
+              <b>Footer</b> — notes, terms, signature line
+            </div>
+          </div>
+          <div style="flex:1">
+            <div class="placeholder" style="background:#fff;border:1px solid #ccc;min-height:150px;padding:8px;font-size:11px;text-align:left">
+              <b>[LOGO] Institute name</b><br/><hr/>
+              <i>Preview with sample student data</i>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

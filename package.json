@@ -6,6 +6,7 @@
     "packages/*"
   ],
   "scripts": {
+    "dev": "node scripts/dev.mjs",
     "dev:admin": "npm run dev --workspace @campusone/institute-admin-web",
     "dev:platform-admin": "npm run dev --workspace @campusone/platform-admin-web",
     "test:admin": "npm run test --workspace @campusone/institute-admin-web",
