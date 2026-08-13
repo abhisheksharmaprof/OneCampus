@@ -14,6 +14,7 @@ urlpatterns = [
     path("api/v1/admin/", include("modules.access_control.api.urls")),
     path("api/v1/admin/", include("modules.admin_console.urls")),
     path("api/v1/admin/academics/", include("modules.academics.api.urls")),
+    path("api/v1/admin/documents/", include("modules.documents.api.urls")),
     path("api/v1/admin/", include("modules.file_storage.urls")),
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
     path("api/docs/", SpectacularSwaggerView.as_view(url_name="schema"), name="swagger-ui"),
