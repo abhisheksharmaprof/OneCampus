@@ -31,6 +31,12 @@ export default function VerifyPage() {
   const formatAmount = (value: number) =>
     value.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
+  // Defense in depth: decodePayload already rejects >200 rows, but never render an
+  // unbounded list even if a payload slips through another path.
+  const MAX_RENDERED_ROWS = 200
+  const visibleItems = payload?.items?.slice(0, MAX_RENDERED_ROWS)
+  const hiddenItemCount = (payload?.items?.length ?? 0) - (visibleItems?.length ?? 0)
+
   return (
     <div style={{ minHeight: '100vh', background: '#F3F5F8', padding: 24, fontFamily: 'Inter, system-ui, sans-serif', color: '#16212E' }}>
       <div style={{ maxWidth: 560, margin: '0 auto', background: '#fff', borderRadius: 12, padding: 28, boxShadow: '0 12px 28px -12px rgba(22,33,46,.18)' }}>
@@ -54,19 +60,24 @@ export default function VerifyPage() {
               <dt style={{ float: 'left', color: '#5B6675', width: 90 }}>Date</dt><dd style={{ margin: 0 }}>{payload.date}</dd>
               {payload.status && <><dt style={{ float: 'left', color: '#5B6675', width: 90 }}>Status</dt><dd style={{ margin: 0 }}>{payload.status}</dd></>}
             </dl>
-            {payload.items && (
+            {visibleItems && (
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, marginTop: 8 }}>
                 <thead><tr style={{ background: '#173A5E', color: '#fff' }}>
                   <th style={{ textAlign: 'left', padding: '6px 8px' }}>Item</th>
                   <th style={{ textAlign: 'right', padding: '6px 8px' }}>Amount</th>
                 </tr></thead>
                 <tbody>
-                  {payload.items.map(([label, amount], index) => (
+                  {visibleItems.map(([label, amount], index) => (
                     <tr key={index} style={{ borderBottom: '1px solid #EEF0F4' }}>
                       <td style={{ padding: '6px 8px' }}>{label}</td>
                       <td style={{ padding: '6px 8px', textAlign: 'right' }}>{formatAmount(amount)}</td>
                     </tr>
                   ))}
+                  {hiddenItemCount > 0 && (
+                    <tr>
+                      <td colSpan={2} style={{ padding: '6px 8px', color: '#5B6675' }}>…and {hiddenItemCount} more items</td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             )}

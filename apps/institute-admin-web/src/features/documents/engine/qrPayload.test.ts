@@ -46,6 +46,41 @@ describe('qrPayload', () => {
     expect(decodePayload(encoded)).toEqual({ ok: false })
   })
 
+  it('rejects item counts over 200 even when the encoded form is tiny (decompression DoS)', () => {
+    // Repetitive rows compress ~1000:1, so tens of thousands of valid-shape items
+    // fit far under the encoded-length gate. The decoder must bound row counts.
+    const boundary = {
+      ...payload,
+      items: Array.from({ length: 201 }, () => ['A', 1] as [string, number]),
+    }
+    expect(encodePayload(boundary).length).toBeLessThanOrEqual(10000)
+    expect(decodePayload(encodePayload(boundary))).toEqual({ ok: false })
+
+    const bomb = {
+      ...payload,
+      items: Array.from({ length: 60000 }, () => ['A', 1] as [string, number]),
+    }
+    expect(encodePayload(bomb).length).toBeLessThanOrEqual(10000)
+    expect(decodePayload(encodePayload(bomb))).toEqual({ ok: false })
+  })
+
+  it('rejects unbounded totals arrays too', () => {
+    const bomb = {
+      ...payload,
+      items: undefined,
+      totals: Array.from({ length: 201 }, () => ['A', 1] as [string, number]),
+    }
+    expect(decodePayload(encodePayload(bomb))).toEqual({ ok: false })
+  })
+
+  it('accepts exactly 200 items (cap boundary)', () => {
+    const large = {
+      ...payload,
+      items: Array.from({ length: 200 }, (_, i) => [`Fee line ${i}`, i * 10] as [string, number]),
+    }
+    expect(decodePayload(encodePayload(large))).toEqual({ ok: true, payload: large })
+  })
+
   it('rejects malformed and wrong-shape payloads', () => {
     expect(decodePayload('%%%not-base64url%%%')).toEqual({ ok: false })
     expect(decodePayload('')).toEqual({ ok: false })

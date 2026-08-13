@@ -29,6 +29,11 @@ export type QrDecodeResult = { ok: true; payload: QrDocPayload } | { ok: false }
 const FRAGMENT_BUDGET = 2500
 /** Hard ceiling on encoded input length, enforced before inflate (zip-bomb guard). */
 const MAX_ENCODED_LENGTH = FRAGMENT_BUDGET * 4
+/** Hard ceiling on items/totals row counts. The encoded-length cap does NOT bound
+ *  the decompressed row count — repetitive rows compress ~1000:1, so a tiny
+ *  fragment can inflate to hundreds of thousands of valid-shape rows and hang the
+ *  verify page (client-side DoS). Real documents stay far below this. */
+const MAX_PAIR_ENTRIES = 200
 
 const CATEGORIES: readonly DocumentCategory[] = ['FEE_INVOICE', 'FEE_RECEIPT', 'MARKSHEET', 'ID_CARD', 'CERTIFICATE']
 
@@ -45,7 +50,7 @@ function fromBase64Url(encoded: string): Uint8Array {
 }
 
 function isPairArray(value: unknown): value is [string, number][] {
-  return Array.isArray(value) && value.every((entry) =>
+  return Array.isArray(value) && value.length <= MAX_PAIR_ENTRIES && value.every((entry) =>
     Array.isArray(entry) && entry.length === 2 && typeof entry[0] === 'string' && typeof entry[1] === 'number')
 }
 
