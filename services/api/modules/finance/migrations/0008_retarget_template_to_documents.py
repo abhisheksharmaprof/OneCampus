@@ -5,6 +5,12 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
+    """Retarget FeeInvoice.template from finance.InvoiceTemplate to documents.DocumentTemplate.
+
+    Deliberately Remove -> Delete -> Add rather than AlterField: existing template ids
+    reference the dropped InvoiceTemplate table and cannot be converted, so the column is
+    reset to NULL (data loss accepted -- testing-phase decision, no migration of old data).
+    """
 
     dependencies = [
         ("documents", "0001_initial"),
