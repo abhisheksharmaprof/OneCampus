@@ -761,7 +761,10 @@ export function importAssignmentsRows(existingAssignments, refs, rows) {
     const teacherName = getVal(row, ["teachername", "teacher"]);
     const subjectName = getVal(row, ["subjectname", "subject"]);
     const className = getVal(row, ["classname", "class"]);
-    const combinedSlotLabel = String(getVal(row, ["combinedslot", "combinedslotlabel", "commonslot"]) || "").trim();
+    // undefined = column absent (leave any existing label untouched); a present
+    // but blank cell is an explicit "" (clears the label on update).
+    const combinedSlotRaw = getVal(row, ["combinedslot", "combinedslotlabel", "commonslot"]);
+    const combinedSlotLabel = combinedSlotRaw === undefined ? undefined : String(combinedSlotRaw).trim();
     const periodsPerWeek = parseInt(getVal(row, ["periodsperweek", "periodsweek", "periods"]), 10);
     const avoidRepeatSameDay = parseBoolYes(getVal(row, ["avoidrepeatsameday", "avoidrepeat", "samedaytwice"]), true);
     // The Class cell may list several sections ("6A; 6B" or "6A / 6B") for a combined lesson.
@@ -775,14 +778,14 @@ export function importAssignmentsRows(existingAssignments, refs, rows) {
     const missingName = classNamesRaw[clsList.findIndex((c) => !c)];
     if (missingName !== undefined) { errors.push(`Assignments row ${i + 2}: class "${missingName}" not found — add it in the Classes sheet first.`); return; }
     if (!periodsPerWeek || periodsPerWeek < 1) { errors.push(`Assignments row ${i + 2}: Periods/Week must be a positive number.`); return; }
-    const classIds = clsList.map((c) => c.id);
+    const classIds = [...new Set(clsList.map((c) => c.id))];
     const sameSet = (a) => {
       const ids = assignmentClassIds(a);
       return ids.length === classIds.length && ids.every((id) => classIds.includes(id));
     };
     const existing = assignments.find((a) => a.teacherId === teacher.id && a.subjectId === subject.id && sameSet(a));
-    if (existing) { Object.assign(existing, { periodsPerWeek, avoidRepeatSameDay, combinedSlotLabel }); updated++; }
-    else { assignments.push({ id: uid("asg"), teacherId: teacher.id, subjectId: subject.id, classIds, classId: classIds[0], combinedSlotLabel, periodsPerWeek, avoidRepeatSameDay }); added++; }
+    if (existing) { Object.assign(existing, { periodsPerWeek, avoidRepeatSameDay, ...(combinedSlotLabel !== undefined ? { combinedSlotLabel } : {}) }); updated++; }
+    else { assignments.push({ id: uid("asg"), teacherId: teacher.id, subjectId: subject.id, classIds, classId: classIds[0], combinedSlotLabel: combinedSlotLabel ?? "", periodsPerWeek, avoidRepeatSameDay }); added++; }
   });
   return { assignments, added, updated, errors };
 }
@@ -855,7 +858,7 @@ async function buildTemplateWorkbook() {
     ["  Available Periods (comma-separated period numbers or ALL)"],
     [""],
     ["Sheet: Assignments — who teaches what to which class, and how often"],
-    ["  Teacher Name, Subject Name, Class Name (use \"6A; 6B\" for combined lessons),"],
+    ["  Teacher Name, Subject Name, Class Name (use \"6A; 6B\" or \"6A / 6B\" for combined lessons),"],
     ["  Combined Slot (optional label — assignments sharing a label and the same classes"],
     ["  are scheduled in the same slot), Periods Per Week, Avoid Repeat Same Day (YES/NO)"],
     ["  Set Periods Per Week to 2 for a subject that should only meet twice a week, for example."],

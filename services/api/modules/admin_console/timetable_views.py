@@ -244,6 +244,10 @@ class StaffTimetableView(APIView):
             # Combined lessons span several sections (classIds); older saved
             # bundles only carry a single classId — normalize both shapes.
             class_ids = entry.get("classIds") or ([entry.get("classId")] if entry.get("classId") else [])
+            if not isinstance(class_ids, list):
+                # Malformed bundle (e.g. a bare string id) — wrap rather than
+                # iterating it character by character below.
+                class_ids = [class_ids]
             class_names = [classes_map.get(cid, {}).get("name", "") for cid in class_ids]
             subject_info = subjects_map.get(entry.get("subjectId", ""), {})
             room_info = rooms_map.get(entry.get("roomId", ""), {})

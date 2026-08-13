@@ -264,6 +264,35 @@ describe("bulk import combined", () => {
     expect(r.assignments[0].periodsPerWeek).toBe(5);
   });
 
+  it("preserves an existing label when the sheet has no Combined Slot column", () => {
+    const existing = [
+      { id: "asg1", teacherId: "t1", subjectId: "s_fr", classIds: ["c6a", "c6b"], classId: "c6a", combinedSlotLabel: "Lang", periodsPerWeek: 3, avoidRepeatSameDay: true },
+    ];
+    const rows = [{ "Teacher Name": "Mrs. Sharma", "Subject Name": "French", "Class Name": "6A; 6B", "Periods Per Week": 4 }];
+    const r = importAssignmentsRows(existing, refs, rows);
+    expect(r.updated).toBe(1);
+    expect(r.assignments[0].combinedSlotLabel).toBe("Lang");
+    expect(r.assignments[0].periodsPerWeek).toBe(4);
+  });
+
+  it("clears an existing label when the Combined Slot cell is present but blank", () => {
+    const existing = [
+      { id: "asg1", teacherId: "t1", subjectId: "s_fr", classIds: ["c6a", "c6b"], classId: "c6a", combinedSlotLabel: "Lang", periodsPerWeek: 3, avoidRepeatSameDay: true },
+    ];
+    const rows = [{ "Teacher Name": "Mrs. Sharma", "Subject Name": "French", "Class Name": "6A; 6B", "Combined Slot": "", "Periods Per Week": 4 }];
+    const r = importAssignmentsRows(existing, refs, rows);
+    expect(r.updated).toBe(1);
+    expect(r.assignments[0].combinedSlotLabel).toBe("");
+  });
+
+  it("defaults the label to empty and dedupes repeated sections on new rows", () => {
+    const rows = [{ "Teacher Name": "Mrs. Sharma", "Subject Name": "French", "Class Name": "6A; 6A; 6B", "Periods Per Week": 3 }];
+    const r = importAssignmentsRows([], refs, rows);
+    expect(r.added).toBe(1);
+    expect(r.assignments[0].classIds).toEqual(["c6a", "c6b"]);
+    expect(r.assignments[0].combinedSlotLabel).toBe("");
+  });
+
   it("reports the missing class name when one section is unknown", () => {
     const rows = [{ "Teacher Name": "Mrs. Sharma", "Subject Name": "French", "Class Name": "6A; 6Z", "Periods Per Week": 3 }];
     const r = importAssignmentsRows([], refs, rows);
