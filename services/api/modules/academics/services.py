@@ -141,6 +141,10 @@ def validate_assignment_sections(*, sections, subject, teacher, combined_slot_la
     """Set-level rules for SubjectTeacherAssignment that clean() can't express (M2M).
 
     Raises a Django ValidationError with a field-keyed dict.
+
+    ``combined_slot_label`` is accepted but intentionally unvalidated here:
+    label-based parallel-option rules are enforced at a later layer, and the
+    parameter is reserved so callers pass the full write payload.
     """
     if not sections:
         raise DjangoValidationError({"classSectionIds": "Select at least one section."})
@@ -160,7 +164,7 @@ def validate_assignment_sections(*, sections, subject, teacher, combined_slot_la
         branch_id=sections[0].branch_id,
         field_name="teacherId",
     )
-    # One teacher per subject per exact section set ("already mapped" rule).
+    # One assignment per subject per exact section set (regardless of teacher).
     target = {s.id for s in sections}
     candidates = (
         SubjectTeacherAssignment.objects.filter(subject=subject, class_sections__in=list(target))

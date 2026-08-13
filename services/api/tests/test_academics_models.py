@@ -46,25 +46,11 @@ def _build_assignment_fixtures():
 
 def _build_validation_fixtures():
     """Assignment fixtures plus a teacher that passes staff/membership checks."""
-    institute = Institute.objects.create(name="Northstar Academy", code="NSA")
-    branch = Branch.objects.create(institute=institute, name="Main", code="MAIN")
-    grade = Grade.objects.create(institute=institute, name="Class 8")
-    year = AcademicYear.objects.create(
-        institute=institute,
-        name="2026-27",
-        start_date=date(2026, 4, 1),
-        end_date=date(2027, 3, 31),
-    )
-    section_a = ClassSection.objects.create(
-        branch=branch, grade=grade, academic_year=year, section_name="A"
-    )
-    section_b = ClassSection.objects.create(
-        branch=branch, grade=grade, academic_year=year, section_name="B"
-    )
-    subject = Subject.objects.create(institute=institute, name="French")
-    teacher = User.objects.create_user(
-        email="teacher@campusone.test", password="StrongPass123!"
-    )
+    section_a, section_b, subject, teacher = _build_assignment_fixtures()
+    branch = section_a.branch
+    institute = branch.institute
+    grade = section_a.grade
+    year = section_a.academic_year
     StaffProfile.objects.create(institute=institute, user=teacher)
     InstituteMembership.objects.create(
         user=teacher,
@@ -132,6 +118,23 @@ def test_validate_allows_same_subject_for_different_section_set():
         teacher=teacher,
         combined_slot_label="",
         assignment_id=None,
+    )
+
+
+@pytest.mark.django_db
+def test_validate_excludes_own_assignment_when_editing():
+    _institute, _branch, _grade, _year, section_a, section_b, subject, teacher = (
+        _build_validation_fixtures()
+    )
+    existing = SubjectTeacherAssignment.objects.create(subject=subject, teacher=teacher)
+    existing.class_sections.set([section_a, section_b])
+
+    validate_assignment_sections(  # must not raise: self-exclusion on edit
+        sections=[section_a, section_b],
+        subject=subject,
+        teacher=teacher,
+        combined_slot_label="",
+        assignment_id=existing.id,
     )
 
 
