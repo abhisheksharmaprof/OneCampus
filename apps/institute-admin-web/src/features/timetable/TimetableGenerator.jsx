@@ -183,6 +183,18 @@ function entryClassIds(e) {
   if (Array.isArray(e.classIds) && e.classIds.length) return e.classIds;
   return e.classId ? [e.classId] : [];
 }
+
+// Pure CSV-row builder for the export: one row per (entry, classId, period),
+// so multi-section and joint blocks explode into one row per participating class.
+export function buildCsvRows(result, bundle) {
+  const teacherById = Object.fromEntries(bundle.teachers.map((t) => [t.id, t]));
+  const subjectById = Object.fromEntries(bundle.subjects.map((s) => [s.id, s]));
+  const classById = Object.fromEntries(bundle.classes.map((c) => [c.id, c]));
+  const rows = [["Day", "Period", "Class", "Subject", "Teacher"]];
+  const sorted = [...result.entries].sort((a, b) => a.day.localeCompare(b.day) || a.periods[0] - b.periods[0]);
+  for (const e of sorted) for (const cid of entryClassIds(e)) for (const p of e.periods) rows.push([e.day, p, classById[cid]?.name, subjectById[e.subjectId]?.name, teacherById[e.teacherId]?.name]);
+  return rows;
+}
 // Assignments sharing a non-blank combinedSlotLabel AND the exact same
 // section set are parallel options (e.g. French/Spanish) that must land on
 // the same (day, period) every week.
@@ -1784,9 +1796,12 @@ function TimetableTab({ bundle, updateBundle, readOnly = false, saveTimetable })
         const overlap = entry.periods.some(p => newPeriods.includes(p));
         if (overlap) {
           if (entry.teacherId === teacherId || entryClassIds(entry).some((c) => classIds.includes(c)) || (requiresRoomId && entry.roomId === requiresRoomId)) {
-            // Joint blocks (slotGroupId) can only move by regenerating; refusing
-            // the drop keeps the group's entries locked/unlocked together.
-            if (entry.slotGroupId) return;
+            // Joint blocks (slotGroupId) move only by regenerating the whole
+            // timetable, so a drop that would displace one is refused outright.
+            if (entry.slotGroupId) {
+              setSaveError("Combined blocks can only be moved by regenerating the timetable.");
+              return;
+            }
             conflictingIds.add(entry.assignmentId);
           }
         }
@@ -1812,6 +1827,7 @@ function TimetableTab({ bundle, updateBundle, readOnly = false, saveTimetable })
       isLocked: true
     });
     
+    setSaveError("");
     setGenerating(true);
     setTimeout(() => {
       const data = { config: bundle.config, teachers: bundle.teachers, subjects: bundle.subjects, classes: bundle.classes, rooms: bundle.rooms, assignments: bundle.assignments };
@@ -1853,12 +1869,7 @@ function TimetableTab({ bundle, updateBundle, readOnly = false, saveTimetable })
 
   const exportCsv = () => {
     if (!result?.feasible) return;
-    const teacherById = Object.fromEntries(bundle.teachers.map((t) => [t.id, t]));
-    const subjectById = Object.fromEntries(bundle.subjects.map((s) => [s.id, s]));
-    const classById = Object.fromEntries(bundle.classes.map((c) => [c.id, c]));
-    const rows = [["Day", "Period", "Class", "Subject", "Teacher"]];
-    const sorted = [...result.entries].sort((a, b) => a.day.localeCompare(b.day) || a.periods[0] - b.periods[0]);
-    for (const e of sorted) for (const cid of entryClassIds(e)) for (const p of e.periods) rows.push([e.day, p, classById[cid]?.name, subjectById[e.subjectId]?.name, teacherById[e.teacherId]?.name]);
+    const rows = buildCsvRows(result, bundle);
     const csv = rows.map((r) => r.map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);

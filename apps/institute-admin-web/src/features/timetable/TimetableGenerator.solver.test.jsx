@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { generateTimetable } from "./TimetableGenerator.jsx";
+import { buildCsvRows, generateTimetable } from "./TimetableGenerator.jsx";
 
 const DAYS = ["MON", "TUE", "WED", "THU", "FRI", "SAT"];
 const PERIODS = [1, 2, 3, 4, 5, 6];
@@ -136,6 +136,38 @@ describe("combined section lessons", () => {
     }
   });
 
+  it("keeps a group-atomically locked joint block in place across regeneration", () => {
+    const bundle = withAssignments(base, [
+      { id: "asg_fr", teacherId: "t1", subjectId: "s_fr", classIds: ["c1", "c2"], combinedSlotLabel: "Lang", periodsPerWeek: 3, avoidRepeatSameDay: true },
+      { id: "asg_es", teacherId: "t2", subjectId: "s_es", classIds: ["c1", "c2"], combinedSlotLabel: "Lang", periodsPerWeek: 3, avoidRepeatSameDay: true },
+      { id: "asg_math", teacherId: "t3", subjectId: "s2", classIds: ["c1"], periodsPerWeek: 4, avoidRepeatSameDay: true },
+    ]);
+    const first = generateTimetable(bundle, { attempts: 5 });
+    expect(first.feasible).toBe(true);
+
+    // Lock the way the UI's toggleLock does: the same isLocked flag applied to
+    // every entry sharing the clicked entry's slotGroupId (group-atomic).
+    const groupId = first.entries.find((e) => e.slotGroupId).slotGroupId;
+    const lockedEntries = first.entries.filter((e) => e.slotGroupId === groupId).map((e) => ({ ...e, isLocked: true }));
+    expect(lockedEntries).toHaveLength(2); // both parallel options of the joint block
+
+    const second = generateTimetable(bundle, { lockedEntries, generateScope: "all" });
+    expect(second.feasible).toBe(true);
+    // Each locked option stays at the locked slot, exactly once (no drop, no duplicate).
+    for (const locked of lockedEntries) {
+      const kept = second.entries.filter((e) => e.assignmentId === locked.assignmentId && e.day === locked.day && e.periods[0] === locked.periods[0]);
+      expect(kept).toHaveLength(1);
+    }
+    // Weekly occurrence counts are unchanged for every parallel option.
+    const fr = second.entries.filter((e) => e.assignmentId === "asg_fr");
+    const es = second.entries.filter((e) => e.assignmentId === "asg_es");
+    expect(fr).toHaveLength(3);
+    expect(es).toHaveLength(3);
+    // And the options are still co-located at every occurrence.
+    const key = (e) => `${e.day}-${e.periods.join(",")}`;
+    expect(fr.map(key).sort()).toEqual(es.map(key).sort());
+  });
+
   it("still schedules legacy assignments that only carry classId", () => {
     const bundle = withAssignments(base, [
       { id: "asg_legacy", teacherId: "t1", subjectId: "s2", classId: "c1", periodsPerWeek: 3, avoidRepeatSameDay: true },
@@ -148,5 +180,38 @@ describe("combined section lessons", () => {
       expect(e.classIds).toEqual(["c1"]);
       expect(e.classId).toBe("c1");
     }
+  });
+});
+
+describe("csv export rows", () => {
+  it("explodes a 2-option × 2-section joint slot into 4 rows with correct pairings", () => {
+    const bundle = makeBundle();
+    const result = {
+      feasible: true,
+      entries: [
+        { assignmentId: "asg_fr", teacherId: "t1", subjectId: "s_fr", classIds: ["c1", "c2"], classId: "c1", slotGroupId: "g1", day: "MON", periods: [1] },
+        { assignmentId: "asg_es", teacherId: "t2", subjectId: "s_es", classIds: ["c1", "c2"], classId: "c1", slotGroupId: "g1", day: "MON", periods: [1] },
+      ],
+    };
+    const rows = buildCsvRows(result, bundle);
+    expect(rows[0]).toEqual(["Day", "Period", "Class", "Subject", "Teacher"]);
+    expect(rows.slice(1)).toEqual([
+      ["MON", 1, "Class 1", "French", "Teacher t1"],
+      ["MON", 1, "Class 2", "French", "Teacher t1"],
+      ["MON", 1, "Class 1", "Spanish", "Teacher t2"],
+      ["MON", 1, "Class 2", "Spanish", "Teacher t2"],
+    ]);
+  });
+
+  it("keeps one row per period for legacy single-class entries", () => {
+    const bundle = makeBundle();
+    const result = {
+      feasible: true,
+      entries: [{ assignmentId: "asg_a", teacherId: "t1", subjectId: "s2", classId: "c1", day: "TUE", periods: [2, 3] }],
+    };
+    expect(buildCsvRows(result, bundle).slice(1)).toEqual([
+      ["TUE", 2, "Class 1", "Mathematics", "Teacher t1"],
+      ["TUE", 3, "Class 1", "Mathematics", "Teacher t1"],
+    ]);
   });
 });
