@@ -2723,7 +2723,7 @@ const payload: QrDocPayload = {
 describe('qrPayload', () => {
   it('round-trips through encode/decode including unicode', () => {
     const unicode = { ...payload, student: 'आरव शर्मा · कक्षा 8' }
-    expect(decodePayload(encodePayload(unicode))).toEqual(unicode)
+    expect(decodePayload(encodePayload(unicode))).toEqual({ ok: true, payload: unicode })
   })
 
   it('produces URL-safe output', () => {
@@ -2740,17 +2740,46 @@ describe('qrPayload', () => {
     const fragment = url.split('#')[1]
     expect(fragment.length).toBeLessThanOrEqual(2500)
     const decoded = decodePayload(fragment)
-    expect(decoded.items).toBeUndefined()
-    expect(decoded.totals).toEqual(payload.totals)
+    expect(decoded.ok).toBe(true)
+    if (!decoded.ok) return
+    expect(decoded.payload.items).toBeUndefined()
+    expect(decoded.payload.totals).toEqual(payload.totals)
   })
 
-  it('builds a payload from DocumentData', () => {
+  it('rejects oversized encoded payloads', () => {
+    // Poorly compressible content so the encoded form blows past the ceiling.
+    const bomb = {
+      ...payload,
+      items: Array.from({ length: 5000 }, (_, i) => [`item-${i}-${Math.sqrt(i + 2)}`, i] as [string, number]),
+    }
+    const encoded = encodePayload(bomb)
+    expect(encoded.length).toBeGreaterThan(10000)
+    expect(decodePayload(encoded)).toEqual({ ok: false })
+  })
+
+  it('rejects malformed and wrong-shape payloads', () => {
+    expect(decodePayload('%%%not-base64url%%%')).toEqual({ ok: false })
+    expect(decodePayload('')).toEqual({ ok: false })
+    expect(decodePayload(encodePayload({ v: 999 } as unknown as QrDocPayload))).toEqual({ ok: false })
+    expect(decodePayload(encodePayload({ ...payload, items: 'not-an-array' } as unknown as QrDocPayload))).toEqual({ ok: false })
+    expect(decodePayload(encodePayload({ ...payload, cat: 'EVIL' } as unknown as QrDocPayload))).toEqual({ ok: false })
+    expect(decodePayload(encodePayload({ ...payload, num: 42 } as unknown as QrDocPayload))).toEqual({ ok: false })
+    expect(decodePayload(encodePayload({ ...payload, items: [['only-one-element']] } as unknown as QrDocPayload))).toEqual({ ok: false })
+  })
+
+  it('builds a payload from DocumentData with c6 line totals', () => {
     const data = sampleDocumentData('FEE_INVOICE')
     const built = payloadFromDocumentData(data)
     expect(built.v).toBe(1)
     expect(built.num).toBe(data.tokens.invoice_no)
     expect(built.inst).toBe(data.tokens.school_name)
     expect(built.items!.length).toBe(data.rows.length)
+    expect(built.items).toEqual(data.rows.map((row) => [String(row.c1), Number(row.c6)]))
+  })
+
+  it('omits items for non-fee categories', () => {
+    const built = payloadFromDocumentData(sampleDocumentData('MARKSHEET'))
+    expect(built.items).toBeUndefined()
   })
 })
 ```
@@ -2761,7 +2790,12 @@ describe('qrPayload', () => {
 /** Self-contained document payloads for QR codes.
  *  The payload rides in a URL #fragment (never sent to any server); the verify page
  *  renders it with zero database dependency. QR capacity is ~2.9KB — buildVerifyUrl
- *  deterministically degrades to a summary (no line items) when over budget. */
+ *  deterministically degrades to a summary (no line items) when over budget.
+ *
+ *  SECURITY: the fragment is attacker-forgeable (anyone can print their own QR
+ *  pointing at /verify), so decodePayload is a trust boundary: it caps input size
+ *  before inflating, never throws, and validates the decoded shape before
+ *  returning ok. */
 
 import { deflate, inflate } from 'pako'
 import QRCode from 'qrcode'
@@ -2779,7 +2813,13 @@ export interface QrDocPayload {
   status?: string
 }
 
+export type QrDecodeResult = { ok: true; payload: QrDocPayload } | { ok: false }
+
 const FRAGMENT_BUDGET = 2500
+/** Hard ceiling on encoded input length, enforced before inflate (zip-bomb guard). */
+const MAX_ENCODED_LENGTH = FRAGMENT_BUDGET * 4
+
+const CATEGORIES: readonly DocumentCategory[] = ['FEE_INVOICE', 'FEE_RECEIPT', 'MARKSHEET', 'ID_CARD', 'CERTIFICATE']
 
 function toBase64Url(bytes: Uint8Array): string {
   let binary = ''
@@ -2793,12 +2833,40 @@ function fromBase64Url(encoded: string): Uint8Array {
   return Uint8Array.from(binary, (character) => character.charCodeAt(0))
 }
 
+function isPairArray(value: unknown): value is [string, number][] {
+  return Array.isArray(value) && value.every((entry) =>
+    Array.isArray(entry) && entry.length === 2 && typeof entry[0] === 'string' && typeof entry[1] === 'number')
+}
+
+function isQrDocPayload(value: unknown): value is QrDocPayload {
+  if (typeof value !== 'object' || value === null) return false
+  const candidate = value as Record<string, unknown>
+  if (candidate.v !== 1) return false
+  if (typeof candidate.cat !== 'string' || !CATEGORIES.includes(candidate.cat as DocumentCategory)) return false
+  for (const key of ['num', 'date', 'inst'] as const) {
+    if (typeof candidate[key] !== 'string') return false
+  }
+  for (const key of ['student', 'status'] as const) {
+    if (candidate[key] !== undefined && typeof candidate[key] !== 'string') return false
+  }
+  for (const key of ['items', 'totals'] as const) {
+    if (candidate[key] !== undefined && !isPairArray(candidate[key])) return false
+  }
+  return true
+}
+
 export function encodePayload(payload: QrDocPayload): string {
   return toBase64Url(deflate(new TextEncoder().encode(JSON.stringify(payload))))
 }
 
-export function decodePayload(encoded: string): QrDocPayload {
-  return JSON.parse(new TextDecoder().decode(inflate(fromBase64Url(encoded)))) as QrDocPayload
+export function decodePayload(encoded: string): QrDecodeResult {
+  if (typeof encoded !== 'string' || encoded.length === 0 || encoded.length > MAX_ENCODED_LENGTH) return { ok: false }
+  try {
+    const parsed: unknown = JSON.parse(new TextDecoder().decode(inflate(fromBase64Url(encoded))))
+    return isQrDocPayload(parsed) ? { ok: true, payload: parsed } : { ok: false }
+  } catch {
+    return { ok: false }
+  }
 }
 
 export function buildVerifyUrl(baseUrl: string, payload: QrDocPayload): string {
@@ -2812,6 +2880,7 @@ export function buildVerifyUrl(baseUrl: string, payload: QrDocPayload): string {
 
 export function payloadFromDocumentData(data: DocumentData): QrDocPayload {
   const isReceipt = data.category === 'FEE_RECEIPT'
+  const isFeeDocument = data.category === 'FEE_INVOICE' || isReceipt
   return {
     v: 1,
     cat: data.category,
@@ -2819,8 +2888,10 @@ export function payloadFromDocumentData(data: DocumentData): QrDocPayload {
     date: data.tokens.invoice_date || data.tokens.issue_date || '',
     inst: data.tokens.school_name || '',
     student: [data.tokens.student_name, data.tokens.class_section].filter(Boolean).join(' · ') || undefined,
-    items: data.rows.length
-      ? data.rows.map((row) => [String(row.c1 ?? ''), Number(row.c4 ?? row.c3 ?? 0) * (Number(row.c3) || 1)] as [string, number])
+    // c6 is the precomputed line total (see datasets.ts data contract). Non-fee
+    // categories carry marks/attributes in these columns, so they get no items.
+    items: isFeeDocument && data.rows.length
+      ? data.rows.map((row) => [String(row.c1 ?? ''), Number(row.c6 ?? 0)] as [string, number])
       : undefined,
     status: data.status,
   }
@@ -2850,7 +2921,7 @@ export async function prepareQrDataUrls(
 - [ ] **Step 4: Verify + commit**
 
 Run: `cd apps/institute-admin-web && npx vitest run src/features/documents/engine/qrPayload.test.ts && npm run typecheck`
-Expected: 4 PASSED, typecheck clean. (Note: `prepareQrDataUrls` isn't unit-tested — it needs a DOM canvas; the codec functions it composes are.)
+Expected: 7 PASSED, typecheck clean. (Note: `prepareQrDataUrls` isn't unit-tested — it needs a DOM canvas; the codec functions it composes are.)
 
 ```bash
 git add apps/institute-admin-web/src/features/documents/engine/qrPayload.ts apps/institute-admin-web/src/features/documents/engine/qrPayload.test.ts

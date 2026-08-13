@@ -1,7 +1,12 @@
 /** Self-contained document payloads for QR codes.
  *  The payload rides in a URL #fragment (never sent to any server); the verify page
  *  renders it with zero database dependency. QR capacity is ~2.9KB — buildVerifyUrl
- *  deterministically degrades to a summary (no line items) when over budget. */
+ *  deterministically degrades to a summary (no line items) when over budget.
+ *
+ *  SECURITY: the fragment is attacker-forgeable (anyone can print their own QR
+ *  pointing at /verify), so decodePayload is a trust boundary: it caps input size
+ *  before inflating, never throws, and validates the decoded shape before
+ *  returning ok. */
 
 import { deflate, inflate } from 'pako'
 import QRCode from 'qrcode'
@@ -19,7 +24,13 @@ export interface QrDocPayload {
   status?: string
 }
 
+export type QrDecodeResult = { ok: true; payload: QrDocPayload } | { ok: false }
+
 const FRAGMENT_BUDGET = 2500
+/** Hard ceiling on encoded input length, enforced before inflate (zip-bomb guard). */
+const MAX_ENCODED_LENGTH = FRAGMENT_BUDGET * 4
+
+const CATEGORIES: readonly DocumentCategory[] = ['FEE_INVOICE', 'FEE_RECEIPT', 'MARKSHEET', 'ID_CARD', 'CERTIFICATE']
 
 function toBase64Url(bytes: Uint8Array): string {
   let binary = ''
@@ -33,12 +44,40 @@ function fromBase64Url(encoded: string): Uint8Array {
   return Uint8Array.from(binary, (character) => character.charCodeAt(0))
 }
 
+function isPairArray(value: unknown): value is [string, number][] {
+  return Array.isArray(value) && value.every((entry) =>
+    Array.isArray(entry) && entry.length === 2 && typeof entry[0] === 'string' && typeof entry[1] === 'number')
+}
+
+function isQrDocPayload(value: unknown): value is QrDocPayload {
+  if (typeof value !== 'object' || value === null) return false
+  const candidate = value as Record<string, unknown>
+  if (candidate.v !== 1) return false
+  if (typeof candidate.cat !== 'string' || !CATEGORIES.includes(candidate.cat as DocumentCategory)) return false
+  for (const key of ['num', 'date', 'inst'] as const) {
+    if (typeof candidate[key] !== 'string') return false
+  }
+  for (const key of ['student', 'status'] as const) {
+    if (candidate[key] !== undefined && typeof candidate[key] !== 'string') return false
+  }
+  for (const key of ['items', 'totals'] as const) {
+    if (candidate[key] !== undefined && !isPairArray(candidate[key])) return false
+  }
+  return true
+}
+
 export function encodePayload(payload: QrDocPayload): string {
   return toBase64Url(deflate(new TextEncoder().encode(JSON.stringify(payload))))
 }
 
-export function decodePayload(encoded: string): QrDocPayload {
-  return JSON.parse(new TextDecoder().decode(inflate(fromBase64Url(encoded)))) as QrDocPayload
+export function decodePayload(encoded: string): QrDecodeResult {
+  if (typeof encoded !== 'string' || encoded.length === 0 || encoded.length > MAX_ENCODED_LENGTH) return { ok: false }
+  try {
+    const parsed: unknown = JSON.parse(new TextDecoder().decode(inflate(fromBase64Url(encoded))))
+    return isQrDocPayload(parsed) ? { ok: true, payload: parsed } : { ok: false }
+  } catch {
+    return { ok: false }
+  }
 }
 
 export function buildVerifyUrl(baseUrl: string, payload: QrDocPayload): string {
@@ -52,6 +91,7 @@ export function buildVerifyUrl(baseUrl: string, payload: QrDocPayload): string {
 
 export function payloadFromDocumentData(data: DocumentData): QrDocPayload {
   const isReceipt = data.category === 'FEE_RECEIPT'
+  const isFeeDocument = data.category === 'FEE_INVOICE' || isReceipt
   return {
     v: 1,
     cat: data.category,
@@ -59,8 +99,10 @@ export function payloadFromDocumentData(data: DocumentData): QrDocPayload {
     date: data.tokens.invoice_date || data.tokens.issue_date || '',
     inst: data.tokens.school_name || '',
     student: [data.tokens.student_name, data.tokens.class_section].filter(Boolean).join(' · ') || undefined,
-    items: data.rows.length
-      ? data.rows.map((row) => [String(row.c1 ?? ''), Number(row.c4 ?? row.c3 ?? 0) * (Number(row.c3) || 1)] as [string, number])
+    // c6 is the precomputed line total (see datasets.ts data contract). Non-fee
+    // categories carry marks/attributes in these columns, so they get no items.
+    items: isFeeDocument && data.rows.length
+      ? data.rows.map((row) => [String(row.c1 ?? ''), Number(row.c6 ?? 0)] as [string, number])
       : undefined,
     status: data.status,
   }
