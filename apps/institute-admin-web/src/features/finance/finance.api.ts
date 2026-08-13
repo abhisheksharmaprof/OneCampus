@@ -205,6 +205,16 @@ export function recordPayment(
   return adminRequest<Payment>(accessToken, 'fees/payments', { method: 'POST', body: JSON.stringify(body) })
 }
 
+export function logDuesExport(
+  accessToken: string,
+  filters: { branchId?: string; classId?: string; minDaysOverdue?: number },
+) {
+  return adminRequest<{ logged: boolean }>(accessToken, 'fees/dues/export', {
+    method: 'POST',
+    body: JSON.stringify(filters),
+  })
+}
+
 export function listDues(
   accessToken: string,
   filters: { page?: number; branchId?: string; classId?: string; minDaysOverdue?: number },

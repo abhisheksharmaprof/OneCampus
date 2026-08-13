@@ -7,6 +7,7 @@ from modules.finance.models import FeeInvoice, FeePayment
 from modules.identity.models import User
 from modules.institutes.models import Branch, Institute, InstituteMembership
 from modules.people.models import Student
+from platform_core.models import AuditEvent
 
 
 @pytest.fixture
@@ -135,3 +136,15 @@ def test_dues_branch_filter_scopes_payments_and_rejects_bad_params(api_client, c
     scoped = api_client.get(f"/api/v1/admin/fees/dues?branchId={main_branch.id}")
     rows = {row["studentName"]: row for row in scoped.json()["data"]["items"]}
     assert rows["Diya"]["paid"] == "30.00"
+
+
+@pytest.mark.django_db
+def test_dues_export_writes_audit_event(api_client, context):
+    response = api_client.post(
+        "/api/v1/admin/fees/dues/export", {"minDaysOverdue": 5}, format="json"
+    )
+
+    assert response.status_code == 201
+    assert AuditEvent.objects.filter(
+        institute=context["institute"], target_type="fee_dues_export"
+    ).exists()

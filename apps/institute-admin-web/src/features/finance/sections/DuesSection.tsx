@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { listDues, listGrades, type DueRow, type GradeOption } from '../finance.api'
+import { listDues, listGrades, logDuesExport, type DueRow, type GradeOption } from '../finance.api'
 import { escapeHtml, openPrintWindow } from '../invoiceRender'
 import { money, Pagination, StatePanel, useAbortableLoad, type FinanceSectionProps } from './shared'
 
@@ -31,6 +31,12 @@ export default function DuesSection({ accessToken, branchId }: FinanceSectionPro
     setPrinting(true)
     setNotice(null)
     try {
+      void logDuesExport(accessToken, {
+        branchId,
+        classId: classFilter || undefined,
+        minDaysOverdue: minDaysOverdue ? Number(minDaysOverdue) : undefined,
+      }).catch(() => {})
+
       const rows: DueRow[] = []
       let fetchPage = 1
       let totalPages = 1

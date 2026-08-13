@@ -13,6 +13,7 @@ from modules.academics.models import StudentEnrollment
 from modules.finance.models import FeeInvoice, FeePayment
 from modules.institutes.api.permissions import IsCurrentInstituteAdmin
 from modules.institutes.models import Branch
+from platform_core.api.audit import audit_mutation
 from platform_core.api.pagination import paginate_admin_queryset
 
 OPEN_STATUSES = (FeeInvoice.Status.ISSUED, FeeInvoice.Status.PARTIALLY_PAID)
@@ -194,3 +195,26 @@ class FeeDuesView(APIView):
                 ),
             }
         )
+
+
+class FeeDuesExportView(APIView):
+    permission_classes = (IsCurrentInstituteAdmin,)
+
+    def post(self, request):
+        filter_serializer = DuesFilterSerializer(data=request.data)
+        filter_serializer.is_valid(raise_exception=True)
+        filters = filter_serializer.validated_data
+        branch_id = filters.get("branchId")
+        class_id = filters.get("classId")
+        audit_mutation(
+            request=request,
+            verb="Updated",
+            target_label="dues list export",
+            target_type="fee_dues_export",
+            extra_meta={
+                "branchId": str(branch_id) if branch_id else None,
+                "classId": str(class_id) if class_id else None,
+                "minDaysOverdue": filters.get("minDaysOverdue"),
+            },
+        )
+        return Response({"success": True, "data": {"logged": True}}, status=201)
