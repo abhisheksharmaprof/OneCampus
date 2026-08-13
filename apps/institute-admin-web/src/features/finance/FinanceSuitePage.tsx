@@ -1,16 +1,15 @@
 import type { ComponentType } from 'react'
-import { BadgeIndianRupee, CalendarClock, FileText, LayoutDashboard, ListChecks, Printer, ReceiptText, Settings2 } from 'lucide-react'
+import { BadgeIndianRupee, CalendarClock, FileText, LayoutDashboard, ListChecks, ReceiptText, Settings2 } from 'lucide-react'
 import OverviewSection from './sections/OverviewSection'
 import InvoicesSection from './sections/InvoicesSection'
 import PaymentsSection from './sections/PaymentsSection'
 import DuesSection from './sections/DuesSection'
 import FeePlansSection from './sections/FeePlansSection'
-import TemplatesSection from './sections/TemplatesSection'
 import SettingsSection from './sections/SettingsSection'
 import './finance-suite.css'
 
 export type FinanceSection =
-  | 'overview' | 'invoices' | 'payments' | 'dues' | 'plans' | 'templates' | 'settings'
+  | 'overview' | 'invoices' | 'payments' | 'dues' | 'plans' | 'settings'
 
 // Keep these prop types identical to the previous version of this file (App.tsx contract):
 // accessToken, branches, selectedBranch (branch id string, or 'all'), section, onNavigate.
@@ -28,7 +27,6 @@ const NAV: { section: FinanceSection; label: string; path: string; icon: Compone
   { section: 'payments', label: 'Payments & Receipts', path: '/finance/payments', icon: ReceiptText },
   { section: 'dues', label: 'Dues', path: '/finance/dues', icon: CalendarClock },
   { section: 'plans', label: 'Fee plans', path: '/finance/fee-structure', icon: ListChecks },
-  { section: 'templates', label: 'Templates', path: '/finance/invoice-templates', icon: Printer },
   { section: 'settings', label: 'Settings', path: '/finance/settings', icon: Settings2 },
 ]
 
@@ -70,7 +68,6 @@ export default function FinanceSuitePage({ accessToken, branches, selectedBranch
         {section === 'payments' && <PaymentsSection {...sectionProps} />}
         {section === 'dues' && <DuesSection {...sectionProps} />}
         {section === 'plans' && <FeePlansSection {...sectionProps} />}
-        {section === 'templates' && <TemplatesSection {...sectionProps} />}
         {section === 'settings' && <SettingsSection {...sectionProps} />}
       </div>
     </div>

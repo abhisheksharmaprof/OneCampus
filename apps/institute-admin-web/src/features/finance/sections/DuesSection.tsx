@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { listDues, listGrades, logDuesExport, type DueRow, type GradeOption } from '../finance.api'
-import { escapeHtml, openPrintWindow } from '../invoiceRender'
+import { openPrintWindow } from '../../documents/engine/docRender'
+import { escapeHtml } from '../../documents/engine/renderHtml'
 import { money, Pagination, StatePanel, useAbortableLoad, type FinanceSectionProps } from './shared'
 
 const OVERDUE_OPTIONS: { value: string; label: string }[] = [

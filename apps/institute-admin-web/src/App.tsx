@@ -53,7 +53,6 @@ const financeSectionByRoute: Record<string, FinanceSection> = {
   FPY1: 'payments',
   FDU1: 'dues',
   FFS1: 'plans',
-  FIT1: 'templates',
   FST1: 'settings',
 }
 

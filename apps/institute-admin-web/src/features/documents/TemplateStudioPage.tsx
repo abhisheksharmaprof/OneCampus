@@ -28,7 +28,9 @@ export default function TemplateStudioPage({ accessToken }: { accessToken: strin
     setNotice(null)
     action
       .then(() => { templates.reload(); then?.() })
-      .catch((cause: unknown) => setNotice(cause instanceof AdminApiError ? cause.message : 'The action failed.'))
+      .catch((cause: unknown) => setNotice(cause instanceof AdminApiError
+        ? (Object.values(cause.fieldErrors)[0]?.[0] ?? cause.message)
+        : 'The action failed.'))
       .finally(() => setBusy(false))
   }
 

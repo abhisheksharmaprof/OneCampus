@@ -1,10 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
-  createInvoice, fetchInstituteBranding, listFeePlans, listTemplates, searchStudents,
+  createInvoice, fetchInstituteBranding, listFeePlans, searchStudents,
   type Invoice, type InvoiceLineItem, type StudentOption,
 } from '../finance.api'
 import { AdminApiError } from '../../admin/admin.api'
-import { buildDocumentModel, openPrintWindow, renderDocumentHtml, resolveLayout } from '../invoiceRender'
+import { listDocumentTemplates } from '../../documents/documents.api'
+import { invoiceToDocumentData } from '../../documents/engine/datasets'
+import { renderDocumentHtml } from '../../documents/engine/docRender'
+import { printFinanceDocument } from '../../documents/engine/printDocument'
+import { defaultLayout } from '../../documents/engine/types'
 import { inDays, money, StatePanel, today, useAbortableLoad } from './shared'
 
 type InvoiceEditorProps = {
@@ -35,7 +39,7 @@ export default function InvoiceEditor({ accessToken, onClose }: InvoiceEditorPro
   const previewRef = useRef<HTMLIFrameElement>(null)
 
   const branding = useAbortableLoad((signal) => fetchInstituteBranding(accessToken, signal), [accessToken])
-  const templatesLoad = useAbortableLoad((signal) => listTemplates(accessToken, 'INVOICE', signal), [accessToken])
+  const templatesLoad = useAbortableLoad((signal) => listDocumentTemplates(accessToken, 'FEE_INVOICE', signal), [accessToken])
   const plansLoad = useAbortableLoad((signal) => listFeePlans(accessToken, false, signal), [accessToken])
   const templates = templatesLoad.data?.items ?? []
   const plans = plansLoad.data?.items ?? []
@@ -77,7 +81,8 @@ export default function InvoiceEditor({ accessToken, onClose }: InvoiceEditorPro
       taxAmount: Number(tax || 0).toFixed(2), total: total.toFixed(2),
       notes, templateId, totalPaid: '0.00',
     }
-    return renderDocumentHtml(buildDocumentModel({ invoice: draft, branding: branding.data }), resolveLayout(template?.layout))
+    const data = invoiceToDocumentData(draft, branding.data)
+    return renderDocumentHtml({ layout: template?.layout ?? defaultLayout('A4P'), data, mode: 'preview' })
   }, [branding.data, student, items, subtotal, discount, tax, total, issueDate, dueDate, notes, template, templateId])
 
   // Debounced so a fast typist doesn't trigger a full iframe document.write() on every keystroke.
@@ -119,9 +124,7 @@ export default function InvoiceEditor({ accessToken, onClose }: InvoiceEditorPro
         notes, templateId, status,
       })
       if (printAfter && branding.data) {
-        const printed = openPrintWindow(
-          renderDocumentHtml(buildDocumentModel({ invoice: created, branding: branding.data }), resolveLayout(template?.layout)),
-        )
+        const printed = await printFinanceDocument({ invoice: created, branding: branding.data, template })
         if (!printed) setError('The invoice was saved, but the print popup was blocked by the browser.')
       }
       return created

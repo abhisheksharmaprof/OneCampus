@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import {
-  fetchInstituteBranding, getInvoice, listInvoices, listPayments, listTemplates, searchStudents,
+  fetchInstituteBranding, getInvoice, listInvoices, listPayments, searchStudents,
   type Invoice, type Payment, type PaymentMethod, type StudentOption,
 } from '../finance.api'
-import { buildDocumentModel, openPrintWindow, renderDocumentHtml, resolveLayout } from '../invoiceRender'
+import { listDocumentTemplates } from '../../documents/documents.api'
+import { printFinanceDocument } from '../../documents/engine/printDocument'
 import { RecordPaymentModal } from './InvoicesSection'
 import { money, Pagination, StatePanel, useAbortableLoad, useModalKeyHandling, type FinanceSectionProps } from './shared'
 
@@ -28,7 +29,7 @@ export default function PaymentsSection({ accessToken, branchId }: FinanceSectio
     (signal) => listPayments(accessToken, { page, branchId, method, search, dateFrom, dateTo }, signal),
     [accessToken, branchId, page, method, search, dateFrom, dateTo],
   )
-  const templates = useAbortableLoad((signal) => listTemplates(accessToken, 'RECEIPT', signal), [accessToken])
+  const templates = useAbortableLoad((signal) => listDocumentTemplates(accessToken, 'FEE_RECEIPT', signal), [accessToken])
   const branding = useAbortableLoad((signal) => fetchInstituteBranding(accessToken, signal), [accessToken])
 
   const printReceipt = async (payment: Payment) => {
@@ -38,13 +39,11 @@ export default function PaymentsSection({ accessToken, branchId }: FinanceSectio
     try {
       // Receipt rendering needs the invoice's line items and student class.
       const invoice = await getInvoice(accessToken, payment.invoiceId)
-      const receiptTemplate = templates.data?.items.find((candidate) => candidate.isDefault) ?? templates.data?.items[0]
-      const printed = openPrintWindow(
-        renderDocumentHtml(
-          buildDocumentModel({ invoice, branding: branding.data, payment }),
-          resolveLayout(receiptTemplate?.layout),
-        ),
-      )
+      const receiptTemplate = templates.data?.items.find((candidate) => candidate.isDefault)
+        ?? templates.data?.items[0] ?? null
+      const printed = await printFinanceDocument({
+        invoice, branding: branding.data, template: receiptTemplate, payment,
+      })
       if (!printed) setNotice('The print popup was blocked by the browser.')
     } catch {
       setNotice('Could not load the invoice for this receipt.')

@@ -2,7 +2,6 @@ import { adminRequest, type PageData } from '../admin/admin.api'
 
 export type InvoiceStatus = 'DRAFT' | 'ISSUED' | 'PARTIALLY_PAID' | 'PAID' | 'CANCELLED'
 export type PaymentMethod = 'CASH' | 'UPI' | 'CARD' | 'BANK' | 'CHEQUE' | 'OTHER'
-export type TemplateKind = 'INVOICE' | 'RECEIPT'
 
 export type InvoiceLineItem = { description: string; period: string; qty: number; amount: string }
 
@@ -73,43 +72,6 @@ export type FeePlan = {
   items: FeePlanItem[]
   isActive: boolean
   branchId: string | null
-}
-
-export type TemplateColumn = {
-  id: string
-  label: string
-  width: number
-  align: 'left' | 'center' | 'right'
-  enabled: boolean
-}
-
-export type TemplateLayout = {
-  branding: {
-    mode: 'institute' | 'custom'
-    name: string
-    address: string
-    phone: string
-    email: string
-    logoUrl: string
-    primary: string
-    accent: string
-  }
-  font: string
-  density: 'comfortable' | 'compact'
-  header: { title: string; fields: string[] }
-  columns: TemplateColumn[]
-  computed: { showSubtotal: boolean; showDiscount: boolean; showTax: boolean; showGrandTotal: boolean }
-  footer: { note: string; showSignature: boolean }
-  showStudentDetails: boolean
-}
-
-export type TemplateRecord = {
-  id: string
-  name: string
-  kind: TemplateKind
-  layout: Partial<TemplateLayout>
-  isDefault: boolean
-  createdAt: string
 }
 
 export type FinanceSettings = {
@@ -247,30 +209,6 @@ export function patchFeePlan(accessToken: string, planId: string, body: Partial<
 
 export function deleteFeePlan(accessToken: string, planId: string) {
   return adminRequest<void>(accessToken, `fees/plans/${planId}`, { method: 'DELETE' })
-}
-
-export function listTemplates(accessToken: string, kind?: TemplateKind, signal?: AbortSignal) {
-  // pageSize: 100 is a deliberate bound — invoice/receipt templates are a small, curated set.
-  return adminRequest<PageData<TemplateRecord>>(accessToken, `fees/templates${query({ kind, pageSize: 100 })}`, { signal })
-}
-
-export function createTemplate(
-  accessToken: string,
-  body: { name: string; kind: TemplateKind; layout: Partial<TemplateLayout>; isDefault?: boolean },
-) {
-  return adminRequest<TemplateRecord>(accessToken, 'fees/templates', { method: 'POST', body: JSON.stringify(body) })
-}
-
-export function patchTemplate(
-  accessToken: string,
-  templateId: string,
-  body: Partial<{ name: string; kind: TemplateKind; layout: Partial<TemplateLayout>; isDefault: boolean }>,
-) {
-  return adminRequest<TemplateRecord>(accessToken, `fees/templates/${templateId}`, { method: 'PATCH', body: JSON.stringify(body) })
-}
-
-export function deleteTemplate(accessToken: string, templateId: string) {
-  return adminRequest<void>(accessToken, `fees/templates/${templateId}`, { method: 'DELETE' })
 }
 
 export function fetchFinanceSettings(accessToken: string, signal?: AbortSignal) {

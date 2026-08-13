@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react'
 import {
   bulkGenerateInvoices, fetchInstituteBranding, listFeePlans, listGrades, listInvoices,
-  listTemplates, patchInvoice, recordPayment,
-  type GradeOption, type Invoice, type FeePlan, type PaymentMethod, type TemplateRecord,
+  patchInvoice, recordPayment,
+  type GradeOption, type Invoice, type FeePlan, type PaymentMethod,
 } from '../finance.api'
 import { AdminApiError } from '../../admin/admin.api'
-import { buildDocumentModel, openPrintWindow, renderDocumentHtml, resolveLayout } from '../invoiceRender'
+import { listDocumentTemplates, type DocumentTemplateRecord } from '../../documents/documents.api'
+import { printFinanceDocument } from '../../documents/engine/printDocument'
 import InvoiceEditor from './InvoiceEditor'
 import {
   inDays, money, Pagination, StatePanel, StatusBadge, today, useAbortableLoad, useModalKeyHandling,
@@ -32,21 +33,20 @@ export default function InvoicesSection({ accessToken, branchId }: Props) {
     [accessToken, branchId, page, statusFilter, classFilter, search, mode],
   )
   const grades = useAbortableLoad((signal) => listGrades(accessToken, signal), [accessToken])
-  const templates = useAbortableLoad((signal) => listTemplates(accessToken, undefined, signal), [accessToken])
+  const templates = useAbortableLoad((signal) => listDocumentTemplates(accessToken, 'FEE_INVOICE', signal), [accessToken])
   const branding = useAbortableLoad((signal) => fetchInstituteBranding(accessToken, signal), [accessToken])
 
-  const templateFor = (invoice: Invoice): TemplateRecord | null => {
+  const templateFor = (invoice: Invoice): DocumentTemplateRecord | null => {
     const all = templates.data?.items ?? []
     return all.find((candidate) => candidate.id === invoice.templateId)
-      ?? all.find((candidate) => candidate.kind === 'INVOICE' && candidate.isDefault)
-      ?? null
+      ?? all.find((candidate) => candidate.isDefault)
+      ?? all[0] ?? null
   }
 
-  const printInvoice = (invoice: Invoice) => {
+  const printInvoice = async (invoice: Invoice) => {
     if (!branding.data) return
-    const printed = openPrintWindow(
-      renderDocumentHtml(buildDocumentModel({ invoice, branding: branding.data }), resolveLayout(templateFor(invoice)?.layout)),
-    )
+    setBusyMessage(null)
+    const printed = await printFinanceDocument({ invoice, branding: branding.data, template: templateFor(invoice) })
     if (!printed) setBusyMessage('The print popup was blocked by the browser.')
   }
 
@@ -103,7 +103,7 @@ export default function InvoicesSection({ accessToken, branchId }: Props) {
                   <td>
                     {(invoice.status === 'ISSUED' || invoice.status === 'PARTIALLY_PAID') && (
                       <>
-                        <button type="button" className="fin-btn" onClick={() => printInvoice(invoice)}>Print</button>{' '}
+                        <button type="button" className="fin-btn" onClick={() => void printInvoice(invoice)}>Print</button>{' '}
                         <button type="button" className="fin-btn" onClick={() => setPayFor(invoice)}>Record payment</button>{' '}
                       </>
                     )}

@@ -123,7 +123,6 @@ export const auxiliaryRoutes: AdminRoute[] = [
   route('FIN1', 'Invoices', '/finance/invoices', 'Finance', 'finance'),
   route('FPY1', 'Payments', '/finance/payments', 'Finance', 'finance'),
   route('FDU1', 'Dues', '/finance/dues', 'Finance', 'finance'),
-  route('FIT1', 'Invoice Templates', '/finance/invoice-templates', 'Finance', 'finance'),
   route('FST1', 'Finance Settings', '/finance/settings', 'Finance', 'finance'),
   route('FEX1', 'Expenses', '/finance/expenses', 'Finance', 'finance'),
   route('FPR1', 'Payroll', '/finance/payroll', 'Finance', 'finance'),
