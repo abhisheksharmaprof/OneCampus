@@ -311,11 +311,15 @@ class Command(BaseCommand):
             )
             sections.append(section)
             for subject_index, subject in enumerate(subjects.values()):
-                SubjectTeacherAssignment.objects.get_or_create(
-                    class_section=section,
+                if SubjectTeacherAssignment.objects.filter(
+                    class_sections=section, subject=subject
+                ).exists():
+                    continue
+                assignment = SubjectTeacherAssignment.objects.create(
                     subject=subject,
-                    defaults={"teacher": teachers[(index + subject_index - 1) % len(teachers)]},
+                    teacher=teachers[(index + subject_index - 1) % len(teachers)],
                 )
+                assignment.class_sections.add(section)
         return sections
 
     def _students(self, institute, branch, year, sections, code):

@@ -450,25 +450,35 @@ class StaffListCreateView(APIView):
             )
         }
         assignment_map: dict[str, list[dict]] = defaultdict(list)
-        assignments = SubjectTeacherAssignment.objects.filter(
-            class_section__branch__institute=institute
-        ).select_related("class_section__grade", "class_section__branch", "subject", "teacher")
+        assignments = (
+            SubjectTeacherAssignment.objects.filter(
+                class_sections__branch__institute=institute
+            )
+            .select_related("subject", "teacher")
+            .prefetch_related("class_sections__grade", "class_sections__branch")
+            .distinct()
+        )
         if branch_id:
-            assignments = assignments.filter(class_section__branch_id=branch_id)
+            assignments = assignments.filter(class_sections__branch_id=branch_id)
         for assignment in assignments:
+            sections = sorted(
+                assignment.class_sections.all(), key=lambda section: section.section_name
+            )
+            if not sections:
+                continue
+            grade = sections[0].grade
             assignment_map[str(assignment.teacher_id)].append(
                 {
                     "id": str(assignment.id),
-                    "classSectionId": str(assignment.class_section_id),
-                    "sectionLabel": (
-                        f"{assignment.class_section.grade.name} "
-                        f"{assignment.class_section.section_name}"
-                    ),
+                    "classSectionId": str(sections[0].id),
+                    "classSectionIds": [str(section.id) for section in sections],
+                    "sectionLabel": f"{grade.name} "
+                    + "/".join(section.section_name for section in sections),
                     "subjectId": str(assignment.subject_id),
                     "subjectName": assignment.subject.name,
                     "periodsPerWeek": int(
                         class_subject_periods.get(
-                            (str(assignment.class_section.grade_id), str(assignment.subject_id)), 0
+                            (str(grade.id), str(assignment.subject_id)), 0
                         )
                         or 0
                     ),
@@ -700,24 +710,34 @@ class StaffDetailView(APIView):
             )
         }
         assignment_map: dict[str, list[dict]] = defaultdict(list)
-        assignments = SubjectTeacherAssignment.objects.filter(
-            class_section__branch__institute=institute,
-            teacher=profile.user,
-        ).select_related("class_section__grade", "class_section__branch", "subject", "teacher")
+        assignments = (
+            SubjectTeacherAssignment.objects.filter(
+                class_sections__branch__institute=institute,
+                teacher=profile.user,
+            )
+            .select_related("subject", "teacher")
+            .prefetch_related("class_sections__grade", "class_sections__branch")
+            .distinct()
+        )
         for assignment in assignments:
+            sections = sorted(
+                assignment.class_sections.all(), key=lambda section: section.section_name
+            )
+            if not sections:
+                continue
+            grade = sections[0].grade
             assignment_map[str(assignment.teacher_id)].append(
                 {
                     "id": str(assignment.id),
-                    "classSectionId": str(assignment.class_section_id),
-                    "sectionLabel": (
-                        f"{assignment.class_section.grade.name} "
-                        f"{assignment.class_section.section_name}"
-                    ),
+                    "classSectionId": str(sections[0].id),
+                    "classSectionIds": [str(section.id) for section in sections],
+                    "sectionLabel": f"{grade.name} "
+                    + "/".join(section.section_name for section in sections),
                     "subjectId": str(assignment.subject_id),
                     "subjectName": assignment.subject.name,
                     "periodsPerWeek": int(
                         class_subject_periods.get(
-                            (str(assignment.class_section.grade_id), str(assignment.subject_id)), 0
+                            (str(grade.id), str(assignment.subject_id)), 0
                         )
                         or 0
                     ),

@@ -300,9 +300,11 @@ class SubjectSummarySerializer(serializers.ModelSerializer):
 
 
 class SubjectTeacherAssignmentSerializer(serializers.ModelSerializer):
-    classSectionId = serializers.UUIDField(source="class_section_id")
-    classSection = serializers.SerializerMethodField()
+    classSectionIds = serializers.SerializerMethodField()
+    classSections = serializers.SerializerMethodField()
+    classSectionId = serializers.SerializerMethodField()  # legacy: first section
     classSectionLabel = serializers.SerializerMethodField()
+    combinedSlotLabel = serializers.CharField(source="combined_slot_label", read_only=True)
     subject = SubjectSummarySerializer(read_only=True)
     teacher = UserSummarySerializer(read_only=True)
     createdAt = serializers.DateTimeField(source="created_at", read_only=True)
@@ -310,25 +312,60 @@ class SubjectTeacherAssignmentSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = SubjectTeacherAssignment
-        fields = ("id", "classSectionId", "classSection", "classSectionLabel", "subject", "teacher", "createdAt", "updatedAt")
+        fields = (
+            "id",
+            "classSectionIds",
+            "classSections",
+            "classSectionId",
+            "classSectionLabel",
+            "combinedSlotLabel",
+            "subject",
+            "teacher",
+            "createdAt",
+            "updatedAt",
+        )
 
-    def get_classSection(self, obj):
-        return {
-            "id": str(obj.class_section_id),
-            "label": f"{obj.class_section.grade.name} {obj.class_section.section_name}",
-            "grade": obj.class_section.grade.name,
-            "sectionName": obj.class_section.section_name,
-        }
+    def _sections(self, obj):
+        return sorted(obj.class_sections.all(), key=lambda section: section.section_name)
+
+    def get_classSectionIds(self, obj):
+        return [str(section.id) for section in self._sections(obj)]
+
+    def get_classSections(self, obj):
+        return [
+            {
+                "id": str(section.id),
+                "label": f"{section.grade.name} {section.section_name}",
+                "grade": section.grade.name,
+                "sectionName": section.section_name,
+            }
+            for section in self._sections(obj)
+        ]
+
+    def get_classSectionId(self, obj):
+        sections = self._sections(obj)
+        return str(sections[0].id) if sections else None
 
     def get_classSectionLabel(self, obj):
-        return f"{obj.class_section.grade.name} {obj.class_section.section_name}"
+        sections = self._sections(obj)
+        if not sections:
+            return ""
+        return f"{sections[0].grade.name} " + "/".join(
+            section.section_name for section in sections
+        )
 
 
 class SubjectTeacherAssignmentWriteSerializer(StrictSerializer):
-    classSectionId = serializers.UUIDField(source="class_section_id", required=False, allow_null=True)
+    classSectionIds = serializers.ListField(
+        child=serializers.UUIDField(), required=False, allow_empty=False, max_length=30
+    )
+    classSectionId = serializers.UUIDField(required=False, allow_null=True)  # legacy
     classId = serializers.UUIDField(source="class_id", required=False)
     subjectId = serializers.UUIDField(source="subject_id")
     teacherId = serializers.UUIDField(source="teacher_id")
+    combinedSlotLabel = serializers.CharField(
+        source="combined_slot_label", required=False, allow_blank=True, max_length=120
+    )
 
 
 class StudentSummarySerializer(serializers.ModelSerializer):

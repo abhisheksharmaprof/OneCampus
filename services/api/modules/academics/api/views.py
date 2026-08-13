@@ -33,6 +33,7 @@ from ..services import (
     save_class_section,
     set_current_academic_year,
     update_enrollment,
+    validate_assignment_sections,
 )
 from .serializers import (
     AcademicOperationSerializer,
@@ -621,25 +622,46 @@ class ClassSectionDetailView(APIView):
         return _delete(self.get_object(request, section_id))
 
 
+def _validate_assignment_sections(**kwargs):
+    """Run the service validation, converting Django ValidationError to DRF 400."""
+    try:
+        validate_assignment_sections(**kwargs)
+    except DjangoValidationError as exc:
+        details = exc.message_dict if hasattr(exc, "message_dict") else exc.messages
+        raise ValidationError(details) from exc
+
+
+def _resolve_assignment_sections(institute, section_ids):
+    sections = list(_section_queryset(institute).filter(id__in=section_ids))
+    if len(sections) != len(set(section_ids)):
+        raise ValidationError({"classSectionIds": ["One or more sections were not found."]})
+    return sections
+
+
 class SubjectTeacherAssignmentListCreateView(APIView):
     permission_classes = (IsCurrentInstituteAdmin,)
 
     def get(self, request):
         institute = _institute(request)
-        assignments = SubjectTeacherAssignment.objects.filter(
-            class_section__branch__institute=institute
-        ).select_related("class_section", "subject", "teacher")
+        assignments = (
+            SubjectTeacherAssignment.objects.filter(
+                class_sections__branch__institute=institute
+            )
+            .select_related("subject", "teacher")
+            .prefetch_related("class_sections__grade")
+            .distinct()
+        )
         section_id = request.query_params.get("classSectionId")
         if section_id:
             get_object_or_404(_section_queryset(institute), id=section_id)
-            assignments = assignments.filter(class_section_id=section_id)
+            assignments = assignments.filter(class_sections__id=section_id)
         student_id = request.query_params.get("studentId")
         if student_id:
             # A student follows the subject-teacher map for their active section.
             active_section_ids = StudentEnrollment.objects.filter(
                 student_id=student_id, student__institute=institute, left_at__isnull=True
             ).values_list("class_section_id", flat=True)
-            assignments = assignments.filter(class_section_id__in=active_section_ids)
+            assignments = assignments.filter(class_sections__id__in=active_section_ids)
         subject_id = request.query_params.get("subjectId")
         if subject_id:
             get_object_or_404(Subject, id=subject_id, institute=institute)
@@ -660,9 +682,12 @@ class SubjectTeacherAssignmentListCreateView(APIView):
         serializer = SubjectTeacherAssignmentWriteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
-        section = None
-        if data.get("class_section_id"):
-            section = get_object_or_404(_section_queryset(institute), id=data["class_section_id"])
+        sections = []
+        section_ids = data.get("classSectionIds") or (
+            [data["classSectionId"]] if data.get("classSectionId") else []
+        )
+        if section_ids:
+            sections = _resolve_assignment_sections(institute, section_ids)
         elif data.get("class_id"):
             grade = get_object_or_404(Grade, id=data["class_id"], institute=institute)
             teacher_membership = User.objects.filter(id=data["teacher_id"], institute_memberships__institute=institute, institute_memberships__is_active=True).values_list("institute_memberships__branch_id", flat=True).first()
@@ -671,17 +696,30 @@ class SubjectTeacherAssignmentListCreateView(APIView):
             if not branch or not year:
                 raise ValidationError({"classId": "A branch and academic year are required before mapping a class."})
             section, _ = ClassSection.objects.get_or_create(branch=branch, grade=grade, academic_year=year, section_name="Main")
-        if section is None:
+            sections = [section]
+        if not sections:
             raise ValidationError({"classId": "Select a class."})
         subject = get_object_or_404(Subject, id=data["subject_id"], institute=institute)
         teacher = _teacher(
             institute=institute,
-            branch=section.branch,
+            branch=sections[0].branch,
             teacher_id=data["teacher_id"],
         )
-        assignment = _save(
-            SubjectTeacherAssignment(class_section=section, subject=subject, teacher=teacher)
+        _validate_assignment_sections(
+            sections=sections,
+            subject=subject,
+            teacher=teacher,
+            combined_slot_label=data.get("combined_slot_label", ""),
+            assignment_id=None,
         )
+        assignment = _save(
+            SubjectTeacherAssignment(
+                subject=subject,
+                teacher=teacher,
+                combined_slot_label=data.get("combined_slot_label", ""),
+            )
+        )
+        assignment.class_sections.set(sections)
         return _success(
             SubjectTeacherAssignmentSerializer(assignment).data,
             status.HTTP_201_CREATED,
@@ -693,11 +731,11 @@ class SubjectTeacherAssignmentDetailView(APIView):
 
     def get_object(self, request, assignment_id):
         return get_object_or_404(
-            SubjectTeacherAssignment.objects.select_related(
-                "class_section__branch", "subject", "teacher"
-            ),
+            SubjectTeacherAssignment.objects.select_related("subject", "teacher")
+            .prefetch_related("class_sections__grade", "class_sections__branch")
+            .distinct(),
             id=assignment_id,
-            class_section__branch__institute=_institute(request),
+            class_sections__branch__institute=_institute(request),
         )
 
     def get(self, request, assignment_id):
@@ -713,10 +751,17 @@ class SubjectTeacherAssignmentDetailView(APIView):
         )
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
-        if "class_section_id" in data:
-            assignment.class_section = get_object_or_404(
-                _section_queryset(institute), id=data["class_section_id"]
-            )
+        sections = None
+        section_ids = data.get("classSectionIds")
+        if section_ids is None and "classSectionId" in data:
+            section_ids = [data["classSectionId"]] if data["classSectionId"] else []
+        if section_ids is not None:
+            sections = _resolve_assignment_sections(institute, section_ids)
+        target_sections = (
+            sections if sections is not None else list(assignment.class_sections.all())
+        )
+        if not target_sections:
+            raise ValidationError({"classSectionIds": ["Select at least one section."]})
         if "subject_id" in data:
             assignment.subject = get_object_or_404(
                 Subject, id=data["subject_id"], institute=institute
@@ -724,10 +769,23 @@ class SubjectTeacherAssignmentDetailView(APIView):
         if "teacher_id" in data:
             assignment.teacher = _teacher(
                 institute=institute,
-                branch=assignment.class_section.branch,
+                branch=target_sections[0].branch,
                 teacher_id=data["teacher_id"],
             )
+        if "combined_slot_label" in data:
+            assignment.combined_slot_label = data["combined_slot_label"]
+        _validate_assignment_sections(
+            sections=target_sections,
+            subject=assignment.subject,
+            teacher=assignment.teacher,
+            combined_slot_label=assignment.combined_slot_label,
+            assignment_id=assignment.id,
+        )
         _save(assignment)
+        if sections is not None:
+            assignment.class_sections.set(sections)
+            # Drop the stale prefetch cache so the response reflects the new set.
+            assignment._prefetched_objects_cache = {}
         return _success(SubjectTeacherAssignmentSerializer(assignment).data)
 
     def delete(self, request, assignment_id):
