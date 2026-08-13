@@ -199,6 +199,9 @@
 .class-mapping-toolbar p { margin: .3rem 0 0; color: #61728d; font-size: .75rem; }
 .class-mapping-controls { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .5rem; }
 .class-mapping-controls select { min-width: 10rem; height: 2.35rem; padding: 0 .65rem; border: 1px solid #d8e0eb; border-radius: .42rem; background: #fff; color: #304968; font-size: .75rem; }
+.section-multiselect { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; margin: 0; border: 1px solid #d8e0eb; border-radius: 8px; padding: .35rem .6rem; }
+.section-multiselect legend { padding: 0 .25rem; color: #61728d; font-size: .68rem; }
+.section-multiselect label { display: inline-flex; align-items: center; gap: .3rem; color: #304968; font-size: .75rem; white-space: nowrap; }
 .class-mapping-panel .subject-reference-table td { vertical-align: middle; }
 .class-mapping-panel .danger-text { color: var(--color-danger); }
 .academics-loading-skeleton { display: grid; gap: 1rem; min-height: 28rem; padding: 1.15rem; border: 1px solid #dce4ef; border-radius: .68rem; background: #fff; }

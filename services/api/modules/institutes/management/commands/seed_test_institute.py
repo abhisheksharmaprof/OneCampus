@@ -367,29 +367,18 @@ class Command(BaseCommand):
             batch_size=100,
         )
 
-        assignment_rows = []
         for class_number, section, subject_names in section_rows:
             for subject_order, subject_name in enumerate(subject_names, start=1):
-                assignment_rows.append(
-                    SubjectTeacherAssignment(
-                        class_section=section,
-                        subject=subjects[subject_name],
-                        teacher=teachers[(subject_order + class_number - 2) % len(teachers)],
-                    )
+                subject = subjects[subject_name]
+                if SubjectTeacherAssignment.objects.filter(
+                    class_sections=section, subject=subject
+                ).exists():
+                    continue
+                assignment = SubjectTeacherAssignment.objects.create(
+                    subject=subject,
+                    teacher=teachers[(subject_order + class_number - 2) % len(teachers)],
                 )
-        existing_assignments = set(
-            SubjectTeacherAssignment.objects.filter(class_section__branch=branch).values_list(
-                "class_section_id", "subject_id"
-            )
-        )
-        SubjectTeacherAssignment.objects.bulk_create(
-            [
-                row
-                for row in assignment_rows
-                if (row.class_section_id, row.subject_id) not in existing_assignments
-            ],
-            batch_size=100,
-        )
+                assignment.class_sections.add(section)
 
         student_rows = []
         enrollment_keys = []

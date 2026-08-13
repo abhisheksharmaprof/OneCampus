@@ -81,11 +81,13 @@ export function listSubjectTeacherAssignments(accessToken: string, params: ListP
   return adminRequest<PageData<SubjectTeacherAssignment>>(accessToken, `academics/section-subject-teachers?${queryString(params)}`, { signal })
 }
 
-export function createSubjectTeacherAssignment(accessToken: string, input: { classSectionId?: string; classId?: string; subjectId: string; teacherId: string }) {
+export type SubjectTeacherAssignmentInput = { classSectionIds?: string[]; classSectionId?: string; classId?: string; subjectId: string; teacherId: string; combinedSlotLabel?: string }
+
+export function createSubjectTeacherAssignment(accessToken: string, input: SubjectTeacherAssignmentInput) {
   return adminRequest<SubjectTeacherAssignment>(accessToken, 'academics/section-subject-teachers', { method: 'POST', body: JSON.stringify(input) })
 }
 
-export function updateSubjectTeacherAssignment(accessToken: string, id: string, input: { classSectionId?: string; classId?: string; subjectId: string; teacherId: string }) {
+export function updateSubjectTeacherAssignment(accessToken: string, id: string, input: SubjectTeacherAssignmentInput) {
   return adminRequest<SubjectTeacherAssignment>(accessToken, `academics/section-subject-teachers/${id}`, { method: 'PATCH', body: JSON.stringify(input) })
 }
 

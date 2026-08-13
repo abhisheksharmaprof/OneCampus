@@ -35,6 +35,8 @@ type SectionRecord = {
 type AssignmentRecord = {
   id: string
   classSectionId: string
+  classSectionIds?: string[]
+  combinedSlotLabel?: string
   subject: { id: string }
   teacher: { id: string }
 }
@@ -124,15 +126,24 @@ function mapBundle(staff: StaffRecord[], subjects: SubjectRecord[], sections: Se
     teachers: staff.map((person) => mapStaff(person, emptyBundle.config)),
     subjects: subjects.map((subject) => ({ id: subject.id, name: subject.name, subjectCode: subject.subjectCode ?? '', isDouble: false, requiresRoomId: null })),
     classes: currentSections.map((section) => ({ id: section.id, gradeId: section.grade.id, name: `${section.grade.name} - ${section.sectionName}` })),
-    assignments: assignments.filter((assignment) => sectionIds.has(assignment.classSectionId) && teacherIds.has(assignment.teacher.id) && subjectIds.has(assignment.subject.id)).map((assignment) => ({
-      id: assignment.id,
-      teacherId: assignment.teacher.id,
-      subjectId: assignment.subject.id,
-      classId: assignment.classSectionId,
-      curriculumId: curriculumByClassAndSubject.get(`${currentSections.find((section) => section.id === assignment.classSectionId)?.grade.id}:${assignment.subject.id}`)?.id,
-      periodsPerWeek: curriculumByClassAndSubject.get(`${currentSections.find((section) => section.id === assignment.classSectionId)?.grade.id}:${assignment.subject.id}`)?.periodsPerWeek ?? 0,
-      avoidRepeatSameDay: true,
-    })),
+    assignments: assignments
+      .map((assignment) => ({ ...assignment, sectionIds: (assignment.classSectionIds?.length ? assignment.classSectionIds : [assignment.classSectionId]).filter((id) => sectionIds.has(id)) }))
+      .filter((assignment) => assignment.sectionIds.length > 0 && teacherIds.has(assignment.teacher.id) && subjectIds.has(assignment.subject.id))
+      .map((assignment) => {
+        const gradeId = currentSections.find((section) => section.id === assignment.sectionIds[0])?.grade.id
+        const mapping = curriculumByClassAndSubject.get(`${gradeId}:${assignment.subject.id}`)
+        return {
+          id: assignment.id,
+          teacherId: assignment.teacher.id,
+          subjectId: assignment.subject.id,
+          classIds: assignment.sectionIds,
+          classId: assignment.sectionIds[0],
+          combinedSlotLabel: assignment.combinedSlotLabel ?? '',
+          curriculumId: mapping?.id,
+          periodsPerWeek: mapping?.periodsPerWeek ?? 0,
+          avoidRepeatSameDay: true,
+        }
+      }),
     rooms: rooms.filter((room) => room.isActive !== false).map((room) => ({ id: room.id, name: room.name })),
   }
 }
@@ -187,7 +198,7 @@ function GenerateTimetablePage({ accessToken, selectedBranch, branches = emptyBr
     createSubject: (input: Record<string, unknown>) => adminRequest<SubjectRecord & { subjectCode?: string }>(accessToken, 'academics/subjects', { method: 'POST', body: JSON.stringify(input) }).then((record) => ({ id: record.id, name: record.name, isDouble: false, requiresRoomId: null })),
     createSection: (input: Record<string, unknown>) => adminRequest<SectionRecord>(accessToken, 'academics/sections', { method: 'POST', body: JSON.stringify(input) }).then((record) => ({ id: record.id, gradeId: record.grade.id, name: `${record.grade.name} - ${record.sectionName}` })),
     createRoom: (input: Record<string, unknown>) => adminRequest<RoomRecord>(accessToken, 'academics/rooms', { method: 'POST', body: JSON.stringify(input) }).then((record) => ({ id: record.id, name: record.name })),
-    saveAssignment: async (input: { id?: string; classSectionId: string; gradeId: string; subjectId: string; teacherId: string; periodsPerWeek: number }) => {
+    saveAssignment: async (input: { id?: string; classSectionIds: string[]; gradeId: string; subjectId: string; teacherId: string; periodsPerWeek: number; combinedSlotLabel?: string }) => {
       if (!input.gradeId) throw new Error('The selected section is not linked to a class in Academic Structure.')
       const curriculumQuery = new URLSearchParams({ page: '1', pageSize: '100', gradeId: input.gradeId })
       const curriculum = await adminRequest<PageData<ClassSubject>>(accessToken, `academics/class-subjects?${curriculumQuery}`)
@@ -195,7 +206,7 @@ function GenerateTimetablePage({ accessToken, selectedBranch, branches = emptyBr
       const savedCurriculum = mapping
         ? await updateClassSubject(accessToken, mapping.id, { periodsPerWeek: input.periodsPerWeek })
         : await createClassSubject(accessToken, { classId: input.gradeId, subjectId: input.subjectId, periodsPerWeek: input.periodsPerWeek })
-      const assignmentInput = { classSectionId: input.classSectionId, subjectId: input.subjectId, teacherId: input.teacherId }
+      const assignmentInput = { classSectionIds: input.classSectionIds, subjectId: input.subjectId, teacherId: input.teacherId, ...(input.combinedSlotLabel ? { combinedSlotLabel: input.combinedSlotLabel } : {}) }
       const assignment = input.id
         ? await updateSubjectTeacherAssignment(accessToken, input.id, assignmentInput)
         : await createSubjectTeacherAssignment(accessToken, assignmentInput)

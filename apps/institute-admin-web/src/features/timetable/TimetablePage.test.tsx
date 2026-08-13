@@ -3,9 +3,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { TimetablePage } from './TimetablePage'
 
 vi.mock('./TimetableGenerator.jsx', () => ({
-  IntegratedTimetableGenerator: ({ initialBundle, loading, saveTimetable }: { initialBundle?: { teachers: Array<{ availablePeriods: number[] }>; subjects: unknown[]; classes: unknown[]; assignments: Array<{ periodsPerWeek: number }> }; loading: boolean; saveTimetable?: (bundle: unknown, status: 'DRAFT' | 'PUBLISHED') => Promise<unknown> }) => loading
+  IntegratedTimetableGenerator: ({ initialBundle, loading, saveTimetable }: { initialBundle?: { teachers: Array<{ availablePeriods: number[] }>; subjects: unknown[]; classes: unknown[]; assignments: Array<{ periodsPerWeek: number; classIds?: string[]; combinedSlotLabel?: string }> }; loading: boolean; saveTimetable?: (bundle: unknown, status: 'DRAFT' | 'PUBLISHED') => Promise<unknown> }) => loading
     ? <div>Loading generator</div>
-    : <div>Generator data: {initialBundle?.teachers.length} teachers, {initialBundle?.subjects.length} subjects, {initialBundle?.classes.length} classes, {initialBundle?.assignments.length} assignments; periods {initialBundle?.assignments[0]?.periodsPerWeek}; availability {initialBundle?.teachers[0]?.availablePeriods.join(',')}{saveTimetable ? <button type="button" onClick={() => void saveTimetable(initialBundle, 'PUBLISHED')}>Test publish</button> : null}</div>,
+    : <div>Generator data: {initialBundle?.teachers.length} teachers, {initialBundle?.subjects.length} subjects, {initialBundle?.classes.length} classes, {initialBundle?.assignments.length} assignments; periods {initialBundle?.assignments[0]?.periodsPerWeek}; availability {initialBundle?.teachers[0]?.availablePeriods.join(',')}; combined {initialBundle?.assignments[1]?.classIds?.length ?? 0} sections labelled {initialBundle?.assignments[1]?.combinedSlotLabel || 'none'}{saveTimetable ? <button type="button" onClick={() => void saveTimetable(initialBundle, 'PUBLISHED')}>Test publish</button> : null}</div>,
   SavedTimetableViewer: ({ initialBundle }: { initialBundle?: { classes: unknown[] } }) => <div>Saved timetable with {initialBundle?.classes.length ?? 0} classes</div>,
 }))
 
@@ -18,8 +18,8 @@ describe('TimetablePage', () => {
       if (url.includes('/staff?')) return Promise.resolve({ ok: true, json: async () => page([{ id: 'profile-1', userId: 'teacher-1', fullName: 'Meera Iyer', role: 'TEACHER', employmentType: 'PART_TIME', availableDays: ['MON', 'WED'], availablePeriods: [1, 2, 3, 4, 5, 6, 7, 8], maxPeriodsPerDay: 3, maxPeriodsPerWeek: 12 }]) })
       if (url.includes('/class-subjects?')) return Promise.resolve({ ok: true, json: async () => page([{ id: 'curriculum-1', classId: 'grade-1', subjectId: 'subject-1', periodsPerWeek: 6 }]) })
       if (url.includes('/subjects?')) return Promise.resolve({ ok: true, json: async () => page([{ id: 'subject-1', name: 'Mathematics', subjectCode: 'MATH' }]) })
-      if (url.includes('/sections?')) return Promise.resolve({ ok: true, json: async () => page([{ id: 'section-1', branch: { id: 'branch-1' }, grade: { id: 'grade-1', name: 'Class 8' }, academicYear: { isCurrent: true }, sectionName: 'A' }]) })
-      if (url.includes('/section-subject-teachers?')) return Promise.resolve({ ok: true, json: async () => page([{ id: 'assignment-1', classSectionId: 'section-1', subject: { id: 'subject-1' }, teacher: { id: 'teacher-1' } }]) })
+      if (url.includes('/sections?')) return Promise.resolve({ ok: true, json: async () => page([{ id: 'section-1', branch: { id: 'branch-1' }, grade: { id: 'grade-1', name: 'Class 8' }, academicYear: { isCurrent: true }, sectionName: 'A' }, { id: 'section-2', branch: { id: 'branch-1' }, grade: { id: 'grade-1', name: 'Class 8' }, academicYear: { isCurrent: true }, sectionName: 'B' }]) })
+      if (url.includes('/section-subject-teachers?')) return Promise.resolve({ ok: true, json: async () => page([{ id: 'assignment-1', classSectionId: 'section-1', subject: { id: 'subject-1' }, teacher: { id: 'teacher-1' } },{ id: 'assignment-2', classSectionIds: ['section-1', 'section-2'], classSectionId: 'section-1', combinedSlotLabel: 'Lang', subject: { id: 'subject-1' }, teacher: { id: 'teacher-1' } }]) })
       if (url.includes('/rooms?')) return Promise.resolve({ ok: true, json: async () => page([]) })
       if (url.includes('/academic-years?')) return Promise.resolve({ ok: true, json: async () => page([{ id: 'year-1', name: '2026-27', isCurrent: true }]) })
       if (url.includes('/classes?')) return Promise.resolve({ ok: true, json: async () => page([{ id: 'grade-1', name: 'Class 8' }]) })
@@ -49,7 +49,7 @@ describe('TimetablePage', () => {
   it('loads branch-scoped CampusOne scheduling records and maps them into the generator', async () => {
     render(<TimetablePage mode="generate" accessToken="token" selectedBranch="branch-1" />)
 
-    expect(await screen.findByText('Generator data: 1 teachers, 1 subjects, 1 classes, 1 assignments; periods 6; availability 1,2,3,4,6,7,8,9')).toBeInTheDocument()
+    expect(await screen.findByText('Generator data: 1 teachers, 1 subjects, 2 classes, 2 assignments; periods 6; availability 1,2,3,4,6,7,8,9; combined 2 sections labelled Lang')).toBeInTheDocument()
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(8))
     for (const call of vi.mocked(fetch).mock.calls) expect(String(call[0])).toContain('pageSize=100')
     expect(vi.mocked(fetch).mock.calls.filter(([url]) => String(url).includes('/staff?') || String(url).includes('/sections?')).every(([url]) => String(url).includes('branchId=branch-1'))).toBe(true)

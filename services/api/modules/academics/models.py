@@ -291,8 +291,8 @@ class ClassSection(TimeStampedModel):
 
 class SubjectTeacherAssignment(TimeStampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    class_section = models.ForeignKey(
-        ClassSection, on_delete=models.CASCADE, related_name="subject_teacher_assignments"
+    class_sections = models.ManyToManyField(
+        ClassSection, related_name="subject_teacher_assignments", blank=True
     )
     subject = models.ForeignKey(
         Subject, on_delete=models.PROTECT, related_name="section_teacher_assignments"
@@ -302,35 +302,17 @@ class SubjectTeacherAssignment(TimeStampedModel):
         on_delete=models.PROTECT,
         related_name="subject_teacher_assignments",
     )
+    # Blank for ordinary lessons. Assignments sharing the same label AND the
+    # same section set are parallel options forced onto one day+period.
+    combined_slot_label = models.CharField(max_length=120, blank=True, default="")
 
     class Meta:
         db_table = "subject_teacher_assignments"
         ordering = ("subject__name",)
-        constraints = [
-            models.UniqueConstraint(
-                fields=("class_section", "subject"), name="uq_section_subject_teacher"
-            )
-        ]
-        indexes = [
-            models.Index(fields=("class_section", "teacher")),
-            models.Index(fields=("teacher", "class_section")),
-        ]
-
-    def clean(self):
-        if self.class_section_id and self.subject_id:
-            institute_id = self.class_section.branch.institute_id
-            if self.subject.institute_id != institute_id:
-                raise ValidationError(
-                    {"subject": "Subject must belong to the section's institute."}
-                )
-            _validate_teacher(
-                teacher=self.teacher,
-                institute_id=institute_id,
-                branch_id=self.class_section.branch_id,
-                field_name="teacher",
-            )
+        indexes = [models.Index(fields=("teacher",))]
 
     def save(self, *args, **kwargs):
+        self.combined_slot_label = (self.combined_slot_label or "").strip()
         self.full_clean()
         return super().save(*args, **kwargs)
 

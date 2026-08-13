@@ -2,10 +2,16 @@ from datetime import date
 
 import pytest
 
-from modules.academics.models import AcademicOperation, AcademicYear, ClassSection, Grade
+from modules.academics.models import (
+    AcademicOperation,
+    AcademicYear,
+    ClassSection,
+    Grade,
+    Subject,
+)
 from modules.identity.models import User
 from modules.institutes.models import Branch, Institute, InstituteMembership
-from modules.people.models import Student
+from modules.people.models import StaffProfile, Student
 
 pytestmark = [pytest.mark.django_db, pytest.mark.urls("modules.academics.api.urls")]
 
@@ -216,3 +222,123 @@ def test_academic_operations_are_persisted_tenant_scoped_and_editable(api_client
         f"/operations/{operation_id}", {"kind": "EXAM"}, format="json"
     )
     assert rejected_kind_change.status_code == 400
+
+
+def build_assignment_fixtures():
+    """Two same-grade sections, one other-grade section, a subject, and a teacher
+    that passes the staff-profile/membership checks in views._teacher."""
+    institute = Institute.objects.create(name="Northstar Academy", code="NSA")
+    branch = Branch.objects.create(institute=institute, name="Main", code="MAIN")
+    grade = Grade.objects.create(institute=institute, name="Class 8", sort_order=8)
+    other_grade = Grade.objects.create(institute=institute, name="Class 9", sort_order=9)
+    year = create_year(institute)
+    section_a = ClassSection.objects.create(
+        branch=branch, grade=grade, academic_year=year, section_name="A"
+    )
+    section_b = ClassSection.objects.create(
+        branch=branch, grade=grade, academic_year=year, section_name="B"
+    )
+    other_grade_section = ClassSection.objects.create(
+        branch=branch, grade=other_grade, academic_year=year, section_name="A"
+    )
+    subject = Subject.objects.create(institute=institute, name="Hindi")
+    teacher = User.objects.create_user(
+        email="teacher@northstar.test", password="StrongPass123!"
+    )
+    StaffProfile.objects.create(institute=institute, user=teacher)
+    InstituteMembership.objects.create(
+        user=teacher,
+        institute=institute,
+        branch=branch,
+        role=InstituteMembership.Role.TEACHER,
+        is_active=True,
+    )
+    return institute, section_a, section_b, other_grade_section, subject, teacher
+
+
+def test_create_assignment_with_multiple_sections(api_client):
+    institute, section_a, section_b, _other, subject, teacher = build_assignment_fixtures()
+    authenticate_admin(api_client, institute=institute, email="admin@northstar.test")
+
+    response = api_client.post(
+        "/section-subject-teachers",
+        {
+            "classSectionIds": [str(section_a.id), str(section_b.id)],
+            "subjectId": str(subject.id),
+            "teacherId": str(teacher.id),
+            "combinedSlotLabel": "Second Language",
+        },
+        format="json",
+    )
+
+    assert response.status_code == 201
+    body = response.json()["data"]
+    assert sorted(body["classSectionIds"]) == sorted([str(section_a.id), str(section_b.id)])
+    assert body["combinedSlotLabel"] == "Second Language"
+    assert body["classSectionId"] in {str(section_a.id), str(section_b.id)}  # legacy field
+    assert body["classSectionLabel"] == "Class 8 A/B"
+
+
+def test_create_assignment_legacy_single_section_still_works(api_client):
+    institute, section_a, _section_b, _other, subject, teacher = build_assignment_fixtures()
+    authenticate_admin(api_client, institute=institute, email="admin@northstar.test")
+
+    response = api_client.post(
+        "/section-subject-teachers",
+        {
+            "classSectionId": str(section_a.id),
+            "subjectId": str(subject.id),
+            "teacherId": str(teacher.id),
+        },
+        format="json",
+    )
+
+    assert response.status_code == 201
+    assert response.json()["data"]["classSectionIds"] == [str(section_a.id)]
+
+
+def test_patch_assignment_expands_section_set(api_client):
+    institute, section_a, section_b, _other, subject, teacher = build_assignment_fixtures()
+    authenticate_admin(api_client, institute=institute, email="admin@northstar.test")
+    created = api_client.post(
+        "/section-subject-teachers",
+        {
+            "classSectionIds": [str(section_a.id)],
+            "subjectId": str(subject.id),
+            "teacherId": str(teacher.id),
+        },
+        format="json",
+    )
+    assert created.status_code == 201
+    assignment_id = created.json()["data"]["id"]
+
+    response = api_client.patch(
+        f"/section-subject-teachers/{assignment_id}",
+        {"classSectionIds": [str(section_a.id), str(section_b.id)]},
+        format="json",
+    )
+
+    assert response.status_code == 200
+    assert sorted(response.json()["data"]["classSectionIds"]) == sorted(
+        [str(section_a.id), str(section_b.id)]
+    )
+
+
+def test_create_assignment_rejects_cross_grade(api_client):
+    institute, section_a, _section_b, other_grade_section, subject, teacher = (
+        build_assignment_fixtures()
+    )
+    authenticate_admin(api_client, institute=institute, email="admin@northstar.test")
+
+    response = api_client.post(
+        "/section-subject-teachers",
+        {
+            "classSectionIds": [str(section_a.id), str(other_grade_section.id)],
+            "subjectId": str(subject.id),
+            "teacherId": str(teacher.id),
+        },
+        format="json",
+    )
+
+    assert response.status_code == 400
+    assert response.json()["error"]["fieldErrors"]["classSectionIds"]

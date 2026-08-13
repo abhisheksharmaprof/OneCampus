@@ -128,6 +128,9 @@ export interface SubjectTeacherAssignment {
   id: string
   classSectionId: string
   classSectionLabel?: string
+  classSectionIds: string[]
+  classSections?: Array<{ id: string; label: string; grade: string; sectionName: string }>
+  combinedSlotLabel?: string
   subject: { id: string; name: string; subjectCode: string }
   teacher: { id: string; fullName: string; email: string }
 }

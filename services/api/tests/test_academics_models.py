@@ -3,14 +3,139 @@ from datetime import date
 import pytest
 from django.core.exceptions import ValidationError
 
-from modules.academics.models import AcademicYear, ClassSection, Grade
+from modules.academics.models import (
+    AcademicYear,
+    ClassSection,
+    Grade,
+    Subject,
+    SubjectTeacherAssignment,
+)
 from modules.academics.services import (
     AcademicsValidationError,
     create_enrollment,
     set_current_academic_year,
+    validate_assignment_sections,
 )
-from modules.institutes.models import Branch, Institute
-from modules.people.models import Student
+from modules.identity.models import User
+from modules.institutes.models import Branch, Institute, InstituteMembership
+from modules.people.models import StaffProfile, Student
+
+
+def _build_assignment_fixtures():
+    institute = Institute.objects.create(name="Northstar Academy", code="NSA")
+    branch = Branch.objects.create(institute=institute, name="Main", code="MAIN")
+    grade = Grade.objects.create(institute=institute, name="Class 8")
+    year = AcademicYear.objects.create(
+        institute=institute,
+        name="2026-27",
+        start_date=date(2026, 4, 1),
+        end_date=date(2027, 3, 31),
+    )
+    section_a = ClassSection.objects.create(
+        branch=branch, grade=grade, academic_year=year, section_name="A"
+    )
+    section_b = ClassSection.objects.create(
+        branch=branch, grade=grade, academic_year=year, section_name="B"
+    )
+    subject = Subject.objects.create(institute=institute, name="French")
+    teacher = User.objects.create_user(
+        email="teacher@campusone.test", password="StrongPass123!"
+    )
+    return section_a, section_b, subject, teacher
+
+
+def _build_validation_fixtures():
+    """Assignment fixtures plus a teacher that passes staff/membership checks."""
+    section_a, section_b, subject, teacher = _build_assignment_fixtures()
+    branch = section_a.branch
+    institute = branch.institute
+    grade = section_a.grade
+    year = section_a.academic_year
+    StaffProfile.objects.create(institute=institute, user=teacher)
+    InstituteMembership.objects.create(
+        user=teacher,
+        institute=institute,
+        branch=branch,
+        role=InstituteMembership.Role.TEACHER,
+        is_active=True,
+    )
+    return institute, branch, grade, year, section_a, section_b, subject, teacher
+
+
+@pytest.mark.django_db
+def test_validate_rejects_cross_grade_sections():
+    institute, branch, _grade, year, section_a, _section_b, subject, teacher = (
+        _build_validation_fixtures()
+    )
+    other_grade = Grade.objects.create(institute=institute, name="Class 9")
+    other_grade_section = ClassSection.objects.create(
+        branch=branch, grade=other_grade, academic_year=year, section_name="A"
+    )
+
+    with pytest.raises(ValidationError) as exc:
+        validate_assignment_sections(
+            sections=[section_a, other_grade_section],
+            subject=subject,
+            teacher=teacher,
+            combined_slot_label="",
+            assignment_id=None,
+        )
+
+    assert "same class" in str(exc.value)
+
+
+@pytest.mark.django_db
+def test_validate_rejects_duplicate_subject_for_same_section_set():
+    _institute, _branch, _grade, _year, section_a, section_b, subject, teacher = (
+        _build_validation_fixtures()
+    )
+    existing = SubjectTeacherAssignment.objects.create(subject=subject, teacher=teacher)
+    existing.class_sections.set([section_a, section_b])
+
+    with pytest.raises(ValidationError) as exc:
+        validate_assignment_sections(
+            sections=[section_a, section_b],
+            subject=subject,
+            teacher=teacher,
+            combined_slot_label="",
+            assignment_id=None,
+        )
+
+    assert "already mapped" in str(exc.value)
+
+
+@pytest.mark.django_db
+def test_validate_allows_same_subject_for_different_section_set():
+    _institute, _branch, _grade, _year, section_a, section_b, subject, teacher = (
+        _build_validation_fixtures()
+    )
+    existing = SubjectTeacherAssignment.objects.create(subject=subject, teacher=teacher)
+    existing.class_sections.set([section_a])
+
+    validate_assignment_sections(  # must not raise
+        sections=[section_b],
+        subject=subject,
+        teacher=teacher,
+        combined_slot_label="",
+        assignment_id=None,
+    )
+
+
+@pytest.mark.django_db
+def test_validate_excludes_own_assignment_when_editing():
+    _institute, _branch, _grade, _year, section_a, section_b, subject, teacher = (
+        _build_validation_fixtures()
+    )
+    existing = SubjectTeacherAssignment.objects.create(subject=subject, teacher=teacher)
+    existing.class_sections.set([section_a, section_b])
+
+    validate_assignment_sections(  # must not raise: self-exclusion on edit
+        sections=[section_a, section_b],
+        subject=subject,
+        teacher=teacher,
+        combined_slot_label="",
+        assignment_id=existing.id,
+    )
 
 
 @pytest.mark.django_db
@@ -121,3 +246,37 @@ def test_enrollment_enforces_branch_consistency_and_capacity():
     with pytest.raises(AcademicsValidationError) as exc_info:
         create_enrollment(student=second, class_section=section, roll_number="2")
     assert "maximum strength" in str(exc_info.value.field_errors)
+
+
+@pytest.mark.django_db
+def test_assignment_supports_multiple_sections():
+    section_a, section_b, subject, teacher = _build_assignment_fixtures()
+
+    assignment = SubjectTeacherAssignment.objects.create(
+        subject=subject, teacher=teacher, combined_slot_label="Second Language"
+    )
+    assignment.class_sections.set([section_a, section_b])
+
+    assert assignment.class_sections.count() == 2
+    assert assignment.combined_slot_label == "Second Language"
+
+
+@pytest.mark.django_db
+def test_assignment_label_defaults_blank():
+    section_a, _section_b, subject, teacher = _build_assignment_fixtures()
+
+    assignment = SubjectTeacherAssignment.objects.create(subject=subject, teacher=teacher)
+    assignment.class_sections.set([section_a])
+
+    assert assignment.combined_slot_label == ""
+
+
+@pytest.mark.django_db
+def test_assignment_label_is_stripped_on_save():
+    _section_a, _section_b, subject, teacher = _build_assignment_fixtures()
+
+    assignment = SubjectTeacherAssignment.objects.create(
+        subject=subject, teacher=teacher, combined_slot_label="  Second Language  "
+    )
+
+    assert assignment.combined_slot_label == "Second Language"
