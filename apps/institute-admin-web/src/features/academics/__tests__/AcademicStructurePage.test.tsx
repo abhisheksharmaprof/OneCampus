@@ -64,6 +64,51 @@ describe('AcademicStructurePage', () => {
     expect(JSON.parse(String(createCall?.[1]?.body))).toEqual({ name: 'Physics', subjectCode: 'PHY' })
   })
 
+  it('submits multi-section mappings with a combined slot label and single-section mappings without it', async () => {
+    const sections = [
+      { id: 'section-a', sectionName: 'A', grade: { id: 'grade-1', name: 'Class 8' } },
+      { id: 'section-b', sectionName: 'B', grade: { id: 'grade-1', name: 'Class 8' } },
+    ]
+    const classSubject = { id: 'cs-1', classId: 'grade-1', subjectId: 'subject-1', subjectCode: 'MATH', subject, periodsPerWeek: 5, isElective: false, isLab: false }
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation((input, options) => {
+      const url = String(input)
+      if (options?.method === 'POST' && url.includes('/section-subject-teachers')) return response({ id: 'sta-1' }, 201)
+      if (url.includes('/section-subject-teachers')) return response(page([]))
+      if (url.includes('/class-subjects')) return response(page([classSubject]))
+      if (url.includes('/academic-years')) return response(page([year]))
+      if (url.includes('/classes')) return response(page([grade]))
+      if (url.includes('/subjects')) return response(page([subject]))
+      if (url.includes('/sections')) return response(page(sections))
+      if (url.includes('/staff')) return response({ items: [{ id: 'staff-1', userId: 'user-1', fullName: 'Asha Verma', role: 'TEACHER' }] })
+      return response(page([]))
+    })
+    const user = userEvent.setup()
+    render(<AcademicStructurePage accessToken="token" branches={[]} selectedBranch="all" initialTab="subjects" />)
+
+    await screen.findByText('Mathematics')
+    await user.click(screen.getByRole('tab', { name: 'Teacher Mapping' }))
+    await user.selectOptions(await screen.findByLabelText('Mapping class'), 'grade-1')
+    await user.click(await screen.findByLabelText('All sections'))
+    await user.type(screen.getByLabelText('Combined slot label'), 'Second Language')
+    await user.selectOptions(screen.getByLabelText('Mapping subject'), 'subject-1')
+    await user.selectOptions(screen.getByLabelText('Mapping teacher'), 'user-1')
+    await user.click(screen.getByRole('button', { name: 'Map teacher' }))
+
+    const posts = () => fetchMock.mock.calls.filter(([url, options]) => String(url).endsWith('/api/v1/admin/academics/section-subject-teachers') && options?.method === 'POST')
+    await waitFor(() => expect(posts()).toHaveLength(1))
+    expect(JSON.parse(String(posts()[0]?.[1]?.body))).toEqual({ classSectionIds: ['section-a', 'section-b'], subjectId: 'subject-1', teacherId: 'user-1', combinedSlotLabel: 'Second Language' })
+
+    await user.selectOptions(screen.getByLabelText('Mapping class'), 'grade-1')
+    await user.click(await screen.findByLabelText('A'))
+    expect(screen.queryByLabelText('Combined slot label')).not.toBeInTheDocument()
+    await user.selectOptions(screen.getByLabelText('Mapping subject'), 'subject-1')
+    await user.selectOptions(screen.getByLabelText('Mapping teacher'), 'user-1')
+    await user.click(screen.getByRole('button', { name: 'Map teacher' }))
+
+    await waitFor(() => expect(posts()).toHaveLength(2))
+    expect(JSON.parse(String(posts()[1]?.[1]?.body))).toEqual({ classSectionIds: ['section-a'], subjectId: 'subject-1', teacherId: 'user-1' })
+  })
+
   it('shows server field errors with the trace reference in the modal', async () => {
     const fetchMock = installApi()
     fetchMock.mockImplementationOnce(() => response(page([subject])))
