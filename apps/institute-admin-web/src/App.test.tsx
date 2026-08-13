@@ -316,6 +316,15 @@ describe('Institute Admin dashboard', () => {
     expect(await screen.findByRole('button', { name: /record payment/i })).toBeInTheDocument()
   })
 
+  it('renders the template studio category home', async () => {
+    window.history.pushState({}, '', '/template-studio')
+    render(<App />)
+
+    expect(await screen.findByRole('heading', { name: 'Template Studio' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /fee invoice/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /id card/i })).toBeInTheDocument()
+  })
+
   it('restores the staff screen with API-backed staff accounts', async () => {
     window.history.pushState({}, '', '/people/staff')
     vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => Promise.resolve({

@@ -2,7 +2,7 @@ export type AdminView =
   | 'dashboard' | 'branches' | 'institute-profile' | 'branding' | 'staff' | 'students'
   | 'parents' | 'enquiries' | 'admissions-funnel' | 'attendance'
   | 'fee-collections' | 'calendar' | 'timetable' | 'operational' | 'coming-soon'
-  | 'academic-operations' | 'academics' | 'finance'
+  | 'academic-operations' | 'academics' | 'finance' | 'template-studio'
 
 export type NavigationIcon =
   | 'dashboard' | 'institute' | 'roles' | 'people' | 'admissions'
@@ -77,6 +77,7 @@ export const adminNavigation: AdminNavigationItem[] = [
   // left sub-sidebar for Overview/Invoices/Payments/Dues/Fee plans/Templates/Settings/Operations,
   // so those aren't duplicated here as expandable children (see auxiliaryRoutes below).
   { label: 'Finance', icon: 'fees', route: route('FH1', 'Finance', '/finance', 'Finance', 'finance') },
+  { label: 'Template Studio', icon: 'reports', route: route('TS1', 'Template Studio', '/template-studio', 'Template Studio', 'template-studio') },
   { label: 'Timetable', icon: 'calendar', children: [
     route('TT1', 'View Timetable', '/timetable', 'Timetable', 'timetable'),
     route('TTG1', 'Generate Timetable', '/timetable/generate', 'Timetable', 'timetable'),

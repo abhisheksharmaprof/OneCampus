@@ -32,6 +32,7 @@ import { ParentsPage } from './features/people/ParentsPage'
 import { StudentsPage } from './features/people/StudentsPage'
 import { ProfilePage } from './features/people/ProfilePages'
 import { AuditLogPage } from './features/audit/AuditLogPage'
+import TemplateStudioPage from './features/documents/TemplateStudioPage'
 
 import './styles/tokens.css'
 import './styles/global.css'
@@ -305,6 +306,7 @@ function RoutedApp() {
       {route?.id === 'FPR1' && <FinanceModulePage accessToken={session.accessToken} branches={visibleBranches} selectedBranch={selectedBranch} module="payroll" />}
       {route?.id === 'FBU1' && <FinanceModulePage accessToken={session.accessToken} branches={visibleBranches} selectedBranch={selectedBranch} module="budget" />}
       {route?.id === 'FRP1' && <FinanceModulePage accessToken={session.accessToken} branches={visibleBranches} selectedBranch={selectedBranch} module="reports" />}
+      {route?.view === 'template-studio' && <TemplateStudioPage accessToken={session.accessToken} />}
       {route?.id === 'AL1' && <AuditLogPage accessToken={session.accessToken} selectedBranch={selectedBranch} />}
       {(route?.view === 'calendar' || route?.id === 'HC1') && <CalendarPage accessToken={session.accessToken} branches={visibleBranches} selectedBranch={selectedBranch} />}
       {route?.view === 'timetable' && <Suspense fallback={<PageSkeleton name="timetable-route" label="Loading timetable" variant="form" />}><TimetablePage mode={route.id === 'TTG1' ? 'generate' : 'view'} accessToken={session.accessToken} branches={visibleBranches} selectedBranch={selectedBranch} onNavigate={navigateWithBranch} /></Suspense>}
