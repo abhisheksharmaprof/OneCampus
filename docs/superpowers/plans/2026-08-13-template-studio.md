@@ -3038,8 +3038,11 @@ describe('computeSnap', () => {
     const sibling = { x: 60, y: 20, w: 30, h: 10 }
     const near = computeSnap({ x: 59.1, y: 100, w: 20, h: 10 }, [sibling], page)
     expect(near.x).toBe(60)
-    const far = computeSnap({ x: 40, y: 100, w: 20, h: 10 }, [sibling], page)
-    expect(far.x).toBe(40)
+    // x: 30 keeps every edge (30 / 40 / 50) > tolerance from all targets; the plan's
+    // original x: 40 put the right edge exactly on the sibling's left edge (60),
+    // which legitimately emits a zero-delta alignment guide.
+    const far = computeSnap({ x: 30, y: 100, w: 20, h: 10 }, [sibling], page)
+    expect(far.x).toBe(30)
     expect(far.guides).toHaveLength(0)
   })
 })
