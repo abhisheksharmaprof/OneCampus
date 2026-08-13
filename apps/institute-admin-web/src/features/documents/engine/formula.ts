@@ -144,6 +144,9 @@ function parse(tokens: Token[]): Node {
   return root
 }
 
+// Intentional coercion asymmetry: '' coerces to 0 via Number(''), matching spreadsheet-style
+// leniency for blank cells; null/undefined are never passed here — they are rejected earlier,
+// at ref resolution (computeTableRows/computeTotals), so a missing value fails as '#ERR' there.
 function asNumber(value: Value): number {
   if (typeof value === 'boolean') return value ? 1 : 0
   const num = typeof value === 'number' ? value : Number(value)
@@ -176,8 +179,16 @@ function evalNode(node: Node, env: FormulaEnv): Value {
         case '>=': return asNumber(l) >= asNumber(r)
         case '<': return asNumber(l) < asNumber(r)
         case '<=': return asNumber(l) <= asNumber(r)
-        case '==': return l === r || asNumberSafe(l) === asNumberSafe(r)
-        case '!=': return !(l === r || asNumberSafe(l) === asNumberSafe(r))
+        case '==': {
+          if (l === r) return true
+          const ln = asNumberSafe(l)
+          return ln !== null && ln === asNumberSafe(r)
+        }
+        case '!=': {
+          if (l === r) return false
+          const ln = asNumberSafe(l)
+          return !(ln !== null && ln === asNumberSafe(r))
+        }
         default: throw new FormulaError(`Unknown operator ${node.op}`)
       }
     }
@@ -210,10 +221,12 @@ function evalNode(node: Node, env: FormulaEnv): Value {
       switch (name) {
         case 'SUM': return values.reduce((sum, value) => sum + value, 0)
         case 'AVG': return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0
-        case 'MAX': return Math.max(...values)
-        case 'MIN': return Math.min(...values)
+        case 'MAX':
+        case 'MIN':
+          if (!values.length) throw new FormulaError(`${name} needs at least one argument`)
+          return name === 'MAX' ? Math.max(...values) : Math.min(...values)
         case 'ROUND': {
-          const digits = values[1] ?? 0
+          const digits = Math.min(Math.max(Math.trunc(values[1] ?? 0), 0), 100)
           return Number(values[0].toFixed(digits))
         }
         default: throw new FormulaError(`Unknown function '${name}'`)
@@ -226,10 +239,27 @@ function asNumberSafe(value: Value): number | null {
   try { return asNumber(value) } catch { return null }
 }
 
-export function evaluateFormula(source: string, env: FormulaEnv): Value {
+/** Tokenize + parse a formula once, so repeated evaluation (e.g. one per table row)
+ *  doesn't re-tokenize/re-parse for every call. Throws FormulaError on bad syntax. */
+function compileFormula(source: string): Node {
   const stripped = source.trim().replace(/^=/, '')
   if (!stripped) throw new FormulaError('Empty formula')
-  return evalNode(parse(tokenize(stripped)), env)
+  return parse(tokenize(stripped))
+}
+
+/** Evaluate an already-compiled AST, applying the same non-finite-result guard as
+ *  `evaluateFormula` (so MAX()/MIN() misuse or arithmetic overflow can never leak
+ *  Infinity/-Infinity/NaN out of the engine). */
+function evalCompiled(node: Node, env: FormulaEnv): Value {
+  const result = evalNode(node, env)
+  if (typeof result === 'number' && !Number.isFinite(result)) {
+    throw new FormulaError('Formula produced a non-finite number')
+  }
+  return result
+}
+
+export function evaluateFormula(source: string, env: FormulaEnv): Value {
+  return evalCompiled(compileFormula(source), env)
 }
 
 /** Compute formula columns for every row. Errors become '#ERR' in that cell only.
@@ -246,6 +276,30 @@ export function computeTableRows(
   const computed = rows.map((row) => ({ ...row }))
   for (const column of columns) {
     if (column.type !== 'formula') continue
+
+    let compiled: Node
+    try {
+      compiled = compileFormula(column.formula ?? '')
+    } catch {
+      // Compile failure applies to every row in this column — set once, skip the row loop.
+      for (const row of computed) row[column.id] = '#ERR'
+      continue
+    }
+
+    // Memoized per-column-pass snapshot: built lazily (only if the formula actually
+    // calls columnValues), once, from the table's state at the start of this pass —
+    // not rebuilt per row/per cell.
+    const columnValuesCache = new Map<string, number[]>()
+    const getColumnValues = (label: string): number[] => {
+      const cached = columnValuesCache.get(label)
+      if (cached) return cached
+      const target = byLabel.get(label)
+      if (!target) throw new FormulaError(`Unknown column [${label}]`)
+      const values = computed.map((r) => Number(r[target.id]) || 0)
+      columnValuesCache.set(label, values)
+      return values
+    }
+
     for (const row of computed) {
       const env: FormulaEnv = {
         ref(name) {
@@ -255,14 +309,10 @@ export function computeTableRows(
           if (value === undefined || value === null || value === '#ERR') throw new FormulaError(`No value for [${name}]`)
           return value as Value
         },
-        columnValues(label) {
-          const target = byLabel.get(label)
-          if (!target) throw new FormulaError(`Unknown column [${label}]`)
-          return computed.map((r) => Number(r[target.id]) || 0)
-        },
+        columnValues: getColumnValues,
       }
       try {
-        row[column.id] = evaluateFormula(column.formula ?? '', env)
+        row[column.id] = evalCompiled(compiled, env)
       } catch {
         row[column.id] = '#ERR'
       }
@@ -305,7 +355,8 @@ export function computeTotals(
       },
     }
     try {
-      const value = evaluateFormula(row.formula ?? '', env)
+      const compiled = compileFormula(row.formula ?? '')
+      const value = evalCompiled(compiled, env)
       results[row.id] = typeof value === 'boolean' ? Number(value) : value as number | string
     } catch {
       results[row.id] = '#ERR'

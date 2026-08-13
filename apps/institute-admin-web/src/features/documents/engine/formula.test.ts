@@ -46,6 +46,22 @@ describe('evaluateFormula', () => {
     expect(() => evaluateFormula('=[Nope]', env)).toThrow()
     expect(() => evaluateFormula('=1+*2', env)).toThrow()
   })
+
+  it('compares strings by value, not by numeric coercion of unrelated strings', () => {
+    expect(evaluateFormula('=IF("Alice"=="Bob",1,0)', env)).toBe(0)
+    expect(evaluateFormula('="a"!="b"', env)).toBe(true)
+    expect(evaluateFormula('=IF([Qty]=="2",1,0)', env)).toBe(1)
+  })
+
+  it('rejects non-finite results from MAX/MIN misuse and arithmetic overflow', () => {
+    expect(() => evaluateFormula('=MAX()', env)).toThrow()
+    expect(() => evaluateFormula('=MIN()', env)).toThrow()
+  })
+
+  it('clamps ROUND digits so toFixed cannot throw RangeError', () => {
+    expect(() => evaluateFormula('=ROUND(1.23456,999)', env)).not.toThrow()
+    expect(() => evaluateFormula('=ROUND(1.23456,-5)', env)).not.toThrow()
+  })
 })
 
 describe('computeTableRows', () => {
@@ -59,6 +75,13 @@ describe('computeTableRows', () => {
     const columns = [...FEE_COLUMNS, col('c6', 'Bad', { type: 'formula', formula: '=[Missing]+1' })]
     const rows = computeTableRows(columns, FEE_ROWS)
     expect(rows[0].c6).toBe('#ERR')
+    expect(rows[0].c5).toBe(3001)
+  })
+
+  it('renders #ERR for MAX() with no arguments, without throwing out of the loop', () => {
+    const columns = [...FEE_COLUMNS, col('c9', 'Bad2', { type: 'formula', formula: '=MAX()' })]
+    const rows = computeTableRows(columns, FEE_ROWS)
+    expect(rows[0].c9).toBe('#ERR')
     expect(rows[0].c5).toBe(3001)
   })
 
