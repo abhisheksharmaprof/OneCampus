@@ -300,3 +300,75 @@ def test_patch_and_delete_enforce_tenant_screen_and_optimistic_version(api_clien
     record.refresh_from_db()
     assert record.is_active is False
     assert record.version == 3
+
+
+def test_staff_timetable_returns_combined_and_legacy_class_ids(api_client):
+    from modules.people.models import StaffProfile
+
+    institute, main, annex, admin, membership = make_tenant("NORTH", "admin@north.test")
+    teacher = User.objects.create_user(email="teacher@north.test", password="StrongPass123!")
+    InstituteMembership.objects.create(
+        user=teacher,
+        institute=institute,
+        branch=main,
+        role=InstituteMembership.Role.TEACHER,
+    )
+    profile = StaffProfile.objects.create(institute=institute, user=teacher)
+    bundle = {
+        "config": {
+            "workingDays": ["MON", "TUE"],
+            "periods": [
+                {"number": 1, "type": "teaching", "start": "08:00", "end": "08:40"},
+                {"number": 2, "type": "teaching", "start": "08:40", "end": "09:20"},
+            ],
+        },
+        "classes": [
+            {"id": "c8a", "name": "Class 8 A"},
+            {"id": "c8b", "name": "Class 8 B"},
+        ],
+        "subjects": [{"id": "s_fr", "name": "French"}],
+        "rooms": [],
+        "lastResult": {
+            "entries": [
+                {
+                    "teacherId": str(teacher.id),
+                    "day": "MON",
+                    "period": 1,
+                    "subjectId": "s_fr",
+                    "classIds": ["c8a", "c8b"],
+                    "classId": "c8a",
+                },
+                # Legacy entry from a bundle saved before combined lessons existed
+                {
+                    "teacherId": str(teacher.id),
+                    "day": "TUE",
+                    "period": 2,
+                    "subjectId": "s_fr",
+                    "classId": "c8b",
+                },
+            ]
+        },
+    }
+    AdminRecord.objects.create(
+        institute=institute,
+        branch=main,
+        screen_id="TT1",
+        record_type="timetable",
+        title="Published timetable",
+        status="PUBLISHED",
+        data={"bundle": bundle},
+    )
+    authenticate(api_client, admin, membership)
+
+    response = api_client.get(f"/staff/{profile.id}/timetable")
+
+    assert response.status_code == 200
+    slots = response.json()["data"]["slots"]
+    assert len(slots) == 2
+    combined, legacy = slots
+    assert combined["classIds"] == ["c8a", "c8b"]
+    assert combined["classId"] == "c8a"
+    assert combined["className"] == "Class 8 A / Class 8 B"
+    assert legacy["classIds"] == ["c8b"]
+    assert legacy["classId"] == "c8b"
+    assert legacy["className"] == "Class 8 B"

@@ -241,7 +241,10 @@ class StaffTimetableView(APIView):
         for entry in teacher_entries:
             day = entry.get("day", "")
             period_number = entry.get("period")
-            class_info = classes_map.get(entry.get("classId", ""), {})
+            # Combined lessons span several sections (classIds); older saved
+            # bundles only carry a single classId — normalize both shapes.
+            class_ids = entry.get("classIds") or ([entry.get("classId")] if entry.get("classId") else [])
+            class_names = [classes_map.get(cid, {}).get("name", "") for cid in class_ids]
             subject_info = subjects_map.get(entry.get("subjectId", ""), {})
             room_info = rooms_map.get(entry.get("roomId", ""), {})
 
@@ -252,10 +255,11 @@ class StaffTimetableView(APIView):
                 "period": period_number,
                 "startTime": period_def.get("start") if period_def else None,
                 "endTime": period_def.get("end") if period_def else None,
-                "className": class_info.get("name", ""),
+                "className": " / ".join(name for name in class_names if name),
                 "subjectName": subject_info.get("name", ""),
                 "roomName": room_info.get("name", ""),
-                "classId": entry.get("classId", ""),
+                "classId": class_ids[0] if class_ids else "",
+                "classIds": class_ids,
                 "subjectId": entry.get("subjectId", ""),
                 "roomId": entry.get("roomId", ""),
             })

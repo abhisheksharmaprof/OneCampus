@@ -753,7 +753,7 @@ function importTeachersRows(existingTeachers, rows, config) {
   });
   return { teachers, added, updated, errors };
 }
-function importAssignmentsRows(existingAssignments, refs, rows) {
+export function importAssignmentsRows(existingAssignments, refs, rows) {
   const assignments = existingAssignments.slice();
   const errors = [];
   let added = 0, updated = 0;
@@ -761,19 +761,28 @@ function importAssignmentsRows(existingAssignments, refs, rows) {
     const teacherName = getVal(row, ["teachername", "teacher"]);
     const subjectName = getVal(row, ["subjectname", "subject"]);
     const className = getVal(row, ["classname", "class"]);
+    const combinedSlotLabel = String(getVal(row, ["combinedslot", "combinedslotlabel", "commonslot"]) || "").trim();
     const periodsPerWeek = parseInt(getVal(row, ["periodsperweek", "periodsweek", "periods"]), 10);
     const avoidRepeatSameDay = parseBoolYes(getVal(row, ["avoidrepeatsameday", "avoidrepeat", "samedaytwice"]), true);
-    if (!teacherName || !subjectName || !className) { errors.push(`Assignments row ${i + 2}: missing Teacher/Subject/Class name, skipped.`); return; }
+    // The Class cell may list several sections ("6A; 6B" or "6A / 6B") for a combined lesson.
+    const classNamesRaw = String(className || "").split(/[;/]/).map((s) => s.trim()).filter(Boolean);
+    if (!teacherName || !subjectName || !classNamesRaw.length) { errors.push(`Assignments row ${i + 2}: missing Teacher/Subject/Class name, skipped.`); return; }
     const teacher = findByNameCI(refs.teachers, teacherName);
     const subject = findByNameCI(refs.subjects, subjectName);
-    const cls = findByNameCI(refs.classes, className);
+    const clsList = classNamesRaw.map((n) => findByNameCI(refs.classes, n));
     if (!teacher) { errors.push(`Assignments row ${i + 2}: teacher "${teacherName}" not found — add them in the Teachers sheet first.`); return; }
     if (!subject) { errors.push(`Assignments row ${i + 2}: subject "${subjectName}" not found — add it in the Subjects sheet first.`); return; }
-    if (!cls) { errors.push(`Assignments row ${i + 2}: class "${className}" not found — add it in the Classes sheet first.`); return; }
+    const missingName = classNamesRaw[clsList.findIndex((c) => !c)];
+    if (missingName !== undefined) { errors.push(`Assignments row ${i + 2}: class "${missingName}" not found — add it in the Classes sheet first.`); return; }
     if (!periodsPerWeek || periodsPerWeek < 1) { errors.push(`Assignments row ${i + 2}: Periods/Week must be a positive number.`); return; }
-    const existing = assignments.find((a) => a.teacherId === teacher.id && a.subjectId === subject.id && a.classId === cls.id);
-    if (existing) { existing.periodsPerWeek = periodsPerWeek; existing.avoidRepeatSameDay = avoidRepeatSameDay; updated++; }
-    else { assignments.push({ id: uid("asg"), teacherId: teacher.id, subjectId: subject.id, classIds: [cls.id], classId: cls.id, periodsPerWeek, avoidRepeatSameDay }); added++; }
+    const classIds = clsList.map((c) => c.id);
+    const sameSet = (a) => {
+      const ids = assignmentClassIds(a);
+      return ids.length === classIds.length && ids.every((id) => classIds.includes(id));
+    };
+    const existing = assignments.find((a) => a.teacherId === teacher.id && a.subjectId === subject.id && sameSet(a));
+    if (existing) { Object.assign(existing, { periodsPerWeek, avoidRepeatSameDay, combinedSlotLabel }); updated++; }
+    else { assignments.push({ id: uid("asg"), teacherId: teacher.id, subjectId: subject.id, classIds, classId: classIds[0], combinedSlotLabel, periodsPerWeek, avoidRepeatSameDay }); added++; }
   });
   return { assignments, added, updated, errors };
 }
@@ -846,7 +855,9 @@ async function buildTemplateWorkbook() {
     ["  Available Periods (comma-separated period numbers or ALL)"],
     [""],
     ["Sheet: Assignments — who teaches what to which class, and how often"],
-    ["  Teacher Name, Subject Name, Class Name, Periods Per Week, Avoid Repeat Same Day (YES/NO)"],
+    ["  Teacher Name, Subject Name, Class Name (use \"6A; 6B\" for combined lessons),"],
+    ["  Combined Slot (optional label — assignments sharing a label and the same classes"],
+    ["  are scheduled in the same slot), Periods Per Week, Avoid Repeat Same Day (YES/NO)"],
     ["  Set Periods Per Week to 2 for a subject that should only meet twice a week, for example."],
   ];
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(instructions), "Instructions");
@@ -884,12 +895,12 @@ async function buildTemplateWorkbook() {
   XLSX.utils.book_append_sheet(
     wb,
     XLSX.utils.json_to_sheet([
-      { "Teacher Name": "Mrs. Sharma", "Subject Name": "Science", "Class Name": "Grade 6 - A", "Periods Per Week": 5, "Avoid Repeat Same Day": "YES" },
-      { "Teacher Name": "Mrs. Sharma", "Subject Name": "English", "Class Name": "Grade 6 - B", "Periods Per Week": 5, "Avoid Repeat Same Day": "YES" },
-      { "Teacher Name": "Mr. Verma", "Subject Name": "Mathematics", "Class Name": "Grade 6 - A", "Periods Per Week": 6, "Avoid Repeat Same Day": "YES" },
-      { "Teacher Name": "Ms. Iyer", "Subject Name": "Art", "Class Name": "Grade 6 - A", "Periods Per Week": 2, "Avoid Repeat Same Day": "YES" },
-      { "Teacher Name": "Mr. Khan", "Subject Name": "Physical Education", "Class Name": "Grade 6 - A", "Periods Per Week": 2, "Avoid Repeat Same Day": "YES" },
-      { "Teacher Name": "Mr. Das", "Subject Name": "Social Studies", "Class Name": "Grade 6 - A", "Periods Per Week": 3, "Avoid Repeat Same Day": "YES" },
+      { "Teacher Name": "Mrs. Sharma", "Subject Name": "Science", "Class Name": "Grade 6 - A", "Combined Slot": "", "Periods Per Week": 5, "Avoid Repeat Same Day": "YES" },
+      { "Teacher Name": "Mrs. Sharma", "Subject Name": "English", "Class Name": "Grade 6 - B", "Combined Slot": "", "Periods Per Week": 5, "Avoid Repeat Same Day": "YES" },
+      { "Teacher Name": "Mr. Verma", "Subject Name": "Mathematics", "Class Name": "Grade 6 - A", "Combined Slot": "", "Periods Per Week": 6, "Avoid Repeat Same Day": "YES" },
+      { "Teacher Name": "Ms. Iyer", "Subject Name": "Art", "Class Name": "Grade 6 - A; Grade 6 - B", "Combined Slot": "", "Periods Per Week": 2, "Avoid Repeat Same Day": "YES" },
+      { "Teacher Name": "Mr. Khan", "Subject Name": "Physical Education", "Class Name": "Grade 6 - A", "Combined Slot": "", "Periods Per Week": 2, "Avoid Repeat Same Day": "YES" },
+      { "Teacher Name": "Mr. Das", "Subject Name": "Social Studies", "Class Name": "Grade 6 - A", "Combined Slot": "", "Periods Per Week": 3, "Avoid Repeat Same Day": "YES" },
     ]),
     "Assignments"
   );

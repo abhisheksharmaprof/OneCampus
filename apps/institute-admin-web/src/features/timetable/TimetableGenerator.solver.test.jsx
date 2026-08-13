@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildCsvRows, generateTimetable } from "./TimetableGenerator.jsx";
+import { buildCsvRows, generateTimetable, importAssignmentsRows } from "./TimetableGenerator.jsx";
 
 const DAYS = ["MON", "TUE", "WED", "THU", "FRI", "SAT"];
 const PERIODS = [1, 2, 3, 4, 5, 6];
@@ -213,5 +213,63 @@ describe("csv export rows", () => {
       ["TUE", 2, "Class 1", "Mathematics", "Teacher t1"],
       ["TUE", 3, "Class 1", "Mathematics", "Teacher t1"],
     ]);
+  });
+});
+
+describe("bulk import combined", () => {
+  const refs = {
+    teachers: [{ id: "t1", name: "Mrs. Sharma" }],
+    subjects: [{ id: "s_fr", name: "French" }],
+    classes: [
+      { id: "c6a", name: "6A" },
+      { id: "c6b", name: "6B" },
+    ],
+  };
+
+  it("imports a multi-class row with a combined slot label", () => {
+    const rows = [
+      { "Teacher Name": "Mrs. Sharma", "Subject Name": "French", "Class Name": "6A; 6B", "Combined Slot": "Lang", "Periods Per Week": 3, "Avoid Repeat Same Day": "YES" },
+    ];
+    const r = importAssignmentsRows([], refs, rows);
+    expect(r.errors).toEqual([]);
+    expect(r.added).toBe(1);
+    const a = r.assignments[0];
+    expect(a.classIds).toEqual(["c6a", "c6b"]);
+    expect(a.classId).toBe("c6a");
+    expect(a.combinedSlotLabel).toBe("Lang");
+    expect(a.periodsPerWeek).toBe(3);
+  });
+
+  it("updates a legacy classId-only assignment when the section set matches", () => {
+    const existing = [
+      { id: "asg1", teacherId: "t1", subjectId: "s_fr", classId: "c6a", periodsPerWeek: 2, avoidRepeatSameDay: true },
+    ];
+    const rows = [{ "Teacher Name": "Mrs. Sharma", "Subject Name": "French", "Class Name": "6A", "Periods Per Week": 4 }];
+    const r = importAssignmentsRows(existing, refs, rows);
+    expect(r.errors).toEqual([]);
+    expect(r.updated).toBe(1);
+    expect(r.assignments).toHaveLength(1);
+    expect(r.assignments[0].periodsPerWeek).toBe(4);
+  });
+
+  it("treats the same section set in a different order as an update, not a duplicate", () => {
+    const existing = [
+      { id: "asg1", teacherId: "t1", subjectId: "s_fr", classIds: ["c6b", "c6a"], classId: "c6b", combinedSlotLabel: "", periodsPerWeek: 2, avoidRepeatSameDay: true },
+    ];
+    const rows = [{ "Teacher Name": "Mrs. Sharma", "Subject Name": "French", "Class Name": "6A / 6B", "Combined Slot": "Lang", "Periods Per Week": 5 }];
+    const r = importAssignmentsRows(existing, refs, rows);
+    expect(r.updated).toBe(1);
+    expect(r.assignments).toHaveLength(1);
+    expect(r.assignments[0].combinedSlotLabel).toBe("Lang");
+    expect(r.assignments[0].periodsPerWeek).toBe(5);
+  });
+
+  it("reports the missing class name when one section is unknown", () => {
+    const rows = [{ "Teacher Name": "Mrs. Sharma", "Subject Name": "French", "Class Name": "6A; 6Z", "Periods Per Week": 3 }];
+    const r = importAssignmentsRows([], refs, rows);
+    expect(r.added).toBe(0);
+    expect(r.assignments).toHaveLength(0);
+    expect(r.errors).toHaveLength(1);
+    expect(r.errors[0]).toMatch(/class "6Z" not found/);
   });
 });
