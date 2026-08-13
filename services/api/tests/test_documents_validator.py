@@ -72,3 +72,23 @@ def test_rejects_non_numeric_geometry_and_oversize():
     huge = minimal_layout(pages=[{"elements": [text_el(content="x" * 70000)]}])
     with pytest.raises(serializers.ValidationError):
         validate_layout(huge, category="FEE_INVOICE")
+
+
+def test_rejects_overflow_negative_dimensions_and_duplicates():
+    with pytest.raises(serializers.ValidationError):
+        validate_layout(minimal_layout(pages=[{"elements": [text_el(x=10 ** 400)]}]), category="FEE_INVOICE")
+    with pytest.raises(serializers.ValidationError):
+        validate_layout(minimal_layout(pages=[{"elements": [text_el(w=-5)]}]), category="FEE_INVOICE")
+    with pytest.raises(serializers.ValidationError):
+        validate_layout(minimal_layout(pages=[{"elements": [text_el(h=0)]}]), category="FEE_INVOICE")
+    with pytest.raises(serializers.ValidationError):
+        validate_layout(minimal_layout(pages=[{"elements": [text_el("dup"), text_el("dup")]}]), category="FEE_INVOICE")
+
+
+def test_rejects_wrong_typed_page_settings():
+    with pytest.raises(serializers.ValidationError):
+        validate_layout(minimal_layout(zones="hello"), category="FEE_INVOICE")
+    bad_margin = minimal_layout()
+    bad_margin["page"]["marginMm"] = "abc"
+    with pytest.raises(serializers.ValidationError):
+        validate_layout(bad_margin, category="FEE_INVOICE")

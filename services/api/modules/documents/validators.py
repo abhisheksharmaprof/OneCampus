@@ -27,6 +27,12 @@ def validate_layout(layout, *, category):
     page = layout.get("page")
     if not isinstance(page, dict) or page.get("sizeId") not in PAGE_SIZE_IDS:
         _fail("Unknown or missing page size.")
+    margin = page.get("marginMm", 0)
+    if not isinstance(margin, (int, float)) or isinstance(margin, bool):
+        _fail("page.marginMm must be a number.")
+    for key in ("zones", "watermark"):
+        if key in layout and not isinstance(layout[key], dict):
+            _fail(f"'{key}' must be an object.")
 
     pages = layout.get("pages")
     if not isinstance(pages, list) or not 1 <= len(pages) <= 2:
@@ -36,6 +42,7 @@ def validate_layout(layout, *, category):
 
     table_count = 0
     element_count = 0
+    seen_ids = set()
     for page_entry in pages:
         elements = page_entry.get("elements") if isinstance(page_entry, dict) else None
         if not isinstance(elements, list):
@@ -48,11 +55,17 @@ def validate_layout(layout, *, category):
                 _fail("Unknown element type.")
             if not isinstance(element.get("id"), str) or not element["id"]:
                 _fail("Every element needs a string id.")
+            if element["id"] in seen_ids:
+                _fail(f"Duplicate element id '{element['id']}'.")
+            seen_ids.add(element["id"])
             for key in GEOMETRY_KEYS:
                 value = element.get(key)
                 if not isinstance(value, (int, float)) or isinstance(value, bool):
                     _fail(f"Element geometry '{key}' must be a number.")
-                if not GEOMETRY_RANGE[0] <= float(value) <= GEOMETRY_RANGE[1]:
+                if key in ("w", "h"):
+                    if not 0 < value <= GEOMETRY_RANGE[1]:
+                        _fail(f"Element geometry '{key}' must be positive.")
+                elif not GEOMETRY_RANGE[0] <= value <= GEOMETRY_RANGE[1]:
                     _fail(f"Element geometry '{key}' is out of range.")
             if element["type"] == "table":
                 table_count += 1
