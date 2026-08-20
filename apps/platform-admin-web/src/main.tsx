@@ -1,11 +1,11 @@
-import { StrictMode, useMemo, useState, type FormEvent } from 'react'
+import { StrictMode, useCallback, useMemo, useState, type FormEvent } from 'react'
 import { createRoot } from 'react-dom/client'
 import { Globe2 } from 'lucide-react'
 import { PlatformAdminPage, type PlatformSession } from '../../institute-admin-web/src/features/platform-admin/PlatformAdminPage'
 import '../../institute-admin-web/src/features/platform-admin/platform-admin.css'
 import './platform-login.css'
 
-const apiBase = (import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:8000').replace(/\/$/, '')
+const apiBase = (import.meta.env.VITE_API_BASE_URL ?? (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? 'http://127.0.0.1:8000' : 'https://api.snifply.com')).replace(/\/$/, '')
 
 function PlatformAdminApp() {
   const session = useMemo(() => {
@@ -17,9 +17,34 @@ function PlatformAdminApp() {
 
   const [activeSession, setActiveSession] = useState<PlatformSession | null>(session)
 
+  const clearSession = useCallback(() => {
+    localStorage.removeItem('campusone.session')
+    setActiveSession(null)
+  }, [])
+
+  const handleSignOut = useCallback(async () => {
+    const currentSession = activeSession
+    try {
+      if (currentSession) {
+        await fetch(`${apiBase}/api/v1/identity/sessions/current`, {
+          method: 'DELETE',
+          headers: {
+            Authorization: `Bearer ${currentSession.accessToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ refreshToken: currentSession.refreshToken }),
+        })
+      }
+    } finally {
+      // Local sign-out must always succeed, even if a stale token prevents
+      // server-side refresh-token revocation.
+      clearSession()
+    }
+  }, [activeSession, clearSession])
+
   if (!activeSession) return <PlatformLogin onAuthenticated={setActiveSession} />
 
-  return <PlatformAdminPage session={activeSession} onSignOut={async () => { localStorage.removeItem('campusone.session'); setActiveSession(null) }} />
+  return <PlatformAdminPage session={activeSession} onSignOut={handleSignOut} onSessionExpired={clearSession} />
 }
 
 function PlatformLogin({ onAuthenticated }: { onAuthenticated: (session: PlatformSession) => void }) {

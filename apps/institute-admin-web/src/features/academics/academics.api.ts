@@ -56,6 +56,9 @@ export function listClasses(accessToken: string, params: ListParams, signal?: Ab
 export function listSubjects(accessToken: string, params: ListParams, signal?: AbortSignal) {
   return adminRequest<PageData<Subject>>(accessToken, `academics/subjects?${queryString(params)}`, { signal })
 }
+export function deleteSubject(accessToken: string, id: string) {
+  return adminRequest<void>(accessToken, `academics/subjects/${id}`, { method: 'DELETE' })
+}
 export function listClassSubjects(accessToken: string, params: ListParams, signal?: AbortSignal) {
   return adminRequest<PageData<ClassSubject>>(accessToken, `academics/class-subjects?${queryString(params)}`, { signal })
 }

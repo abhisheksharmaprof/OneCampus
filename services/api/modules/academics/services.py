@@ -1,9 +1,9 @@
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 
-from modules.institutes.models import Institute
+from modules.institutes.models import Branch, Institute
 
-from .models import AcademicYear, ClassSection, StudentEnrollment
+from .models import AcademicYear, ClassSection, Grade, StudentEnrollment
 
 
 class AcademicsValidationError(Exception):
@@ -35,6 +35,42 @@ def save_academic_year(*, academic_year, make_current=None):
 
 
 @transaction.atomic
+def ensure_default_section(*, grade, branch, academic_year=None):
+    """Return the fallback section for a class without a configured section."""
+    if academic_year is None:
+        academic_year = AcademicYear.objects.filter(
+            institute_id=grade.institute_id, is_current=True
+        ).first()
+    if academic_year is None:
+        raise AcademicsValidationError(
+            {"academicYearId": ["A current academic year is required for class placement."]}
+        )
+    if branch.institute_id != grade.institute_id or academic_year.institute_id != grade.institute_id:
+        raise AcademicsValidationError(
+            {"classId": ["Class, branch, and academic year must belong to the same institute."]}
+        )
+    section, _ = ClassSection.objects.get_or_create(
+        branch=branch, grade=grade, academic_year=academic_year,
+        section_name="Default", defaults={"max_strength": 100},
+    )
+    return section
+
+
+@transaction.atomic
+def provision_default_sections(*, grade):
+    """Create a Default section for every active branch in the current year."""
+    academic_year = AcademicYear.objects.filter(
+        institute_id=grade.institute_id, is_current=True
+    ).first()
+    if academic_year is None:
+        return []
+    return [
+        ensure_default_section(grade=grade, branch=branch, academic_year=academic_year)
+        for branch in Branch.objects.filter(institute_id=grade.institute_id, is_active=True)
+    ]
+
+
+@transaction.atomic
 def set_current_academic_year(*, institute, academic_year):
     Institute.objects.select_for_update().get(pk=institute.pk)
     AcademicYear.objects.filter(institute=institute, is_current=True).exclude(
@@ -42,6 +78,8 @@ def set_current_academic_year(*, institute, academic_year):
     ).update(is_current=False)
     academic_year.is_current = True
     academic_year.save(update_fields=("is_current", "updated_at"))
+    for grade in Grade.objects.filter(institute_id=institute.pk):
+        provision_default_sections(grade=grade)
     return academic_year
 
 

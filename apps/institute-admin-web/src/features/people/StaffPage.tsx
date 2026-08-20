@@ -30,6 +30,10 @@ type StaffPageData = PageData<Staff> & { summary?: StaffSummary }
 const emptyPage = <T,>(): PageData<T> => ({ count: 0, page: 1, pageSize: 0, totalPages: 1, next: null, previous: null, items: [] })
 const days = [['MON', 'Monday'], ['TUE', 'Tuesday'], ['WED', 'Wednesday'], ['THU', 'Thursday'], ['FRI', 'Friday'], ['SAT', 'Saturday'], ['SUN', 'Sunday']] as const
 const teachingPeriods = [1, 2, 3, 4, 5, 6, 7, 8]
+const addStaffRoleOptions = [
+  { value: 'TEACHER', label: 'Teacher' },
+  { value: 'STAFF', label: 'Staff' },
+] as const
 
 function humanize(value: string) {
   return value
@@ -172,8 +176,7 @@ export function StaffPage({ accessToken, branches, selectedBranch }: { accessTok
     setSaving(true)
     setActionError('')
     try {
-      const selectedRole = staffRoles.find((item) => (item.isSystemRole ? item.name.toUpperCase() : `CUSTOM:${item.id}`) === newStaffRole)
-      const role = selectedRole?.isSystemRole ? selectedRole.name.toUpperCase() : newStaffRole.startsWith('CUSTOM:') ? 'STAFF' : newStaffRole
+      const role = newStaffRole === 'TEACHER' ? 'TEACHER' : 'STAFF'
       await adminRequest<Staff>(accessToken, 'staff', {
         method: 'POST',
         body: JSON.stringify({
@@ -182,7 +185,6 @@ export function StaffPage({ accessToken, branches, selectedBranch }: { accessTok
           phone: form.get('phone'),
           branchId: form.get('branchId') || branchId,
           role,
-          ...(selectedRole && !selectedRole.isSystemRole ? { roleId: selectedRole.id } : {}),
           department: form.get('department'),
           ...(role === 'TEACHER'
             ? {
@@ -217,8 +219,7 @@ export function StaffPage({ accessToken, branches, selectedBranch }: { accessTok
     avgAttendance: null,
     activeStaff: data.items.filter((item) => item.status === 'ACTIVE').length,
   }
-  const selectedStaffRole = staffRoles.find((item) => (item.isSystemRole ? item.name.toUpperCase() : `CUSTOM:${item.id}`) === newStaffRole)
-  const newStaffMembershipRole = selectedStaffRole?.isSystemRole ? selectedStaffRole.name.toUpperCase() : newStaffRole.startsWith('CUSTOM:') ? 'STAFF' : newStaffRole
+  const newStaffMembershipRole = newStaffRole
 
   const deleteStaff = async (staffId: string, staffName: string) => {
     if (!window.confirm(`Delete ${staffName || 'this staff member'}? Their access to this institute will be deactivated.`)) return
@@ -459,7 +460,7 @@ export function StaffPage({ accessToken, branches, selectedBranch }: { accessTok
             <label>Work email *<input name="email" type="email" required autoComplete="email" /></label>
             <label>Mobile number<input name="phone" type="tel" inputMode="tel" autoComplete="tel" placeholder="e.g. +91 98765 43210" /></label>
             <input type="hidden" name="branchId" value={branchId} />
-            <label>Role *<select name="role" value={newStaffRole} onChange={(event) => setNewStaffRole(event.target.value)}>{(staffRoles.length ? staffRoles : [{ id: 'fallback-teacher', name: 'Teacher', isSystemRole: true }, { id: 'fallback-staff', name: 'Staff', isSystemRole: true }] as Role[]).map((roleOption) => <option key={roleOption.id} value={roleOption.isSystemRole ? roleOption.name.toUpperCase() : `CUSTOM:${roleOption.id}`}>{roleOption.name}</option>)}</select></label>
+            <label>Role *<select name="role" value={newStaffRole} onChange={(event) => setNewStaffRole(event.target.value)}>{addStaffRoleOptions.map((roleOption) => <option key={roleOption.value} value={roleOption.value}>{roleOption.label}</option>)}</select></label>
             <label>Department<input name="department" value={departmentValue} onChange={(event) => setDepartmentValue(event.target.value)} placeholder="Administration, Science..." /></label>
           </div>
 

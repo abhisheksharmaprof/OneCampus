@@ -1,0 +1,23 @@
+{
+  "rules": [
+    {
+      "id": "expire-staging-objects",
+      "enabled": true,
+      "conditions": {
+        "prefix": "v1/staging/"
+      },
+      "deleteObjectsTransition": {
+        "condition": {
+          "maxAge": 86400,
+          "type": "Age"
+        }
+      },
+      "abortMultipartUploadsTransition": {
+        "condition": {
+          "maxAge": 86400,
+          "type": "Age"
+        }
+      }
+    }
+  ]
+}

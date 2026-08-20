@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from 'react'
-import { CheckCircle2, Upload, FileText, Image as ImageIcon, Save, Eye } from 'lucide-react'
+import { CheckCircle2, FileText, Image as ImageIcon, Save, Eye } from 'lucide-react'
 import { FileUploadField, Modal, PageSkeleton } from '../../components/admin-ui'
 import { Card, SectionHeader } from '../../components/ui/primitives'
 import { adminRequest, adminUpload } from '../admin/admin.api'
@@ -50,13 +50,6 @@ interface Branch {
   postal_code?: string
   email?: string
   phone?: string
-}
-
-interface InstituteDocument {
-  id: string
-  type: string
-  uploadedDate: string
-  status: 'Verified' | 'Pending'
 }
 
 interface LogoAsset {
@@ -205,13 +198,6 @@ export function InstituteProfilePage({ accessToken }: { accessToken: string }) {
   const [primaryColor, setPrimaryColor] = useState('#2E5AAC')
   const [gradingScale, setGradingScale] = useState('percentage')
   const [isDirty, setIsDirty] = useState(false)
-
-  const [documents, setDocuments] = useState<InstituteDocument[]>([
-    { id: '1', type: 'Affiliation Certificate', uploadedDate: '12 Jan 2024', status: 'Verified' },
-    { id: '2', type: 'Registration Certificate', uploadedDate: '—', status: 'Pending' },
-    { id: '3', type: 'PAN Card', uploadedDate: '—', status: 'Pending' },
-    { id: '4', type: 'GST Certificate', uploadedDate: '12 Jan 2024', status: 'Pending' },
-  ])
 
   useEffect(() => {
     void adminRequest<InstituteProfile>(accessToken, 'institute')
@@ -497,44 +483,6 @@ export function InstituteProfilePage({ accessToken }: { accessToken: string }) {
                   </label>
                 </div>
 
-                <div className="doc-panel-divider" />
-                <div className="panel-inner-heading">
-                  <h3 className="h3">Institute Documents</h3>
-                  <button
-                    type="button"
-                    className="button-secondary btn-sm"
-                    onClick={() => setUploadModalOpen(true)}
-                  >
-                    <Upload size={14} /> Upload Document
-                  </button>
-                </div>
-
-                <table className="mini-table">
-                  <thead>
-                    <tr>
-                      <th>Document Type</th>
-                      <th>Uploaded Date</th>
-                      <th>Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {documents.map((doc) => (
-                      <tr key={doc.id}>
-                        <td>
-                          <span className="row-name-cell">
-                            <FileText size={15} color="var(--color-primary)" /> {doc.type}
-                          </span>
-                        </td>
-                        <td>{doc.uploadedDate}</td>
-                        <td>
-                          <span className={`status-badge ${doc.status === 'Verified' ? 'tone-success' : 'tone-warning'}`}>
-                            {doc.status}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
               </Card>
             </div>
 
@@ -740,7 +688,6 @@ export function InstituteProfilePage({ accessToken }: { accessToken: string }) {
                 setUploading(true); setUploadError('')
                 try {
                   const result = await adminUpload<{ id?: string; uploadedDate?: string; type?: string }>(accessToken, 'institute/documents', documentFile, { documentType })
-                  setDocuments((prev) => [...prev, { id: result.id ?? String(Date.now()), type: result.type ?? documentType.replaceAll('_', ' '), uploadedDate: result.uploadedDate ?? 'Today', status: 'Pending' }])
                   setDocumentFile(null); setUploadModalOpen(false)
                 } catch (cause) { setUploadError(cause instanceof Error ? cause.message : 'The document could not be uploaded.') } finally { setUploading(false) }
               }}

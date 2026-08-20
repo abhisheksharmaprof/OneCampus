@@ -200,6 +200,7 @@
 .class-mapping-controls { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .5rem; }
 .class-mapping-controls select { min-width: 10rem; height: 2.35rem; padding: 0 .65rem; border: 1px solid #d8e0eb; border-radius: .42rem; background: #fff; color: #304968; font-size: .75rem; }
 .class-mapping-panel .subject-reference-table td { vertical-align: middle; }
+.subject-mapping-labels { display: block; max-width: 18rem; margin-top: .18rem; white-space: normal; line-height: 1.35; }
 .class-mapping-panel .danger-text { color: var(--color-danger); }
 .academics-loading-skeleton { display: grid; gap: 1rem; min-height: 28rem; padding: 1.15rem; border: 1px solid #dce4ef; border-radius: .68rem; background: #fff; }
 .skeleton-heading, .skeleton-toolbar, .skeleton-metrics, .skeleton-tabs { display: flex; gap: .75rem; align-items: center; }

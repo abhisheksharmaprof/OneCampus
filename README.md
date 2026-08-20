@@ -41,6 +41,14 @@ uv run python manage.py migrate
 uv run python manage.py runserver
 ```
 
+To start both admin apps, the API, and the Cloudflare tunnel together with fixed ports, run from the repository root:
+
+```bash
+npm run dev
+```
+
+The public admin URLs are `https://institute.snifply.com` and `https://platform.snifply.com`. The tunnel configuration is stored in `cloudflared/campusone.yml`.
+
 In another terminal, run an admin application from the repository root:
 
 ```bash

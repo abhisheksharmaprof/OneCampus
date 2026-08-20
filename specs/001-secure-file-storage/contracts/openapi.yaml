@@ -1,0 +1,585 @@
+openapi: 3.1.0
+info:
+  title: CampusOne Secure File Storage API
+  version: 1.0.0
+  description: >-
+    Provider-neutral CampusOne contracts for direct uploads, metadata, access grants,
+    and recoverable lifecycle operations. Storage bucket names, object keys, and provider
+    errors are never exposed. All JSON uses the standard CampusOne envelope.
+servers:
+  - url: /api/v1
+security:
+  - bearerAuth: []
+tags:
+  - name: File uploads
+  - name: Files
+  - name: File access
+paths:
+  /admin/file-uploads:
+    post:
+      tags: [File uploads]
+      operationId: initiateFileUpload
+      summary: Authorize one direct, conditional upload
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InitiateUploadRequest'
+      responses:
+        '201':
+          description: New upload authorization created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadAuthorizationEnvelope'
+        '200':
+          description: Existing equivalent idempotent authorization returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadAuthorizationEnvelope'
+        '400': {$ref: '#/components/responses/ValidationError'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409':
+          description: Idempotency key or replacement conflict
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ErrorEnvelope'}
+  /admin/file-uploads/{uploadId}/complete:
+    post:
+      tags: [File uploads]
+      operationId: completeFileUpload
+      summary: Verify staged content and activate its immutable file record
+      parameters:
+        - $ref: '#/components/parameters/UploadId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                etag:
+                  type: string
+                  maxLength: 255
+                  description: Opaque ETag observed by the browser; server verification is authoritative.
+      responses:
+        '200':
+          description: Upload was already completed; same active asset returned
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/FileEnvelope'}
+        '201':
+          description: Staged content verified and activated
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/FileEnvelope'}
+        '409':
+          description: Object is missing, incomplete, mismatched, unsafe, or concurrently replaced
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ErrorEnvelope'}
+        '410':
+          description: Upload authorization expired
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ErrorEnvelope'}
+        '503': {$ref: '#/components/responses/StorageUnavailable'}
+  /admin/files:
+    get:
+      tags: [Files]
+      operationId: listFiles
+      summary: List tenant-scoped file metadata without creating access grants
+      parameters:
+        - {$ref: '#/components/parameters/OwnerTypeQuery'}
+        - name: ownerId
+          in: query
+          schema: {type: string, format: uuid}
+        - name: category
+          in: query
+          schema: {$ref: '#/components/schemas/FileCategory'}
+        - name: state
+          in: query
+          schema: {$ref: '#/components/schemas/FileState'}
+        - name: visibility
+          in: query
+          schema: {$ref: '#/components/schemas/FileVisibility'}
+        - {$ref: '#/components/parameters/Page'}
+        - {$ref: '#/components/parameters/PageSize'}
+      responses:
+        '200':
+          description: Bounded metadata page ordered by newest then ID
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/FilePageEnvelope'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /admin/files/{fileId}:
+    get:
+      tags: [Files]
+      operationId: getFileMetadata
+      summary: Get one tenant-scoped file and variant metadata
+      parameters:
+        - {$ref: '#/components/parameters/FileId'}
+      responses:
+        '200':
+          description: File metadata; never contains a storage locator or access URL
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/FileEnvelope'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    delete:
+      tags: [Files]
+      operationId: softDeleteFile
+      summary: Hide a file and begin its recoverable retention period
+      parameters:
+        - {$ref: '#/components/parameters/FileId'}
+        - name: If-Match
+          in: header
+          required: false
+          schema: {type: string, pattern: '^[1-9][0-9]*$'}
+          description: Current metadata version for optimistic concurrency.
+      responses:
+        '204': {description: File soft-deleted}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409':
+          description: Concurrent lifecycle change
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ErrorEnvelope'}
+  /admin/files/{fileId}/restore:
+    post:
+      tags: [Files]
+      operationId: restoreFile
+      summary: Restore a soft-deleted file before retention expires
+      parameters:
+        - {$ref: '#/components/parameters/FileId'}
+      responses:
+        '200':
+          description: File restored
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/FileEnvelope'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409':
+          description: Content cannot be verified or singleton replacement conflicts
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ErrorEnvelope'}
+        '410':
+          description: Retention deadline passed
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ErrorEnvelope'}
+  /admin/files/{fileId}/retry-preview:
+    post:
+      tags: [Files]
+      operationId: retryFilePreview
+      summary: Retry a failed preview within bounded attempt policy
+      parameters:
+        - {$ref: '#/components/parameters/FileId'}
+      responses:
+        '202':
+          description: Preview processing queued
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/FileEnvelope'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409':
+          description: Preview is not retryable in the current state
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ErrorEnvelope'}
+  /admin/files/{fileId}/access-events:
+    get:
+      tags: [Files]
+      operationId: listFileAccessEvents
+      summary: List a file's bounded security-event history
+      parameters:
+        - {$ref: '#/components/parameters/FileId'}
+        - name: action
+          in: query
+          schema: {type: string}
+        - name: outcome
+          in: query
+          schema:
+            type: string
+            enum: [ALLOWED, DENIED, SUCCEEDED, FAILED, PENDING]
+        - {$ref: '#/components/parameters/Page'}
+        - {$ref: '#/components/parameters/PageSize'}
+      responses:
+        '200':
+          description: Audit event page
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AccessEventPageEnvelope'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /files/{fileId}/access-grants:
+    post:
+      tags: [File access]
+      operationId: createFileAccessGrant
+      summary: Authorize a current user and issue a short-lived private read grant
+      description: >-
+        Available to authenticated CampusOne clients. The server re-evaluates tenant,
+        branch, role, owner relationship, release state, source state, and variant privacy.
+        Audit records grant issuance or denial, not proof that the browser consumed bytes.
+      parameters:
+        - {$ref: '#/components/parameters/FileId'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAccessGrantRequest'
+      responses:
+        '201':
+          description: Short-lived read grant issued
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AccessGrantEnvelope'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409':
+          description: File or variant is not currently available
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ErrorEnvelope'}
+        '503': {$ref: '#/components/responses/StorageUnavailable'}
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: {type: string, minLength: 16, maxLength: 128}
+    UploadId:
+      name: uploadId
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
+    FileId:
+      name: fileId
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
+    OwnerTypeQuery:
+      name: ownerType
+      in: query
+      schema: {$ref: '#/components/schemas/OwnerType'}
+    Page:
+      name: page
+      in: query
+      schema: {type: integer, minimum: 1, default: 1}
+    PageSize:
+      name: pageSize
+      in: query
+      schema: {type: integer, minimum: 1, maximum: 100, default: 25}
+  responses:
+    ValidationError:
+      description: Request validation failed
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ErrorEnvelope'}
+    Forbidden:
+      description: Authenticated actor is not permitted
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ErrorEnvelope'}
+    NotFound:
+      description: Resource does not exist or is intentionally concealed by scope
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ErrorEnvelope'}
+    StorageUnavailable:
+      description: External storage is temporarily unavailable; safe retry guidance included
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ErrorEnvelope'}
+  schemas:
+    OwnerType:
+      type: string
+      enum: [STUDENT, STAFF, INSTITUTE, CLASS, SUBJECT, TERM]
+    FileCategory:
+      type: string
+      enum:
+        - PROFILE_PHOTO
+        - LOGO
+        - LETTERHEAD
+        - BANNER
+        - GALLERY_IMAGE
+        - ID_DOCUMENT
+        - CERTIFICATE
+        - MARKSHEET
+        - ACADEMIC_NOTE
+        - OTHER_DOCUMENT
+    FileVisibility:
+      type: string
+      enum: [PRIVATE, PUBLIC]
+    FileState:
+      type: string
+      enum:
+        - PENDING_UPLOAD
+        - AWAITING_UPLOAD
+        - VERIFYING
+        - ACTIVE
+        - QUARANTINED
+        - FAILED
+        - EXPIRED
+        - SOFT_DELETED
+        - DISPOSAL_PENDING
+        - DISPOSAL_FAILED
+        - DISPOSED
+    OwnerReference:
+      type: object
+      additionalProperties: false
+      required: [type, id]
+      properties:
+        type: {$ref: '#/components/schemas/OwnerType'}
+        id: {type: string, format: uuid}
+    InitiateUploadRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - owner
+        - category
+        - originalFileName
+        - mediaType
+        - sizeBytes
+        - checksum
+      properties:
+        owner: {$ref: '#/components/schemas/OwnerReference'}
+        category: {$ref: '#/components/schemas/FileCategory'}
+        originalFileName: {type: string, minLength: 1, maxLength: 255}
+        mediaType: {type: string, minLength: 3, maxLength: 127}
+        sizeBytes: {type: integer, minimum: 1, maximum: 26214400}
+        checksum:
+          type: object
+          additionalProperties: false
+          required: [algorithm, value]
+          properties:
+            algorithm: {type: string, enum: [MD5]}
+            value: {type: string, description: Base64-encoded digest}
+        visibility:
+          allOf: [{$ref: '#/components/schemas/FileVisibility'}]
+          default: PRIVATE
+        replacesFileId: {type: string, format: uuid}
+    UploadAuthorization:
+      type: object
+      additionalProperties: false
+      required: [uploadId, fileId, state, expiresAt, upload, completeUrl]
+      properties:
+        uploadId: {type: string, format: uuid}
+        fileId: {type: string, format: uuid}
+        state: {type: string, const: AWAITING_UPLOAD}
+        expiresAt: {type: string, format: date-time}
+        upload:
+          type: object
+          additionalProperties: false
+          required: [method, url, headers]
+          properties:
+            method: {type: string, const: PUT}
+            url: {type: string, format: uri, description: Opaque bearer grant; do not log or persist client-side.}
+            headers:
+              type: object
+              additionalProperties: {type: string}
+              description: Exact headers that the browser must send, including Content-Type, Content-MD5, and If-None-Match.
+        completeUrl: {type: string}
+    UploadAuthorizationEnvelope:
+      type: object
+      additionalProperties: false
+      required: [success, data]
+      properties:
+        success: {type: boolean, const: true}
+        data: {$ref: '#/components/schemas/UploadAuthorization'}
+    FileSummary:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - owner
+        - category
+        - originalFileName
+        - mediaType
+        - sizeBytes
+        - state
+        - visibility
+        - createdAt
+        - version
+      properties:
+        id: {type: string, format: uuid}
+        owner: {$ref: '#/components/schemas/OwnerReference'}
+        category: {$ref: '#/components/schemas/FileCategory'}
+        originalFileName: {type: string}
+        mediaType: {type: string}
+        sizeBytes: {type: integer, minimum: 1}
+        state: {$ref: '#/components/schemas/FileState'}
+        visibility: {$ref: '#/components/schemas/FileVisibility'}
+        uploadedBy:
+          oneOf:
+            - $ref: '#/components/schemas/UserSummary'
+            - type: 'null'
+        createdAt: {type: string, format: date-time}
+        deletedAt: {type: [string, 'null'], format: date-time}
+        retentionUntil: {type: [string, 'null'], format: date-time}
+        preview:
+          oneOf:
+            - $ref: '#/components/schemas/PreviewSummary'
+            - type: 'null'
+        version: {type: integer, minimum: 1}
+    FileDetail:
+      allOf:
+        - $ref: '#/components/schemas/FileSummary'
+        - type: object
+          properties:
+            checksumAlgorithm: {type: string}
+            variants:
+              type: array
+              items: {$ref: '#/components/schemas/VariantSummary'}
+            replacesFileId: {type: [string, 'null'], format: uuid}
+    UserSummary:
+      type: object
+      additionalProperties: false
+      required: [id, name]
+      properties:
+        id: {type: string, format: uuid}
+        name: {type: string}
+    PreviewSummary:
+      type: object
+      additionalProperties: false
+      required: [state]
+      properties:
+        state: {type: string, enum: [PENDING, PROCESSING, READY, FAILED]}
+        variantId: {type: [string, 'null'], format: uuid}
+    VariantSummary:
+      type: object
+      additionalProperties: false
+      required: [id, type, state]
+      properties:
+        id: {type: string, format: uuid}
+        type: {type: string, enum: [THUMBNAIL, DISPLAY]}
+        state: {type: string, enum: [PENDING, PROCESSING, READY, FAILED]}
+        mediaType: {type: [string, 'null']}
+        sizeBytes: {type: [integer, 'null'], minimum: 1}
+        width: {type: [integer, 'null'], minimum: 1}
+        height: {type: [integer, 'null'], minimum: 1}
+    FileEnvelope:
+      type: object
+      additionalProperties: false
+      required: [success, data]
+      properties:
+        success: {type: boolean, const: true}
+        data: {$ref: '#/components/schemas/FileDetail'}
+    FilePageEnvelope:
+      type: object
+      additionalProperties: false
+      required: [success, data]
+      properties:
+        success: {type: boolean, const: true}
+        data:
+          allOf:
+            - $ref: '#/components/schemas/PageMetadata'
+            - type: object
+              required: [items]
+              properties:
+                items:
+                  type: array
+                  items: {$ref: '#/components/schemas/FileSummary'}
+    PageMetadata:
+      type: object
+      required: [count, page, pageSize, totalPages, items]
+      properties:
+        count: {type: integer, minimum: 0}
+        page: {type: integer, minimum: 1}
+        pageSize: {type: integer, minimum: 1, maximum: 100}
+        totalPages: {type: integer, minimum: 0}
+        next: {type: [string, 'null']}
+        previous: {type: [string, 'null']}
+    CreateAccessGrantRequest:
+      type: object
+      additionalProperties: false
+      required: [purpose, variant]
+      properties:
+        purpose: {type: string, enum: [VIEW, DOWNLOAD, PREVIEW]}
+        variant: {type: string, enum: [ORIGINAL, THUMBNAIL, DISPLAY]}
+    AccessGrant:
+      type: object
+      additionalProperties: false
+      required: [method, url, expiresAt, disposition]
+      properties:
+        method: {type: string, const: GET}
+        url: {type: string, format: uri, description: Short-lived opaque bearer grant; never log it.}
+        expiresAt: {type: string, format: date-time}
+        disposition: {type: string, enum: [inline, attachment]}
+    AccessGrantEnvelope:
+      type: object
+      additionalProperties: false
+      required: [success, data]
+      properties:
+        success: {type: boolean, const: true}
+        data: {$ref: '#/components/schemas/AccessGrant'}
+    AccessEvent:
+      type: object
+      additionalProperties: false
+      required: [id, fileId, action, outcome, createdAt]
+      properties:
+        id: {type: string}
+        fileId: {type: string, format: uuid}
+        actor: {oneOf: [{$ref: '#/components/schemas/UserSummary'}, {type: 'null'}]}
+        action: {type: string}
+        purpose: {type: [string, 'null']}
+        outcome: {type: string, enum: [ALLOWED, DENIED, SUCCEEDED, FAILED, PENDING]}
+        reasonCode: {type: [string, 'null']}
+        traceId: {type: [string, 'null']}
+        createdAt: {type: string, format: date-time}
+    AccessEventPageEnvelope:
+      type: object
+      additionalProperties: false
+      required: [success, data]
+      properties:
+        success: {type: boolean, const: true}
+        data:
+          allOf:
+            - $ref: '#/components/schemas/PageMetadata'
+            - type: object
+              required: [items]
+              properties:
+                items:
+                  type: array
+                  items: {$ref: '#/components/schemas/AccessEvent'}
+    ErrorEnvelope:
+      type: object
+      additionalProperties: false
+      required: [success, error]
+      properties:
+        success: {type: boolean, const: false}
+        error:
+          type: object
+          additionalProperties: false
+          required: [code, message, traceId]
+          properties:
+            code:
+              type: string
+              description: >-
+                Stable code such as VALIDATION_ERROR, INVALID_FILE_NAME, FILE_TOO_LARGE,
+                MEDIA_TYPE_NOT_ALLOWED, CONTENT_TYPE_MISMATCH, OWNER_NOT_FOUND,
+                OWNER_SCOPE_DENIED, UPLOAD_EXPIRED, UPLOAD_NOT_READY, UPLOAD_MISMATCH,
+                IDEMPOTENCY_CONFLICT, FILE_NOT_AVAILABLE, RETENTION_EXPIRED,
+                STORAGE_UNAVAILABLE, PROCESSING_FAILED, FORBIDDEN, or NOT_FOUND.
+            message: {type: string}
+            fieldErrors:
+              type: object
+              additionalProperties:
+                type: array
+                items: {type: string}
+            traceId: {type: string}
+            retryable: {type: boolean, default: false}
+            action: {type: [string, 'null'], description: Safe user-facing correction or retry hint.}

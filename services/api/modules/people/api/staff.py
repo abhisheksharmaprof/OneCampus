@@ -19,11 +19,6 @@ from modules.file_storage.services import FileStorageError, read_url
 from modules.identity.models import User
 from modules.institutes.api.permissions import IsCurrentInstituteAdmin
 from modules.institutes.models import Branch, InstituteMembership
-from modules.people.invitations.services import (
-    deliver_issued_invitation,
-    invitation_delivery_data,
-    issue_staff_invitation,
-)
 from modules.people.models import TEACHER_WORKING_DAYS, StaffProfile
 from platform_core.api.audit import audit_mutation
 from platform_core.api.pagination import AdminPageNumberPagination
@@ -177,8 +172,11 @@ class StaffSerializer(serializers.ModelSerializer):
         return "PENDING_INVITE" if value.invite_pending else "ACTIVE"
 
     def get_inviteDelivery(self, value) -> dict | None:
-        invitation = value.staff_invitations.order_by("-created_at").first()
-        return invitation_delivery_data(invitation)
+        return {
+            "status": "PENDING_OTP" if value.invite_pending else "ACTIVE",
+            "attemptedAt": None,
+            "deliveredAt": None,
+        }
 
     def get_profilePhotoUrl(self, value) -> str | None:
         asset = FileAsset.objects.filter(
@@ -617,6 +615,7 @@ class StaffListCreateView(APIView):
                     first_name=first_name,
                     last_name=remainder[0] if remainder else "",
                     is_active=False,
+                    otp_required=True,
                 )
                 user.set_unusable_password()
                 user.phone = data.get("phone", "").strip()
@@ -662,12 +661,10 @@ class StaffListCreateView(APIView):
                     bank_account_last4=data.get("bank_account_last4", ""),
                     bank_ifsc=data.get("bank_ifsc", ""),
                 )
-                issued = issue_staff_invitation(staff_profile=profile)
         except IntegrityError:
             raise serializers.ValidationError(
                 {"employeeCode": ["This employee code is already in use."]}
             ) from None
-        deliver_issued_invitation(issued)
         audit_mutation(
             request=request,
             verb="Created",

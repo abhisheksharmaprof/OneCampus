@@ -128,3 +128,43 @@ def test_parent_list_honors_branch_scope(api_client):
     assert scoped.status_code == 200
     assert [item["fullName"] for item in scoped.json()["data"]["items"]] == ["Parent 1"]
     assert foreign.status_code == 404
+
+
+@pytest.mark.django_db
+def test_parent_list_by_student_returns_only_linked_guardians(api_client):
+    institute = Institute.objects.create(name="Northstar Academy", code="NSA")
+    branch = Branch.objects.create(institute=institute, name="Main", code="MAIN", is_head_office=True)
+    admin = User.objects.create_user(email="admin@northstar.test", password="StrongPass123!")
+    InstituteMembership.objects.create(user=admin, institute=institute, role=InstituteMembership.Role.INSTITUTE_ADMIN)
+    first_student = Student.objects.create(
+        institute=institute, branch=branch, admission_number="NSA-1", first_name="Diya"
+    )
+    second_student = Student.objects.create(
+        institute=institute, branch=branch, admission_number="NSA-2", first_name="Aarav"
+    )
+
+    login = api_client.post(
+        "/api/v1/identity/sessions",
+        {"email": admin.email, "password": "StrongPass123!", "client": "admin-web"},
+        format="json",
+    )
+    api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {login.json()['data']['accessToken']}")
+
+    for index, student in enumerate((first_student, second_student), start=1):
+        created = api_client.post(
+            "/api/v1/admin/parents",
+            {
+                "fullName": f"Parent {index}",
+                "email": f"parent{index}@northstar.test",
+                "phone": f"987654321{index}",
+                "studentId": str(student.id),
+                "relationship": "GUARDIAN",
+            },
+            format="json",
+        )
+        assert created.status_code == 201
+
+    response = api_client.get(f"/api/v1/admin/parents?studentId={first_student.id}")
+
+    assert response.status_code == 200
+    assert [item["fullName"] for item in response.json()["data"]["items"]] == ["Parent 1"]

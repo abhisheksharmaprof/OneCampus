@@ -38,6 +38,7 @@ class StudentAttendance(TimeStampedModel):
     subject_id = models.UUIDField(null=True, blank=True)
 
     class Meta:
+        db_table = "attendance_records"
         ordering = ("-date", "student_id")
         constraints = [
             models.UniqueConstraint(
@@ -83,6 +84,7 @@ class LeaveType(TimeStampedModel):
     is_active = models.BooleanField(default=True)
 
     class Meta:
+        db_table = "leave_types"
         constraints = [models.UniqueConstraint(fields=("institute", "name", "applicable_to"), name="uq_leave_type_scope")]
 
 
@@ -123,6 +125,7 @@ class LeaveApplication(TimeStampedModel):
     supporting_document_url = models.CharField(max_length=500, blank=True)
 
     class Meta:
+        db_table = "leave_applications"
         ordering = ("status", "start_date", "-created_at")
 
 
@@ -135,6 +138,9 @@ class LeaveBalance(TimeStampedModel):
     allocated_days = models.DecimalField(max_digits=5, decimal_places=1, default=0)
     used_days = models.DecimalField(max_digits=5, decimal_places=1, default=0)
     pending_days = models.DecimalField(max_digits=5, decimal_places=1, default=0)
+
+    class Meta:
+        db_table = "leave_balances"
 
 
 class AttendanceSettings(TimeStampedModel):
@@ -168,6 +174,9 @@ class AttendanceAuditLog(TimeStampedModel):
     previous_status = models.CharField(max_length=16, blank=True)
     next_status = models.CharField(max_length=16, blank=True)
     note = models.CharField(max_length=500, blank=True)
+
+    class Meta:
+        db_table = "attendance_audit_log"
 
 
 class AttendanceNotification(TimeStampedModel):

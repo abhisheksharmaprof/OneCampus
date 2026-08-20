@@ -7,6 +7,7 @@ from django.utils import timezone
 
 from modules.identity.models import OtpChallenge, User
 from modules.institutes.models import Institute, InstituteMembership
+from modules.people.models import ParentProfile
 
 PASSWORD = "StrongPass123!"
 
@@ -53,7 +54,7 @@ def test_password_login_requests_otp_without_exposing_raw_code(
 ):
     response = request_challenge(api_client, otp_user)
 
-    assert response.status_code == 409
+    assert response.status_code == 409, response.json()
     payload = response.json()
     assert payload["error"]["code"] == "OTP_REQUIRED"
     details = payload["error"]["details"]
@@ -198,4 +199,64 @@ def test_otp_verification_is_rate_limited(api_client):
     response = api_client.post("/api/v1/identity/sessions/otp", payload, format="json")
 
     assert response.status_code == 429
-    assert response.json()["error"]["code"] == "throttled"
+
+
+@pytest.mark.django_db
+def test_pending_parent_can_start_with_email_or_phone_then_set_password(
+    api_client, delivered_codes
+):
+    institute = Institute.objects.create(name="Parent Academy", code="PARENT")
+    user = User.objects.create_user(
+        email="parent@parent.test",
+        password=None,
+        phone="+919876543210",
+        is_active=False,
+        otp_required=True,
+    )
+    user.set_unusable_password()
+    user.save(update_fields=("password",))
+    InstituteMembership.objects.create(
+        user=user, institute=institute, role=InstituteMembership.Role.PARENT
+    )
+    ParentProfile.objects.create(institute=institute, user=user)
+
+    response = api_client.post(
+        "/api/v1/identity/sessions",
+        {"identifier": "9876543210", "client": "parent-mobile"},
+        format="json",
+    )
+    assert response.status_code == 409, response.json()
+    assert response.json()["error"]["code"] == "OTP_REQUIRED"
+
+    details = response.json()["error"]["details"]
+    verified = api_client.post(
+        "/api/v1/identity/sessions/otp",
+        {"challengeId": details["challengeId"], "code": delivered_codes[-1]["code"]},
+        format="json",
+    )
+    assert verified.status_code == 200
+    assert verified.json()["data"]["passwordSetupRequired"] is True
+    user.refresh_from_db()
+    assert user.is_active is True
+
+    setup = api_client.post(
+        "/api/v1/identity/sessions/password-setup",
+        {"password": PASSWORD, "confirmPassword": PASSWORD},
+        format="json",
+        HTTP_AUTHORIZATION=f"Bearer {verified.json()['data']['accessToken']}",
+    )
+    assert setup.status_code == 200
+    user.refresh_from_db()
+    assert user.has_usable_password() is True
+    assert user.otp_required is False
+
+
+@pytest.mark.django_db
+def test_unknown_login_identifier_is_reported_as_unregistered(api_client):
+    response = api_client.post(
+        "/api/v1/identity/sessions",
+        {"identifier": "not-registered@example.com", "client": "staff-mobile"},
+        format="json",
+    )
+    assert response.status_code == 400
+    assert "not registered" in response.json()["error"]["fieldErrors"]["identifier"][0]

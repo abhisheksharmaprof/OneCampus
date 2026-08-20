@@ -70,6 +70,7 @@ def active_record_or_404(request, screen_id, record_id):
 class ScreenCatalogView(APIView):
     permission_classes = (IsCurrentInstituteAdmin,)
 
+    @extend_schema(operation_id="admin_screens_catalog_list")
     def get(self, request):
         items = [screen.as_dict() for screen in SCREENS]
         return Response({"success": True, "data": {"count": len(items), "items": items}})
@@ -78,6 +79,7 @@ class ScreenCatalogView(APIView):
 class ScreenDetailView(APIView):
     permission_classes = (IsCurrentInstituteAdmin,)
 
+    @extend_schema(operation_id="admin_screens_detail_retrieve")
     def get(self, request, screen_id):
         screen = generic_screen_or_404(screen_id)
         query = AdminRecordQuerySerializer(data=request.query_params)

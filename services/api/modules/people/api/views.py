@@ -11,8 +11,8 @@ from rest_framework.exceptions import ValidationError as RestValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from modules.academics.models import ClassSection, StudentEnrollment
-from modules.academics.services import AcademicsValidationError, create_enrollment
+from modules.academics.models import AcademicYear, ClassSection, Grade, StudentEnrollment
+from modules.academics.services import AcademicsValidationError, create_enrollment, ensure_default_section
 from modules.institutes.api.permissions import IsCurrentInstituteAdmin
 from modules.institutes.models import Branch
 from modules.people.models import Student, StudentGuardian
@@ -191,6 +191,7 @@ class StudentListCreateView(APIView):
         validate_unique_student_identifiers(
             institute=request.institute, data=serializer.validated_data
         )
+        section = None
         for _ in range(3):
             try:
                 with transaction.atomic():
@@ -215,6 +216,21 @@ class StudentListCreateView(APIView):
                             class_section=section,
                             roll_number=f"PENDING-{student.admission_number[-6:]}",
                         )
+                    elif serializer.validated_data.get("classId"):
+                        grade = get_object_or_404(
+                            Grade, id=serializer.validated_data["classId"], institute=request.institute
+                        )
+                        year = None
+                        if serializer.validated_data.get("academicYearId"):
+                            year = get_object_or_404(
+                                AcademicYear, id=serializer.validated_data["academicYearId"], institute=request.institute
+                            )
+                        section = ensure_default_section(grade=grade, branch=branch, academic_year=year)
+                        create_enrollment(
+                            student=student,
+                            class_section=section,
+                            roll_number=f"PENDING-{student.admission_number[-6:]}",
+                        )
                 audit_mutation(
                     request=request,
                     verb="Created",
@@ -224,7 +240,7 @@ class StudentListCreateView(APIView):
                     extra_meta={
                         "admissionNumber": student.admission_number,
                         "branchId": str(branch.id),
-                        "classSectionId": str(section.id) if serializer.validated_data.get("classSectionId") else None,
+                        "classSectionId": str(section.id) if section else None,
                     },
                 )
                 return Response(

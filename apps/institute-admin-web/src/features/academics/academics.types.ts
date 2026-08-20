@@ -46,6 +46,7 @@ export interface Subject {
   id: string
   name: string
   subjectCode: string
+  branchId?: string | null
   classesCount: number
   createdAt: string
   updatedAt: string
@@ -54,6 +55,8 @@ export interface ClassSubject {
   id: string
   classId: string
   subjectId: string
+  sectionId?: string | null
+  sectionLabel?: string | null
   subject: { id: string; name: string; subjectCode: string }
   subjectCode: string
   subjectCodeOverride: string
@@ -103,7 +106,7 @@ export interface ListParams {
 export type AcademicYearInput = Pick<AcademicYear, 'name' | 'startDate' | 'endDate'> & { isCurrent?: boolean }
 export type AcademicTermInput = Pick<AcademicTerm, 'name' | 'startDate' | 'endDate'> & { academicYearId: string; sortOrder?: number }
 export type AcademicClassInput = Pick<AcademicClass, 'name' | 'sortOrder'>
-export type SubjectInput = Pick<Subject, 'name' | 'subjectCode'>
+export type SubjectInput = Pick<Subject, 'name' | 'subjectCode'> & { branchId?: string | null }
 export interface ClassSectionInput {
   branchId: string
   gradeId: string

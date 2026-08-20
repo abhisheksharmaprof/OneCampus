@@ -58,6 +58,7 @@ class Institute(TimeStampedModel):
     brand_color = models.CharField(max_length=7, default="#2457D6")
 
     class Meta:
+        db_table = "institutes"
         ordering = ("name",)
 
     def save(self, *args, **kwargs):
@@ -145,6 +146,7 @@ class Branch(TimeStampedModel):
     branch_admin_name = models.CharField(max_length=200, blank=True)
 
     class Meta:
+        db_table = "branches"
         ordering = ("institute_id", "name")
         constraints = [
             models.UniqueConstraint(
@@ -180,6 +182,9 @@ class InstituteDocument(TimeStampedModel):
     file_name = models.CharField(max_length=255)
     verified = models.BooleanField(default=False)
 
+    class Meta:
+        db_table = "institute_documents"
+
 
 class SubscriptionPlan(TimeStampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -190,6 +195,9 @@ class SubscriptionPlan(TimeStampedModel):
     max_students = models.PositiveIntegerField(default=100)
     features_json = models.JSONField(default=list)
     is_active = models.BooleanField(default=True)
+
+    class Meta:
+        db_table = "subscription_plans"
 
 
 class InstituteSubscription(TimeStampedModel):
@@ -202,6 +210,9 @@ class InstituteSubscription(TimeStampedModel):
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.TRIAL)
     trial_ends_at = models.DateTimeField()
 
+    class Meta:
+        db_table = "institute_subscriptions"
+
 
 class InstituteConsentRecord(TimeStampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -210,6 +221,9 @@ class InstituteConsentRecord(TimeStampedModel):
     authorized_to_register = models.BooleanField()
     terms_accepted = models.BooleanField()
     ip_address = models.GenericIPAddressField(null=True, blank=True)
+
+    class Meta:
+        db_table = "institute_consent_records"
 
 
 class InstituteMembership(TimeStampedModel):
@@ -233,6 +247,7 @@ class InstituteMembership(TimeStampedModel):
     valid_until = models.DateTimeField(null=True, blank=True)
 
     class Meta:
+        db_table = "institute_memberships"
         ordering = ("institute_id", "user_id", "role")
         constraints = [
             models.UniqueConstraint(

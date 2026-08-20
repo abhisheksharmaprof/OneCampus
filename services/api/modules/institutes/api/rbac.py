@@ -100,4 +100,5 @@ PERM = {
     "files.view": "files.view",
     "files.upload": "files.upload",
     "files.delete": "files.delete",
+    "files.publish": "files.publish",
 }

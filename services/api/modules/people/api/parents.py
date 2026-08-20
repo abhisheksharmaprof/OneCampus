@@ -119,6 +119,12 @@ class ParentListCreateView(APIView):
                 student_links__student__branch_id=branch_id,
                 student_links__student__is_active=True,
             ).distinct()
+        student_id = request.query_params.get("studentId")
+        if student_id:
+            parents = parents.filter(
+                student_links__student_id=student_id,
+                student_links__student__is_active=True,
+            ).distinct()
         search = request.query_params.get("search", "").strip()
         if search:
             parents = parents.filter(user__first_name__icontains=search) | parents.filter(user__last_name__icontains=search) | parents.filter(user__phone__icontains=search) | parents.filter(user__email__icontains=search)
@@ -181,6 +187,7 @@ class ParentListCreateView(APIView):
                 last_name=rest[0] if rest else "",
                 phone=data["phone"],
                 is_active=False,
+                otp_required=True,
             )
             user.set_unusable_password()
             user.save(update_fields=("password",))

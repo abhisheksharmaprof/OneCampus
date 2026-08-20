@@ -16,6 +16,7 @@ import {
   Globe2,
   LayoutDashboard,
   LifeBuoy,
+  LoaderCircle,
   LogOut,
   Menu,
   MoreHorizontal,
@@ -48,22 +49,25 @@ type Application = {
   email: string
   submitted: string
   plan: string
-  status: 'Needs review' | 'In review'
+  status: 'Needs review' | 'In review' | 'Approved' | 'Declined'
 }
 
-const applicationsSeed: Application[] = [
-  { id: 'REG-1048', name: 'Oakridge Public School', city: 'Bengaluru, Karnataka', owner: 'Rohan Mehta', email: 'rohan@oakridge.edu', submitted: 'Today, 10:42 AM', plan: 'Growth', status: 'Needs review' },
-  { id: 'REG-1047', name: 'The Heritage Academy', city: 'Pune, Maharashtra', owner: 'Nandini Shah', email: 'nandini@heritage.ac.in', submitted: 'Yesterday, 4:18 PM', plan: 'Scale', status: 'In review' },
-  { id: 'REG-1046', name: 'Riverbend International', city: 'Jaipur, Rajasthan', owner: 'Aditya Singh', email: 'aditya@riverbend.school', submitted: 'Aug 01, 2026', plan: 'Starter', status: 'Needs review' },
-]
+function applicationStatus(value: unknown): Application['status'] {
+  switch (value) {
+    case 'pending_review': return 'Needs review'
+    case 'approved': return 'Approved'
+    case 'declined': return 'Declined'
+    default: return 'In review'
+  }
+}
 
-const institutes = [
-  ['Northstar Academy', 'NSA', 'Mumbai, MH', 'Scale', '342', 'Active'],
-  ['Greenfield Public School', 'GPS', 'Delhi, DL', 'Growth', '218', 'Active'],
-  ['Bright Horizon School', 'BHS', 'Kochi, KL', 'Starter', '86', 'Trial'],
-  ['St. Mary’s Convent', 'SMC', 'Lucknow, UP', 'Growth', '164', 'Past due'],
-  ['Oakridge Public School', 'OPS', 'Bengaluru, KA', 'Growth', '—', 'Pending'],
-]
+function applicationStatusClass(status: Application['status']): string {
+  if (status === 'Needs review') return 'pending'
+  if (status === 'Approved') return 'active'
+  return 'review'
+}
+
+type InstituteRow = [string, string, string, string, string, string]
 
 const navItems: Array<{ id: PlatformSection; label: string; icon: typeof LayoutDashboard }> = [
   { id: 'overview', label: 'Overview', icon: LayoutDashboard },
@@ -74,28 +78,57 @@ const navItems: Array<{ id: PlatformSection; label: string; icon: typeof LayoutD
   { id: 'audit', label: 'Audit activity', icon: Activity },
 ]
 
-export function PlatformAdminPage({ session, onSignOut }: { session: PlatformSession; onSignOut: () => Promise<void> }) {
+export function PlatformAdminPage({ session, onSignOut, onSessionExpired }: { session: PlatformSession; onSignOut: () => Promise<void>; onSessionExpired: () => void }) {
   const [section, setSection] = useState<PlatformSection>(() => sectionFromPath(window.location.pathname))
   const [mobileOpen, setMobileOpen] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
-  const [applications, setApplications] = useState(applicationsSeed)
+  const [applications, setApplications] = useState<Application[]>([])
+  const [allApplications, setAllApplications] = useState<Application[]>([])
+  const [institutes, setInstitutes] = useState<InstituteRow[]>([])
+  const [loading, setLoading] = useState(true)
   const [query, setQuery] = useState('')
   const [toast, setToast] = useState('')
   const [signingOut, setSigningOut] = useState(false)
+  const [profileOpen, setProfileOpen] = useState(false)
 
   useEffect(() => {
-    const apiBase = (import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:8000').replace(/\/$/, '')
-    fetch(`${apiBase}/api/v1/admin/platform/registrations`, { headers: { Authorization: `Bearer ${session.accessToken}` } })
-      .then((response) => response.ok ? response.json() : Promise.reject(new Error('Unable to load registration queue.')))
-      .then((payload: { data?: { items?: Array<Record<string, unknown>> } }) => {
+    const apiBase = (import.meta.env.VITE_API_BASE_URL ?? (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? 'http://127.0.0.1:8000' : 'https://api.snifply.com')).replace(/\/$/, '')
+    const headers = { Authorization: `Bearer ${session.accessToken}` }
+    let sessionExpired = false
+    const requireAuthorized = (response: Response) => {
+      if (response.status === 401) {
+        sessionExpired = true
+        onSessionExpired()
+        throw new Error('Your session has expired.')
+      }
+      return response
+    }
+    Promise.all([
+      fetch(`${apiBase}/api/v1/admin/platform/registrations`, { headers }).then(async (response) => {
+        requireAuthorized(response)
+        if (!response.ok) throw new Error('Unable to load registration queue.')
+        return response.json() as Promise<{ data?: { items?: Array<Record<string, unknown>> } }>
+      }).then((registrationsPayload) => {
+        const payload = registrationsPayload as { data?: { items?: Array<Record<string, unknown>> } }
         const items = payload.data?.items ?? []
-        if (!items.length) return
         setApplications(items.map((item) => ({
-          id: String(item.id), name: String(item.displayName || item.name), city: String(item.city || 'Details pending'), owner: String(item.contactName || 'Institute owner'), email: String(item.contactEmail || item.primaryEmail || '—'), submitted: 'Pending review', plan: 'Starter', status: 'Needs review' as const,
+          id: String(item.id), name: String(item.displayName || item.legalName || item.name), city: [item.city, item.state].filter(Boolean).join(', ') || 'Details pending', owner: String(item.contactName || 'Institute owner'), email: String(item.contactEmail || item.primaryEmail || '—'), submitted: 'Pending review', plan: 'Starter', status: 'Needs review' as const,
         })))
-      })
-      .catch(() => undefined)
-  }, [session.accessToken])
+      }).catch(() => { if (!sessionExpired) setToast('Unable to load the registration queue. Please refresh and try again.') }),
+      fetch(`${apiBase}/api/v1/admin/platform/institutes`, { headers }).then(async (response) => {
+        requireAuthorized(response)
+        if (!response.ok) throw new Error('Unable to load institutes.')
+        return response.json() as Promise<{ data?: { items?: Array<Record<string, unknown>> } }>
+      }).then((institutesPayload) => {
+        const instituteItems = (institutesPayload as { data?: { items?: Array<Record<string, unknown>> } }).data?.items ?? []
+        setAllApplications(instituteItems.map((item) => ({
+          id: String(item.id), name: String(item.displayName || item.legalName || item.name), city: [item.city, item.state].filter(Boolean).join(', ') || 'Details pending', owner: String(item.contactName || 'Institute owner'), email: String(item.contactEmail || item.primaryEmail || '—'), submitted: applicationStatus(item.onboardingStatus), plan: 'Starter', status: applicationStatus(item.onboardingStatus),
+        })))
+        setInstitutes(instituteItems.map((item) => [String(item.displayName || item.legalName || item.name), String(item.code || ''), [item.city, item.state].filter(Boolean).join(', ') || '—', '—', '—', item.onboardingStatus === 'approved' ? 'Active' : item.onboardingStatus === 'pending_review' ? 'Pending' : item.onboardingStatus === 'declined' ? 'Declined' : 'Draft']))
+      }).catch(() => { if (!sessionExpired) setToast((current) => current || 'Unable to load the institute list. Please refresh and try again.') })
+    ])
+      .finally(() => setLoading(false))
+  }, [onSessionExpired, session.accessToken])
 
   const goTo = (next: PlatformSection) => {
     setSection(next)
@@ -107,10 +140,15 @@ export function PlatformAdminPage({ session, onSignOut }: { session: PlatformSes
   const filteredInstitutes = useMemo(() => institutes.filter((row) => row.join(' ').toLowerCase().includes(query.toLowerCase())), [query])
 
   const updateApplication = async (id: string, action: 'approved' | 'rejected') => {
-    const apiBase = (import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:8000').replace(/\/$/, '')
-    const response = await fetch(`${apiBase}/api/v1/admin/platform/registrations/${id}/${action === 'approved' ? 'approve' : 'reject'}`, { method: 'POST', headers: { Authorization: `Bearer ${session.accessToken}`, 'Content-Type': 'application/json' }, body: action === 'rejected' ? JSON.stringify({ reason: 'Please review the application details and resubmit.' }) : undefined })
-    if (!response.ok) { setToast('The application could not be updated. Please try again.'); return }
+    const apiBase = (import.meta.env.VITE_API_BASE_URL ?? (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? 'http://127.0.0.1:8000' : 'https://api.snifply.com')).replace(/\/$/, '')
+    const response = await fetch(`${apiBase}/api/v1/admin/platform/registrations/${id}/${action === 'approved' ? 'approve' : 'reject'}`, { method: 'POST', headers: { Authorization: `Bearer ${session.accessToken}`, 'Content-Type': 'application/json' }, body: action === 'rejected' ? JSON.stringify({ reason: 'Please review the application details and resubmit.' }) : '{}' })
+    if (response.status === 401) {
+      onSessionExpired()
+      return
+    }
+    if (!response.ok) { const detail = await response.json().catch(() => null); setToast(detail?.error?.message ?? 'The application could not be updated. Please try again.'); return }
     setApplications((items) => items.filter((item) => item.id !== id))
+    setAllApplications((items) => items.filter((item) => item.id !== id))
     setToast(action === 'approved' ? 'Institute approved. An onboarding email is queued.' : 'Registration rejected and applicant notified.')
     window.setTimeout(() => setToast(''), 3500)
   }
@@ -124,7 +162,10 @@ export function PlatformAdminPage({ session, onSignOut }: { session: PlatformSes
       <div className="platform-breadcrumb"><span>CampusOne</span><ArrowRight /><strong>Platform control center</strong></div>
       <div className="platform-top-actions">
         <button className="platform-icon-button" type="button" aria-label="Notifications"><Bell /><i /></button>
-        <div className="platform-user"><span className="platform-avatar">{initials}</span><span className="platform-user-copy"><strong>{session.user.displayName}</strong><small>Platform administrator</small></span><ChevronDown /></div>
+        <div className="platform-profile-menu">
+          <button className="platform-user" type="button" aria-label="Open profile menu" aria-expanded={profileOpen} onClick={() => setProfileOpen((value) => !value)}><span className="platform-avatar">{initials}</span><span className="platform-user-copy"><strong>{session.user.displayName}</strong><small>Platform administrator</small></span><ChevronDown /></button>
+          {profileOpen && <div className="platform-profile-popover" role="menu"><button type="button" role="menuitem" disabled={signingOut} onClick={() => { setSigningOut(true); void onSignOut().finally(() => setSigningOut(false)) }}><LogOut />{signingOut ? 'Signing out…' : 'Sign out'}</button></div>}
+        </div>
       </div>
     </header>
     <div className={`platform-scrim ${mobileOpen ? 'is-visible' : ''}`} onClick={() => setMobileOpen(false)} />
@@ -140,7 +181,7 @@ export function PlatformAdminPage({ session, onSignOut }: { session: PlatformSes
     </aside>
     <main className="platform-main">
       {section === 'overview' && <Overview pending={pending} onNavigate={goTo} />}
-      {section === 'registrations' && <RegistrationQueue applications={applications} onAction={updateApplication} />}
+      {section === 'registrations' && (loading ? <div className="platform-page"><div className="platform-panel platform-empty">Loading registration queue…</div></div> : <RegistrationQueue applications={applications} allApplications={allApplications} onAction={updateApplication} />)}
       {section === 'institutes' && <Institutes query={query} setQuery={setQuery} rows={filteredInstitutes} />}
       {section === 'subscriptions' && <Subscriptions />}
       {section === 'users' && <UsersAccess />}
@@ -165,10 +206,18 @@ function Overview({ pending, onNavigate }: { pending: number; onNavigate: (secti
   </div>
 }
 
- function RegistrationQueue({ applications, onAction }: { applications: Application[]; onAction: (id: string, action: 'approved' | 'rejected') => Promise<void> }) {
+function RegistrationQueue({ applications, allApplications, onAction }: { applications: Application[]; allApplications: Application[]; onAction: (id: string, action: 'approved' | 'rejected') => Promise<void> }) {
   const [selected, setSelected] = useState<string | null>(applications[0]?.id ?? null)
-  const active = applications.find((item) => item.id === selected) ?? applications[0]
-  return <div className="platform-page"><PageTitle eyebrow="Governance" title="Registration queue" description="Review, approve, or reject new institutes before they enter the CampusOne network." action={<button className="platform-button platform-button--dark" type="button"><FileText /> Export queue</button>} /><div className="platform-queue-layout"><section className="platform-panel platform-queue-list"><div className="platform-toolbar"><div className="platform-tabs"><button className="is-active" type="button">Needs review <span>{applications.length}</span></button><button type="button">In review</button><button type="button">All applications</button></div><button className="platform-icon-button" type="button" aria-label="More queue actions"><MoreHorizontal /></button></div>{applications.map((item) => <button type="button" className={`platform-application-row ${selected === item.id ? 'is-selected' : ''}`} key={item.id} onClick={() => setSelected(item.id)}><span className="platform-institute-avatar">{item.name.split(' ').map((word) => word[0]).join('').slice(0, 2)}</span><span><strong>{item.name}</strong><small>{item.city} · {item.submitted}</small></span><span className={`platform-status platform-status--${item.status === 'In review' ? 'review' : 'pending'}`}>{item.status}</span></button>)}{!applications.length && <div className="platform-empty"><CheckCircle2 /><strong>Queue cleared</strong><p>There are no registrations waiting for review.</p></div>}</section>{active && <section className="platform-panel platform-review-panel"><div className="platform-review-heading"><div><p className="platform-eyebrow">Application {active.id}</p><h2>{active.name}</h2><p>{active.city}</p></div><span className="platform-status platform-status--pending">{active.status}</span></div><div className="platform-review-summary"><div><span>Applicant</span><strong>{active.owner}</strong><small>{active.email}</small></div><div><span>Requested plan</span><strong>{active.plan}</strong><small>14-day trial included</small></div><div><span>Submitted</span><strong>{active.submitted}</strong><small>Documents attached</small></div></div><div className="platform-document-check"><div><CheckCircle2 /><span><strong>Registration documents</strong><small>3 files verified · business registration, tax ID, address proof</small></span></div><button className="platform-link" type="button">View documents <ArrowRight /></button></div><div className="platform-review-checks"><h3>Approval checklist</h3>{['Institute identity and legal name match', 'Applicant has authority to create this workspace', 'Required documents are clear and current'].map((label) => <label key={label}><input type="checkbox" defaultChecked />{label}</label>)}</div><div className="platform-review-actions"><button className="platform-button platform-button--danger" type="button" onClick={() => onAction(active.id, 'rejected')}><XCircle /> Reject application</button><button className="platform-button platform-button--success" type="button" onClick={() => onAction(active.id, 'approved')}><Check /> Approve institute</button></div></section>}</div></div>
+  const [tab, setTab] = useState<'review' | 'in-review' | 'all'>('review')
+  const [pendingAction, setPendingAction] = useState<'approved' | 'rejected' | null>(null)
+  const visibleApplications = tab === 'review' ? applications : tab === 'in-review' ? allApplications.filter((item) => item.status === 'In review') : allApplications
+  const active = visibleApplications.find((item) => item.id === selected) ?? visibleApplications[0]
+  const submitAction = async (action: 'approved' | 'rejected') => {
+    if (!active || pendingAction) return
+    setPendingAction(action)
+    try { await onAction(active.id, action) } finally { setPendingAction(null) }
+  }
+  return <div className="platform-page"><PageTitle eyebrow="Governance" title="Registration queue" description="Review, approve, or reject new institutes before they enter the CampusOne network." action={<button className="platform-button platform-button--dark" type="button"><FileText /> Export queue</button>} /><div className="platform-queue-layout"><section className="platform-panel platform-queue-list"><div className="platform-toolbar"><div className="platform-tabs"><button className={tab === 'review' ? 'is-active' : ''} type="button" onClick={() => setTab('review')}>Needs review <span>{applications.length}</span></button><button className={tab === 'in-review' ? 'is-active' : ''} type="button" onClick={() => setTab('in-review')}>In review <span>{allApplications.filter((item) => item.status === 'In review').length}</span></button><button className={tab === 'all' ? 'is-active' : ''} type="button" onClick={() => setTab('all')}>All applications <span>{allApplications.length}</span></button></div><button className="platform-icon-button" type="button" aria-label="More queue actions"><MoreHorizontal /></button></div>{visibleApplications.map((item) => <button type="button" className={`platform-application-row ${selected === item.id ? 'is-selected' : ''}`} key={item.id} onClick={() => setSelected(item.id)}><span className="platform-institute-avatar">{item.name.split(' ').map((word) => word[0]).join('').slice(0, 2)}</span><span><strong>{item.name}</strong><small>{item.city} · {item.submitted}</small></span><span className={`platform-status platform-status--${applicationStatusClass(item.status)}`}>{item.status}</span></button>)}{!visibleApplications.length && <div className="platform-empty"><CheckCircle2 /><strong>{tab === 'review' ? 'Queue cleared' : 'No applications found'}</strong><p>{tab === 'review' ? 'There are no registrations waiting for review.' : 'There are no applications in this view.'}</p></div>}</section>{active && <section className="platform-panel platform-review-panel"><div className="platform-review-heading"><div><p className="platform-eyebrow">Application {active.id}</p><h2>{active.name}</h2><p>{active.city}</p></div><span className={`platform-status platform-status--${applicationStatusClass(active.status)}`}>{active.status}</span></div><div className="platform-review-summary"><div><span>Applicant</span><strong>{active.owner}</strong><small>{active.email}</small></div><div><span>Requested plan</span><strong>{active.plan}</strong><small>14-day trial included</small></div><div><span>Submitted</span><strong>{active.submitted}</strong><small>Documents attached</small></div></div><div className="platform-document-check"><div><CheckCircle2 /><span><strong>Registration documents</strong><small>3 files verified · business registration, tax ID, address proof</small></span></div><button className="platform-link" type="button">View documents <ArrowRight /></button></div><div className="platform-review-checks"><h3>Approval checklist</h3>{['Institute identity and legal name match', 'Applicant has authority to create this workspace', 'Required documents are clear and current'].map((label) => <label key={label}><input type="checkbox" defaultChecked />{label}</label>)}</div>{active.status === 'Needs review' && <div className="platform-review-actions"><button className="platform-button platform-button--danger" type="button" disabled={pendingAction !== null} onClick={() => void submitAction('rejected')}><XCircle /> {pendingAction === 'rejected' ? <><LoaderCircle className="platform-button-spinner" /> Rejecting…</> : 'Reject application'}</button><button className="platform-button platform-button--success" type="button" disabled={pendingAction !== null} onClick={() => void submitAction('approved')}><Check /> {pendingAction === 'approved' ? <><LoaderCircle className="platform-button-spinner" /> Approving…</> : 'Approve institute'}</button></div>}</section>}</div></div>
 }
 
 function Institutes({ query, setQuery, rows }: { query: string; setQuery: (value: string) => void; rows: string[][] }) { return <div className="platform-page"><PageTitle eyebrow="Network management" title="All institutes" description="Search and manage every institute, campus, owner, and subscription in the network." action={<button className="platform-button platform-button--dark" type="button"><Building2 /> Add institute</button>} /><section className="platform-panel platform-table-panel"><div className="platform-toolbar"><label className="platform-search"><Search /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search institutes, cities, or codes…" /></label><div className="platform-filter-actions"><button className="platform-select" type="button">All statuses <ChevronDown /></button><button className="platform-select" type="button">All plans <ChevronDown /></button></div></div><div className="platform-table-wrap"><table className="platform-table"><thead><tr><th>Institute</th><th>Location</th><th>Plan</th><th>Students</th><th>Status</th><th /></tr></thead><tbody>{rows.map((row) => <tr key={row[1]}><td><strong>{row[0]}</strong><small>{row[1]}</small></td><td>{row[2]}</td><td>{row[3]}</td><td>{row[4]}</td><td><span className={`platform-status platform-status--${row[5] === 'Active' ? 'active' : row[5] === 'Pending' ? 'pending' : 'review'}`}>{row[5]}</span></td><td><button className="platform-icon-button" type="button" aria-label={`Open ${row[0]}`}><ArrowRight /></button></td></tr>)}</tbody></table></div></section></div> }

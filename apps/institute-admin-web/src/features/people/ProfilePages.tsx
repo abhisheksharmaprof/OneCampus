@@ -204,7 +204,7 @@ function StudentProfilePage({ id, accessToken, onBack }: { id?: string; accessTo
   const [searchParams, setSearchParams] = useSearchParams()
   const requestedTab = searchParams.get('tab')
   const [tab, setTab] = useState(
-    requestedTab
+    requestedTab && requestedTab !== 'documents'
       ? requestedTab.split('-').map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join(' ')
       : 'Overview',
   )
@@ -225,7 +225,7 @@ function StudentProfilePage({ id, accessToken, onBack }: { id?: string; accessTo
   const [saveError, setSaveError]   = useState('')
   const [saving, setSaving]         = useState(false)
 
-  const tabs = ['Overview', 'Timetable', 'Attendance', 'Fees', 'Academic History', 'Guardians', 'Documents']
+  const tabs = ['Overview', 'Timetable', 'Attendance', 'Fees', 'Academic History', 'Guardians']
 
   /* fetch student */
   useEffect(() => {
@@ -462,7 +462,6 @@ function StudentProfilePage({ id, accessToken, onBack }: { id?: string; accessTo
       )}
 
       {/* ── DOCUMENTS ── */}
-      {tab === 'Documents' && <StudentDocuments accessToken={accessToken} studentId={student?.id ?? id} />}
     </div>
   )
 }
@@ -909,7 +908,7 @@ function StaffProfilePage({ id, accessToken, onBack }: { id?: string; accessToke
   const [searchParams, setSearchParams] = useSearchParams()
   const requestedTab = searchParams.get('tab')
   const [tab, setTab] = useState(
-    requestedTab
+    requestedTab && requestedTab !== 'documents'
       ? requestedTab.split('-').map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join(' ')
       : 'Overview',
   )
@@ -937,7 +936,7 @@ function StaffProfilePage({ id, accessToken, onBack }: { id?: string; accessToke
   const [publishedTimetable, setPublishedTimetable] = useState<PublishedTimetable>(null)
   const [timetableLoading, setTimetableLoading] = useState(false)
 
-  const tabs = ['Overview', 'Timetable', 'Classes & Subjects', 'Roles & Permissions', 'Attendance', 'Salary', 'Documents']
+  const tabs = ['Overview', 'Timetable', 'Classes & Subjects', 'Roles & Permissions', 'Attendance', 'Salary']
 
   useEffect(() => {
     setProfileLoading(true)
@@ -1084,7 +1083,6 @@ function StaffProfilePage({ id, accessToken, onBack }: { id?: string; accessToke
           )}
           {tab === 'Attendance' && <AttendanceCard accessToken={accessToken} staffUserId={staffUserId} />}
           {tab === 'Salary' && <StaffSalary staff={staffRecord} />}
-          {tab === 'Documents' && <StaffDocuments accessToken={accessToken} staffId={typeof staffRecord?.id === 'string' ? staffRecord.id : id} />}
         </>}
     </div>
   )
@@ -1181,15 +1179,21 @@ function StaffTimetable({ staff, assignments, publishedTimetable, loading, onOpe
   const timetableAssignments = assignments.length ? assignments : (Array.isArray(staff?.teachingAssignments) ? (staff.teachingAssignments as TeachingAssignment[]) : [])
   const breakCards = STAFF_BREAKS
 
-  const hasPublishedTimetable = publishedTimetable && publishedTimetable.slots && publishedTimetable.slots.length > 0
-  const workingDays = hasPublishedTimetable ? publishedTimetable.workingDays : (Array.isArray(staff?.availableDays) ? (staff.availableDays as string[]) : [])
+  // A published timetable with zero teacher entries is still a valid timetable.
+  // Only the absence of the published record should trigger the empty state.
+  const hasPublishedTimetable = Boolean(publishedTimetable)
+  const workingDays = publishedTimetable?.workingDays?.length
+    ? publishedTimetable.workingDays
+    : (Array.isArray(staff?.availableDays) ? (staff.availableDays as string[]) : [])
   const visibleDays = workingDays.length ? workingDays : ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
-  const periods = hasPublishedTimetable ? publishedTimetable.periods : STAFF_TIMETABLE_SLOTS.map((s) => ({ number: s.period, start: s.time.split(' – ')[0] || '', end: s.time.split(' – ')[1]?.replace(' AM', '').replace(' PM', '') || '' }))
+  const periods = publishedTimetable?.periods?.length
+    ? publishedTimetable.periods
+    : STAFF_TIMETABLE_SLOTS.map((s) => ({ number: s.period, start: s.time, end: '' }))
 
   // Build a lookup map: day -> period -> slot
   const slotMap: Record<string, Record<number, PublishedTimetableSlot>> = {}
   if (hasPublishedTimetable) {
-    for (const slot of publishedTimetable.slots) {
+    for (const slot of publishedTimetable?.slots ?? []) {
       if (!slotMap[slot.day]) slotMap[slot.day] = {}
       slotMap[slot.day][slot.period] = slot
     }
@@ -1201,8 +1205,8 @@ function StaffTimetable({ staff, assignments, publishedTimetable, loading, onOpe
       {loading
         ? <p className="section-caption">Loading published timetable…</p>
         : hasPublishedTimetable
-          ? <p className="section-caption" style={{ display: 'flex', alignItems: 'center', gap: '.35rem' }}>Synced from published timetable — <span className="status-badge tone-success">Published</span> {publishedTimetable.timetableTitle && <span style={{ opacity: .65 }}>· {publishedTimetable.timetableTitle}</span>} {publishedTimetable.timetableUpdatedAt && <span style={{ opacity: .55 }}>· {new Date(publishedTimetable.timetableUpdatedAt).toLocaleDateString()}</span>}</p>
-          : <p className="section-caption">No published timetable found. Assign subjects and publish a timetable to see the teacher's weekly schedule here.</p>
+          ? <div className="staff-timetable-status"><span className="status-badge tone-success">Published</span><span>Synced from the timetable builder</span>{publishedTimetable?.timetableTitle && <strong>{publishedTimetable.timetableTitle}</strong>}{publishedTimetable?.timetableUpdatedAt && <time dateTime={publishedTimetable.timetableUpdatedAt}>Updated {new Date(publishedTimetable.timetableUpdatedAt).toLocaleDateString()}</time>}</div>
+          : <div className="staff-timetable-empty-banner"><strong>No published timetable yet</strong><span>This weekly grid is ready for the teacher. Publish a timetable to sync classes, subjects, rooms, and times here.</span></div>
       }
       <div className="staff-timetable-grid">
         {visibleDays.map((day, dayIndex) => (
@@ -1227,16 +1231,14 @@ function StaffTimetable({ staff, assignments, publishedTimetable, loading, onOpe
                   )
                 }
 
-                // Fallback: use assignment cycling when no published timetable
-                const assignment = timetableAssignments.length ? timetableAssignments[(dayIndex * periods.length + periodIndex) % timetableAssignments.length] : null
-                const roomLabel = String(staff?.workLocation ?? 'Assigned room')
                 return (
-                  <div className="staff-slot-card" key={`${day}-${typeof periodDef === 'object' ? (periodDef as { number: number }).number : periodIndex}`}>
-                    <span className="staff-slot-badge">Room: {roomLabel}</span>
+                  <div className="staff-slot-card staff-slot-card--empty" key={`${day}-${typeof periodDef === 'object' ? (periodDef as { number: number }).number : periodIndex}`}>
+                    <span className="staff-slot-badge">Available</span>
                     <div className="staff-slot-divider" />
-                    <div className="staff-slot-meta">Class : {assignment?.sectionLabel ?? '—'}</div>
-                    <div className="staff-slot-meta">Subject : {assignment?.subjectName ?? '—'}</div>
-                    <div className="staff-slot-time">{typeof periodDef === 'object' ? `${(periodDef as { start: string; end: string }).start} – ${(periodDef as { start: string; end: string }).end}` : (STAFF_TIMETABLE_SLOTS[periodIndex]?.time ?? '')}</div>
+                    <div className="staff-slot-empty-copy">No class assigned</div>
+                    <div className="staff-slot-meta">Class : —</div>
+                    <div className="staff-slot-meta">Subject : —</div>
+                    <div className="staff-slot-time">{typeof periodDef === 'object' ? `${(periodDef as { start: string; end: string }).start}${(periodDef as { end: string }).end ? ` – ${(periodDef as { end: string }).end}` : ''}` : ''}</div>
                   </div>
                 )
               })}
@@ -1259,7 +1261,7 @@ function StaffTimetable({ staff, assignments, publishedTimetable, loading, onOpe
         <div className="sp-table-head"><span>Class-section</span><span>Subject</span><span>Assignment status</span></div>
         {timetableAssignments.length
           ? timetableAssignments.map((assignment) => {
-              const isScheduled = hasPublishedTimetable && publishedTimetable.slots.some((s) => s.classId === assignment.classSectionId && s.subjectId === assignment.subjectId)
+              const isScheduled = Boolean(publishedTimetable?.slots.some((s) => s.classId === assignment.classSectionId && s.subjectId === assignment.subjectId))
               return (
                 <div className="sp-table-row" key={assignment.id}>
                   <span>{assignment.sectionLabel}</span>

@@ -1,3 +1,4 @@
+import re
 from datetime import timedelta
 from pathlib import Path
 
@@ -11,14 +12,50 @@ environ.Env.read_env(BASE_DIR / ".env")
 SECRET_KEY = env("DJANGO_SECRET_KEY", default="local-development-only")
 DEBUG = env.bool("DJANGO_DEBUG", default=False)
 
+API_LOG_DIR = BASE_DIR / "logs"
+API_LOG_DIR.mkdir(parents=True, exist_ok=True)
+API_LOG_FILE = API_LOG_DIR / "api.log"
+# Local logs intentionally represent the current server run only.  Remove old
+# rotations during startup; cloud log shipping can be added later without
+# changing the JSON event schema.
+for api_log in API_LOG_DIR.glob("api.log*"):
+    try:
+        api_log.unlink(missing_ok=True)
+    except PermissionError:
+        # Windows keeps an open log file exclusively locked.  This happens
+        # when a second management command starts while an API server is still
+        # running; preserve that server's log and allow this command to start.
+        pass
+
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
-    "formatters": {"campusone": {"format": "[{levelname}] {name}: {message}", "style": "{"}},
-    "handlers": {"console": {"class": "logging.StreamHandler", "formatter": "campusone"}},
-    "loggers": {
-        "modules.identity.api": {"handlers": ["console"], "level": "INFO", "propagate": False},
+    "formatters": {
+        "campusone": {"format": "[{levelname}] {name}: {message}", "style": "{"},
+        "json": {"()": "platform_core.logging.JsonLogFormatter"},
     },
+    "handlers": {
+        "console": {"class": "logging.StreamHandler", "formatter": "campusone"},
+        "api_file": {
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": API_LOG_FILE,
+            "formatter": "json",
+            "maxBytes": env.int("API_LOG_MAX_BYTES", default=10 * 1024 * 1024),
+            "backupCount": env.int("API_LOG_BACKUP_COUNT", default=5),
+            "encoding": "utf-8",
+        },
+    },
+    "loggers": {
+        "modules.identity.api": {
+            "handlers": ["console", "api_file"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "api.request": {"handlers": ["api_file", "console"], "level": "INFO", "propagate": False},
+    },
+    # Captures exception logs from every API module, including tracebacks from
+    # the DRF exception handler.  Request metadata remains on api.request.
+    "root": {"handlers": ["api_file", "console"], "level": "ERROR"},
 }
 ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=["localhost", "127.0.0.1"])
 
@@ -93,14 +130,22 @@ else:
     if DATABASES["default"]["ENGINE"] == "django.db.backends.sqlite3":
         raise ImproperlyConfigured(
             "DJANGO_USE_SQLITE=false requires a PostgreSQL DATABASE_URL. "
-            "Replace DATABASE_URL=sqlite:///db.sqlite3 in services/api/.env with the cloud database URL."
+            "Replace DATABASE_URL=sqlite:///db.sqlite3 in services/api/.env "
+            "with the cloud database URL."
         )
     # Persistent connections are useful in production, but they easily exhaust
     # small hosted Postgres plans during local Django development/reloads.
     default_conn_max_age = 0 if DEBUG else 60
-    DATABASES["default"]["CONN_MAX_AGE"] = env.int("DATABASE_CONN_MAX_AGE", default=default_conn_max_age)
+    DATABASES["default"]["CONN_MAX_AGE"] = env.int(
+        "DATABASE_CONN_MAX_AGE", default=default_conn_max_age
+    )
+    # Do not let an unreachable hosted database hold an API request for the
+    # driver's default (often several minutes).  This keeps health/readiness
+    # checks and failed requests responsive while the database is unavailable.
+    database_options = DATABASES["default"].setdefault("OPTIONS", {})
+    database_options["connect_timeout"] = env.int("DATABASE_CONNECT_TIMEOUT", default=10)
     if env.bool("DATABASE_SSL_REQUIRE", default=True):
-        DATABASES["default"].setdefault("OPTIONS", {})["sslmode"] = "require"
+        database_options["sslmode"] = "require"
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
@@ -141,9 +186,7 @@ CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS", default=["http://localho
 # Vite may move to the next available port when another dev server is running.
 # Keep this convenience limited to local development; production still uses the
 # explicit CORS_ALLOWED_ORIGINS list above.
-CORS_ALLOWED_ORIGIN_REGEXES = (
-    [r"^https?://(localhost|127\.0\.0\.1):\d+$"] if DEBUG else []
-)
+CORS_ALLOWED_ORIGIN_REGEXES = [r"^https?://(localhost|127\.0\.0\.1):\d+$"] if DEBUG else []
 CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=["http://localhost:5173"])
 
 REST_FRAMEWORK = {
@@ -186,6 +229,16 @@ CELERY_TASK_ALWAYS_EAGER = env.bool("CELERY_TASK_ALWAYS_EAGER", default=False)
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_ACCEPT_CONTENT = ["json"]
+CELERY_BEAT_SCHEDULE = {
+    "expire-file-upload-sessions": {
+        "task": "modules.file_storage.tasks.expire_file_upload_sessions",
+        "schedule": 300.0,
+    },
+    "cleanup-expired-staging-objects": {
+        "task": "modules.file_storage.tasks.cleanup_expired_staging_objects",
+        "schedule": 900.0,
+    },
+}
 
 # Transactional email (OTP and operational notifications). Production values
 # are environment-driven; tests override the delivery boundary directly.
@@ -206,3 +259,69 @@ AZURE_STORAGE_CONTAINER = env("AZURE_STORAGE_CONTAINER", default="campusone-file
 AZURE_STORAGE_SAS_EXPIRY_MINUTES = env.int("AZURE_STORAGE_SAS_EXPIRY_MINUTES", default=15)
 AZURE_STORAGE_UPLOAD_EXPIRY_MINUTES = env.int("AZURE_STORAGE_UPLOAD_EXPIRY_MINUTES", default=30)
 AZURE_STORAGE_MAX_UPLOAD_BYTES = env.int("AZURE_STORAGE_MAX_UPLOAD_BYTES", default=104857600)
+
+# Secure object storage. R2 uses its S3-compatible API for application data
+# transfer and the Cloudflare API only for bucket administration/cache purge.
+FILE_STORAGE_PROVIDER = env("FILE_STORAGE_PROVIDER", default="r2").lower()
+if FILE_STORAGE_PROVIDER not in {"r2", "azure"}:
+    raise ImproperlyConfigured("FILE_STORAGE_PROVIDER must be either 'r2' or 'azure'.")
+
+R2_ACCOUNT_ID = env("R2_ACCOUNT_ID", default="")
+R2_ACCESS_KEY_ID = env("R2_ACCESS_KEY_ID", default="")
+R2_SECRET_ACCESS_KEY = env("R2_SECRET_ACCESS_KEY", default="")
+R2_REGION = env("R2_REGION", default="auto")
+R2_ENDPOINT_URL = env(
+    "R2_ENDPOINT_URL",
+    default=(f"https://{R2_ACCOUNT_ID}.r2.cloudflarestorage.com" if R2_ACCOUNT_ID else ""),
+)
+R2_PRIVATE_BUCKET = env("R2_PRIVATE_BUCKET", default="campusone-private-dev")
+R2_PUBLIC_BUCKET = env("R2_PUBLIC_BUCKET", default="campusone-public-dev")
+R2_PUBLIC_BASE_URL = env("R2_PUBLIC_BASE_URL", default="").rstrip("/")
+R2_UPLOAD_TTL_SECONDS = env.int("R2_UPLOAD_TTL_SECONDS", default=900)
+R2_DOWNLOAD_TTL_SECONDS = env.int("R2_DOWNLOAD_TTL_SECONDS", default=300)
+R2_STAGING_DELETE_BUFFER_SECONDS = env.int("R2_STAGING_DELETE_BUFFER_SECONDS", default=300)
+R2_CONNECT_TIMEOUT_SECONDS = env.int("R2_CONNECT_TIMEOUT_SECONDS", default=5)
+R2_READ_TIMEOUT_SECONDS = env.int("R2_READ_TIMEOUT_SECONDS", default=15)
+R2_MAX_ATTEMPTS = env.int("R2_MAX_ATTEMPTS", default=4)
+R2_MAX_POOL_CONNECTIONS = env.int("R2_MAX_POOL_CONNECTIONS", default=20)
+CLOUDFLARE_API_TOKEN = env("CLOUDFLARE_API_TOKEN", default="")
+CLOUDFLARE_ACCOUNT_ID = env("CLOUDFLARE_ACCOUNT_ID", default=R2_ACCOUNT_ID)
+CLOUDFLARE_ZONE_ID = env("CLOUDFLARE_ZONE_ID", default="")
+
+FILE_STORAGE_RETENTION_DAYS = env.int("FILE_STORAGE_RETENTION_DAYS", default=30)
+FILE_STORAGE_MAX_PROFILE_BYTES = env.int("FILE_STORAGE_MAX_PROFILE_BYTES", default=5 * 1024 * 1024)
+FILE_STORAGE_MAX_BRANDING_BYTES = env.int(
+    "FILE_STORAGE_MAX_BRANDING_BYTES", default=10 * 1024 * 1024
+)
+FILE_STORAGE_MAX_DOCUMENT_BYTES = env.int(
+    "FILE_STORAGE_MAX_DOCUMENT_BYTES", default=25 * 1024 * 1024
+)
+FILE_STORAGE_PREVIEW_MAX_PIXELS = env.int("FILE_STORAGE_PREVIEW_MAX_PIXELS", default=40_000_000)
+FILE_STORAGE_THUMBNAIL_SIZE = env.int("FILE_STORAGE_THUMBNAIL_SIZE", default=150)
+FILE_STORAGE_ALLOWED_ORIGINS = env.list(
+    "FILE_STORAGE_ALLOWED_ORIGINS", default=CORS_ALLOWED_ORIGINS
+)
+
+_r2_bucket_pattern = re.compile(r"^[a-z0-9](?:[a-z0-9-]{1,61}[a-z0-9])?$")
+for _setting_name, _bucket_name in {
+    "R2_PRIVATE_BUCKET": R2_PRIVATE_BUCKET,
+    "R2_PUBLIC_BUCKET": R2_PUBLIC_BUCKET,
+}.items():
+    if not _r2_bucket_pattern.fullmatch(_bucket_name):
+        raise ImproperlyConfigured(
+            f"{_setting_name} must be a lowercase R2 bucket name between 3 and 63 characters."
+        )
+if R2_PRIVATE_BUCKET == R2_PUBLIC_BUCKET:
+    raise ImproperlyConfigured("R2 private and public buckets must be different.")
+
+for _setting_name, _value, _minimum, _maximum in (
+    ("R2_UPLOAD_TTL_SECONDS", R2_UPLOAD_TTL_SECONDS, 60, 3600),
+    ("R2_DOWNLOAD_TTL_SECONDS", R2_DOWNLOAD_TTL_SECONDS, 30, 900),
+    ("R2_CONNECT_TIMEOUT_SECONDS", R2_CONNECT_TIMEOUT_SECONDS, 1, 30),
+    ("R2_READ_TIMEOUT_SECONDS", R2_READ_TIMEOUT_SECONDS, 1, 60),
+    ("R2_MAX_ATTEMPTS", R2_MAX_ATTEMPTS, 1, 8),
+    ("R2_MAX_POOL_CONNECTIONS", R2_MAX_POOL_CONNECTIONS, 1, 200),
+    ("FILE_STORAGE_RETENTION_DAYS", FILE_STORAGE_RETENTION_DAYS, 1, 365),
+):
+    if not _minimum <= _value <= _maximum:
+        raise ImproperlyConfigured(f"{_setting_name} must be between {_minimum} and {_maximum}.")

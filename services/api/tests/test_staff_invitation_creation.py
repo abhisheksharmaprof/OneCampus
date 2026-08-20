@@ -2,7 +2,6 @@ import pytest
 
 from modules.identity.models import User
 from modules.institutes.models import Branch, Institute, InstituteMembership
-from modules.people.invitations import delivery
 from modules.people.invitations.models import StaffInvitation
 
 
@@ -16,7 +15,7 @@ def _authenticate_admin(api_client, admin):
 
 
 @pytest.mark.django_db
-def test_staff_creation_issues_hashed_token_and_reports_delivery(api_client, monkeypatch):
+def test_staff_creation_uses_otp_onboarding_without_invitation_table(api_client):
     institute = Institute.objects.create(name="Northstar Academy", code="NSA")
     branch = Branch.objects.create(
         institute=institute,
@@ -31,12 +30,6 @@ def test_staff_creation_issues_hashed_token_and_reports_delivery(api_client, mon
         role=InstituteMembership.Role.INSTITUTE_ADMIN,
     )
     _authenticate_admin(api_client, admin)
-    delivered = {}
-
-    def capture_delivery(*, invitation, raw_token):
-        delivered.update(invitation=invitation, raw_token=raw_token)
-
-    monkeypatch.setattr(delivery, "deliver_staff_setup_invitation", capture_delivery)
     response = api_client.post(
         "/api/v1/admin/staff",
         {
@@ -51,19 +44,16 @@ def test_staff_creation_issues_hashed_token_and_reports_delivery(api_client, mon
     assert response.status_code == 201
     body = response.json()["data"]
     assert body["userId"]
-    assert body["inviteDelivery"]["status"] == "SENT"
+    assert body["inviteDelivery"]["status"] == "PENDING_OTP"
     assert "token" not in str(response.json()).lower()
-
-    invitation = StaffInvitation.objects.get()
-    _, secret = delivered["raw_token"].split(".", 1)
-    assert invitation.token_hash != delivered["raw_token"]
-    assert invitation.token_hash != secret
-    assert invitation.secret_matches(secret)
-    assert invitation.expires_at > invitation.created_at
+    assert not StaffInvitation.objects.exists()
+    user = User.objects.get(email="meera@northstar.test")
+    assert user.is_active is False
+    assert user.otp_required is True
 
 
 @pytest.mark.django_db
-def test_staff_creation_survives_delivery_failure_and_reports_it(api_client, monkeypatch):
+def test_staff_creation_does_not_require_email_delivery(api_client):
     institute = Institute.objects.create(name="Northstar Academy", code="NSA")
     branch = Branch.objects.create(
         institute=institute,
@@ -79,10 +69,6 @@ def test_staff_creation_survives_delivery_failure_and_reports_it(api_client, mon
     )
     _authenticate_admin(api_client, admin)
 
-    def fail_delivery(**kwargs):
-        raise RuntimeError("provider unavailable")
-
-    monkeypatch.setattr(delivery, "deliver_staff_setup_invitation", fail_delivery)
     response = api_client.post(
         "/api/v1/admin/staff",
         {
@@ -95,6 +81,6 @@ def test_staff_creation_survives_delivery_failure_and_reports_it(api_client, mon
     )
 
     assert response.status_code == 201
-    assert response.json()["data"]["inviteDelivery"]["status"] == "FAILED"
-    assert StaffInvitation.objects.get().delivery_status == "FAILED"
+    assert response.json()["data"]["inviteDelivery"]["status"] == "PENDING_OTP"
+    assert not StaffInvitation.objects.exists()
     assert User.objects.get(email="meera@northstar.test").is_active is False

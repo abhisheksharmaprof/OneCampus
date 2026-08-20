@@ -27,8 +27,6 @@ def short_branch_code(name, institute):
     base = (base + "XXX")[:4]
     if len(base) < 3:
         base = (base + "XXX")[:3]
-    if base == "MAIN":
-        base = "MCA"
     code = base
     suffix = 0
     while Branch.objects.filter(institute=institute, code=code).exists():
@@ -53,6 +51,7 @@ class InstituteSerializer(serializers.ModelSerializer):
     logoUrl = serializers.URLField(source="logo_url", allow_blank=True)
     brandColor = serializers.CharField(source="brand_color")
     isActive = serializers.BooleanField(source="is_active")
+    onboardingStatus = serializers.CharField(source="onboarding_status", read_only=True)
     legalName = serializers.CharField(source="name")
     displayName = serializers.CharField(source="display_name")
     instituteType = serializers.CharField(source="institute_type")
@@ -81,7 +80,7 @@ class InstituteSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Institute
-        fields = ("id", "name", "slug", "publicUrl", "logoUrl", "brandColor", "code", "isActive", "legalName", "displayName", "instituteType", "boardAffiliation", "boardAffiliationNo", "udiseCode", "estYear", "medium", "entityType", "registrationNo", "panNo", "gstNo", "address_line_1", "address_line_2", "city", "state", "postalCode", "country", "primaryEmail", "primaryPhone", "alternatePhone", "websiteUrl", "contactName", "contactDesignation", "contactPhone", "contactEmail")
+        fields = ("id", "name", "slug", "publicUrl", "logoUrl", "brandColor", "code", "isActive", "onboardingStatus", "legalName", "displayName", "instituteType", "boardAffiliation", "boardAffiliationNo", "udiseCode", "estYear", "medium", "entityType", "registrationNo", "panNo", "gstNo", "address_line_1", "address_line_2", "city", "state", "postalCode", "country", "primaryEmail", "primaryPhone", "alternatePhone", "websiteUrl", "contactName", "contactDesignation", "contactPhone", "contactEmail")
 
 
 class InstituteUpdateSerializer(StrictSerializer):

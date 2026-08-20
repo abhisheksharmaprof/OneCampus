@@ -166,13 +166,17 @@ export function InstituteSetupPage({
   // Fetch Branches List
   useEffect(() => {
     const c = new AbortController()
+    setError('')
     const q = new URLSearchParams({ page: String(page), pageSize: '25' })
     if (search) q.set('search', search)
     if (statusFilter !== 'ALL') q.set('isActive', statusFilter === 'ACTIVE' ? 'true' : 'false')
 
     void adminRequest<PageData<Branch>>(accessToken, `branches?${q}`, { signal: c.signal })
       .then(setData)
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Campus sites could not be loaded.'))
+      .catch((e: unknown) => {
+        if (c.signal.aborted) return
+        setError(e instanceof Error ? e.message : 'Campus sites could not be loaded.')
+      })
     return () => c.abort()
   }, [accessToken, page, revision, search, statusFilter])
 
@@ -183,9 +187,13 @@ export function InstituteSetupPage({
       return
     }
     const c = new AbortController()
+    setError('')
     void adminRequest<Branch>(accessToken, `branches/${branchId}`, { signal: c.signal })
       .then(setBranch)
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Branch could not be loaded.'))
+      .catch((e: unknown) => {
+        if (c.signal.aborted) return
+        setError(e instanceof Error ? e.message : 'Branch could not be loaded.')
+      })
     return () => c.abort()
   }, [accessToken, branchId, revision])
 

@@ -3,6 +3,7 @@ from rest_framework import status
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from drf_spectacular.utils import extend_schema
 
 from modules.institutes.models import Branch
 from platform_core.api.pagination import paginate_admin_queryset
@@ -158,6 +159,7 @@ class RoleDetailView(APIView):
 class RoleCloneView(APIView):
     permission_classes = (HasAccessControlSession,)
 
+    @extend_schema(operation_id="admin_roles_clone_create")
     def post(self, request, role_id):
         serializer = RoleCloneSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)

@@ -61,7 +61,7 @@ describe('AcademicStructurePage', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     const createCall = fetchMock.mock.calls.find(([url, options]) => String(url).endsWith('/api/v1/admin/academics/subjects') && options?.method === 'POST')
     expect(createCall).toBeDefined()
-    expect(JSON.parse(String(createCall?.[1]?.body))).toEqual({ name: 'Physics', subjectCode: 'PHY' })
+    expect(JSON.parse(String(createCall?.[1]?.body))).toEqual({ name: 'Physics', subjectCode: 'PHY', branchId: null })
   })
 
   it('shows server field errors with the trace reference in the modal', async () => {
@@ -75,7 +75,7 @@ describe('AcademicStructurePage', () => {
     const dialog = screen.getByRole('dialog', { name: 'Edit subject' })
     await user.click(within(dialog).getByRole('button', { name: 'Save subject' }))
 
-    expect(await within(dialog).findByRole('alert')).toHaveTextContent('A subject with this name already exists.')
+    expect(await within(dialog).findByText('A subject with this name already exists.')).toBeVisible()
     expect(dialog).toHaveTextContent('Reference: trace-academics-42')
     expect(within(dialog).getByLabelText(/subject name/i)).toHaveAttribute('aria-invalid', 'true')
   })

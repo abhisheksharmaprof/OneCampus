@@ -108,8 +108,8 @@ export function StudentBulkImport({ open, onClose, accessToken, branches, select
     const missing = fields.filter((field) => field.required && !mapping[field.key]).map((field) => field.label)
     const placementError = !classId
       ? 'Choose a class from the institute database before importing.'
-      : !sectionId
-        ? availableSections.length ? 'Choose a section before importing.' : 'No section is configured for the selected class and branch. Configure a section before importing.'
+      : availableSections.length > 1 && !sectionId
+        ? 'Choose a section before importing.'
         : ''
     const scopeError = !branchId ? 'Choose a branch before importing.' : ''
     if (missing.length || placementError || scopeError) {
@@ -166,7 +166,7 @@ export function StudentBulkImport({ open, onClose, accessToken, branches, select
         nextFailures.push({ row: index + 2, name, reason })
       } else {
         try {
-          const created = await adminRequest<{ id: string }>(accessToken, 'students', { method: 'POST', body: JSON.stringify({ branchId, admissionNumber: value('admissionNumber') || undefined, ...(sectionId ? { classSectionId: sectionId } : {}), firstName, lastName, fatherName: value('fatherName') || undefined, motherName: value('motherName') || undefined, dateOfBirth: birthDate, gender: value('gender'), aadharNumber: value('aadharNumber') || undefined, socialCategory: value('socialCategory') || undefined, religion: value('religion') || undefined, dateOfAdmission: admissionDate, mobileNumber: value('mobileNumber') || undefined, emailAddress: value('emailAddress') || undefined }) })
+          const created = await adminRequest<{ id: string }>(accessToken, 'students', { method: 'POST', body: JSON.stringify({ branchId, classId, ...(sectionId ? { classSectionId: sectionId } : {}), admissionNumber: value('admissionNumber') || undefined, firstName, lastName, fatherName: value('fatherName') || undefined, motherName: value('motherName') || undefined, dateOfBirth: birthDate, gender: value('gender'), aadharNumber: value('aadharNumber') || undefined, socialCategory: value('socialCategory') || undefined, religion: value('religion') || undefined, dateOfAdmission: admissionDate, mobileNumber: value('mobileNumber') || undefined, emailAddress: value('emailAddress') || undefined }) })
           for (const [parentIndex, parent] of parentCandidates.entries()) {
             try {
               await linkParent(created.id, parent.name, parent.phone, parent.email, parent.relationship, parentIndex === 0)

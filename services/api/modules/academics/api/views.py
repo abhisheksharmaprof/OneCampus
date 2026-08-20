@@ -1,4 +1,5 @@
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import IntegrityError
 from django.db.models import Count, Prefetch, Q
 from django.db.models.deletion import ProtectedError
 from django.shortcuts import get_object_or_404
@@ -31,6 +32,8 @@ from ..services import (
     create_enrollment,
     save_academic_year,
     save_class_section,
+    ensure_default_section,
+    provision_default_sections,
     set_current_academic_year,
     update_enrollment,
 )
@@ -150,6 +153,14 @@ def _save(instance, *, update_fields=None):
     except DjangoValidationError as exc:
         details = exc.message_dict if hasattr(exc, "message_dict") else exc.messages
         raise ValidationError(details) from exc
+    except IntegrityError as exc:
+        if isinstance(instance, Subject) and "uq_subject_code_per_institute" in str(exc):
+            raise ValidationError({
+                "subjectCode": [
+                    "This subject code is already in use in this institute. Please choose a different code."
+                ]
+            }) from exc
+        raise
     return instance
 
 
@@ -258,8 +269,10 @@ class AcademicYearListCreateView(APIView):
         branch = _branch_filter(request)
         years = AcademicYear.objects.filter(institute=_institute(request))
         if branch:
-            years = years.filter(class_sections__branch=branch)
-        years = years.annotate(classes_count=Count("class_sections__grade", distinct=True)).order_by("-start_date", "name")
+            # Academic years are institute-wide. Keep years with no sections
+            # visible while still limiting populated years to the selected branch.
+            years = years.filter(Q(class_sections__branch=branch) | Q(class_sections__isnull=True))
+        years = years.annotate(classes_count=Count("class_sections__grade", distinct=True)).distinct().order_by("-start_date", "name")
         search = request.query_params.get("search", "").strip()
         if search:
             years = years.filter(name__icontains=search)
@@ -364,8 +377,9 @@ class GradeListCreateView(APIView):
         branch = _branch_filter(request)
         grades = Grade.objects.filter(institute=_institute(request))
         if branch:
-            grades = grades.filter(sections__branch=branch)
-        grades = grades.annotate(subjects_count=Count("curriculum_subjects", distinct=True)).order_by("sort_order", "name")
+            # Classes are institute-wide and may not have a section yet.
+            grades = grades.filter(Q(sections__branch=branch) | Q(sections__isnull=True))
+        grades = grades.annotate(subjects_count=Count("curriculum_subjects", distinct=True)).distinct().order_by("sort_order", "name")
         search = request.query_params.get("search", "").strip()
         if search:
             grades = grades.filter(name__icontains=search)
@@ -379,6 +393,7 @@ class GradeListCreateView(APIView):
         serializer = GradeWriteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         grade = _save(Grade(institute=_institute(request), **serializer.validated_data))
+        provision_default_sections(grade=grade)
         return _success(GradeSerializer(grade).data, status.HTTP_201_CREATED)
 
 
@@ -408,11 +423,14 @@ class SubjectListCreateView(APIView):
     permission_classes = (IsCurrentInstituteAdmin,)
 
     def get(self, request):
-        branch = _branch_filter(request)
         subjects = Subject.objects.filter(institute=_institute(request))
+        branch = _branch_filter(request)
         if branch:
-            subjects = subjects.filter(class_curricula__grade__sections__branch=branch)
-        subjects = subjects.annotate(classes_count=Count("class_curricula__grade", distinct=True)).order_by("name", "subject_code")
+            subjects = subjects.filter(Q(branch=branch) | Q(branch__isnull=True))
+        # Subjects and their class curriculum mappings are institute-wide. A
+        # class can be assigned a subject before its branch sections exist, so
+        # do not scope this catalogue through class sections.
+        subjects = subjects.annotate(classes_count=Count("class_curricula__grade", distinct=True)).distinct().order_by("name", "subject_code")
         search = request.query_params.get("search", "").strip()
         if search:
             subjects = subjects.filter(
@@ -425,7 +443,9 @@ class SubjectListCreateView(APIView):
         )
 
     def post(self, request):
-        serializer = SubjectWriteSerializer(data=request.data)
+        serializer = SubjectWriteSerializer(
+            data=request.data, context={"institute": _institute(request)}
+        )
         serializer.is_valid(raise_exception=True)
         subject = _save(Subject(institute=_institute(request), **serializer.validated_data))
         return _success(SubjectSerializer(subject).data, status.HTTP_201_CREATED)
@@ -442,7 +462,12 @@ class SubjectDetailView(APIView):
 
     def patch(self, request, subject_id):
         subject = self.get_object(request, subject_id)
-        serializer = SubjectWriteSerializer(instance=subject, data=request.data, partial=True)
+        serializer = SubjectWriteSerializer(
+            instance=subject,
+            data=request.data,
+            partial=True,
+            context={"institute": _institute(request)},
+        )
         serializer.is_valid(raise_exception=True)
         for field, value in serializer.validated_data.items():
             setattr(subject, field, value)
@@ -450,7 +475,12 @@ class SubjectDetailView(APIView):
         return _success(SubjectSerializer(subject).data)
 
     def delete(self, request, subject_id):
-        return _delete(self.get_object(request, subject_id))
+        try:
+            return _delete(self.get_object(request, subject_id))
+        except ValidationError as exc:
+            if exc.detail.get("nonFieldErrors") == ["This record is in use and cannot be deleted."]:
+                raise ValidationError({"nonFieldErrors": ["Remove this subject from all class and section mappings before deleting it."]}) from exc
+            raise
 
 
 class ClassSubjectListCreateView(APIView):
@@ -458,10 +488,10 @@ class ClassSubjectListCreateView(APIView):
 
     def get(self, request):
         institute = _institute(request)
-        curriculum = ClassSubject.objects.filter(institute=institute).select_related("grade", "subject")
+        curriculum = ClassSubject.objects.filter(institute=institute).select_related("grade", "subject", "class_section", "class_section__branch")
         branch = _branch_filter(request)
         if branch:
-            curriculum = curriculum.filter(grade__sections__branch=branch)
+            curriculum = curriculum.filter(Q(class_section__branch=branch) | Q(class_section__isnull=True))
         grade_id = request.query_params.get("classId") or request.query_params.get("gradeId")
         if grade_id:
             curriculum = curriculum.filter(grade_id=grade_id)
@@ -470,13 +500,30 @@ class ClassSubjectListCreateView(APIView):
     def post(self, request):
         serializer = ClassSubjectWriteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        grade = get_object_or_404(Grade, id=serializer.validated_data["grade_id"], institute=_institute(request))
-        subject = get_object_or_404(Subject, id=serializer.validated_data["subject_id"], institute=_institute(request))
+        data = dict(serializer.validated_data)
+        branch_id = data.pop("branch_id", None)
+        section_id = data.pop("class_section_id", None)
+        grade = get_object_or_404(Grade, id=data.pop("grade_id"), institute=_institute(request))
+        subject = get_object_or_404(Subject, id=data.pop("subject_id"), institute=_institute(request))
+        branch = get_object_or_404(Branch, id=branch_id, institute=_institute(request), is_active=True) if branch_id else None
+        if section_id:
+            section = get_object_or_404(ClassSection.objects.select_related("branch"), id=section_id, grade=grade)
+        else:
+            branch = branch or (subject.branch if subject.branch_id else None)
+            if branch is None:
+                branches = list(Branch.objects.filter(institute=_institute(request), is_active=True))
+                if len(branches) == 1:
+                    branch = branches[0]
+            if branch is None:
+                raise ValidationError({"branchId": ["Select a branch so the default section can be assigned."]})
+            section = ensure_default_section(grade=grade, branch=branch)
+        if subject.branch_id and subject.branch_id != section.branch_id:
+            raise ValidationError({"sectionId": ["The subject and section must belong to the same branch."]})
         if not serializer.validated_data.get("is_lab", False):
-            serializer.validated_data["room_id"] = None
-        if serializer.validated_data.get("room_id"):
-            serializer.validated_data["room_id"] = get_object_or_404(Room, id=serializer.validated_data["room_id"], institute=_institute(request)).id
-        curriculum = _save(ClassSubject(institute=_institute(request), grade=grade, subject=subject, **{key: value for key, value in serializer.validated_data.items() if key not in ("grade_id", "subject_id")}))
+            data["room_id"] = None
+        if data.get("room_id"):
+            data["room_id"] = get_object_or_404(Room, id=data["room_id"], institute=_institute(request)).id
+        curriculum = _save(ClassSubject(institute=_institute(request), grade=grade, subject=subject, class_section=section, **data))
         return _success(ClassSubjectSerializer(curriculum).data, status.HTTP_201_CREATED)
 
 
@@ -490,7 +537,12 @@ class ClassSubjectDetailView(APIView):
         curriculum = self.get_object(request, curriculum_id)
         serializer = ClassSubjectWriteSerializer(instance=curriculum, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
-        for field, value in serializer.validated_data.items():
+        data = dict(serializer.validated_data)
+        data.pop("branch_id", None)
+        if "class_section_id" in data:
+            section_id = data.pop("class_section_id")
+            curriculum.class_section = get_object_or_404(ClassSection.objects.select_related("branch"), id=section_id, grade=curriculum.grade) if section_id else None
+        for field, value in data.items():
             if field == "grade_id": curriculum.grade = get_object_or_404(Grade, id=value, institute=_institute(request))
             elif field == "subject_id": curriculum.subject = get_object_or_404(Subject, id=value, institute=_institute(request))
             elif field == "room_id": curriculum.room = get_object_or_404(Room, id=value, institute=_institute(request)) if value else None

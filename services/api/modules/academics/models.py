@@ -130,6 +130,13 @@ class Subject(TimeStampedModel):
     institute = models.ForeignKey(
         "institutes.Institute", on_delete=models.CASCADE, related_name="subjects"
     )
+    branch = models.ForeignKey(
+        "institutes.Branch",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="subjects",
+    )
     name = models.CharField(max_length=100)
     subject_code = models.CharField(max_length=20, blank=True)
 
@@ -138,11 +145,8 @@ class Subject(TimeStampedModel):
         ordering = ("name", "subject_code")
         constraints = [
             models.UniqueConstraint(
-                fields=("institute", "name"), name="uq_subject_name_per_institute"
-            ),
-            models.UniqueConstraint(
-                fields=("institute", "subject_code"),
-                condition=~Q(subject_code=""),
+                fields=("branch", "subject_code"),
+                condition=Q(branch__isnull=False) & ~Q(subject_code=""),
                 name="uq_subject_code_per_institute",
             ),
         ]
@@ -188,6 +192,13 @@ class ClassSubject(TimeStampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     institute = models.ForeignKey("institutes.Institute", on_delete=models.CASCADE, related_name="class_subjects")
     grade = models.ForeignKey(Grade, on_delete=models.CASCADE, related_name="curriculum_subjects")
+    class_section = models.ForeignKey(
+        "ClassSection",
+        on_delete=models.CASCADE,
+        related_name="curriculum_subjects",
+        null=True,
+        blank=True,
+    )
     subject = models.ForeignKey(Subject, on_delete=models.PROTECT, related_name="class_curricula")
     room = models.ForeignKey(Room, on_delete=models.SET_NULL, related_name="class_subjects", null=True, blank=True)
     is_lab = models.BooleanField(default=False)
@@ -200,12 +211,22 @@ class ClassSubject(TimeStampedModel):
     class Meta:
         db_table = "class_subjects"
         ordering = ("sort_order", "subject__name")
-        constraints = [models.UniqueConstraint(fields=("grade", "subject"), name="uq_class_subject")]
+        constraints = [
+            models.UniqueConstraint(
+                fields=("class_section", "subject"), name="uq_class_section_subject"
+            )
+        ]
         indexes = [models.Index(fields=("institute", "grade"))]
 
     def clean(self):
         if self.grade_id and self.subject_id and self.grade.institute_id != self.subject.institute_id:
             raise ValidationError({"subject": "Subject must belong to the class's institute."})
+        if self.class_section_id and self.class_section.grade_id != self.grade_id:
+            raise ValidationError({"section": "Section must belong to the selected class."})
+        if self.class_section_id and self.class_section.branch.institute_id != self.institute_id:
+            raise ValidationError({"section": "Section must belong to the selected institute."})
+        if self.subject.branch_id and self.class_section_id and self.subject.branch_id != self.class_section.branch_id:
+            raise ValidationError({"section": "Subject and section must belong to the same branch."})
         if self.institute_id and self.grade_id and self.institute_id != self.grade.institute_id:
             raise ValidationError({"grade": "Class must belong to the selected institute."})
         if self.room_id and not self.is_lab:

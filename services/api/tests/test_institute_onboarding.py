@@ -48,7 +48,8 @@ def test_public_onboarding_atomically_creates_tenant_and_email_password_admin(ap
     assert response.data["data"]["accessToken"]
     assert response.data["data"]["refreshToken"]
     assert response.data["data"]["user"]["activeRole"] == "INSTITUTE_ADMIN"
-    assert response.data["data"]["onboarding"]["completed"] is True
+    assert response.data["data"]["onboarding"]["completed"] is False
+    assert response.data["data"]["onboarding"]["status"] == "pending_review"
 
     user = User.objects.get()
     institute = Institute.objects.get()
@@ -59,6 +60,9 @@ def test_public_onboarding_atomically_creates_tenant_and_email_password_admin(ap
     assert user.last_name == "Sharma"
     assert user.check_password("StrongPass123!")
     assert institute.name == "Riverdale International School"
+    assert institute.display_name == "Riverdale International School"
+    assert institute.onboarding_status == Institute.OnboardingStatus.PENDING_REVIEW
+    assert institute.is_active is False
     assert institute.code.startswith("RIVERDALE-")
     assert len(institute.code) <= 32
     assert branch.institute == institute

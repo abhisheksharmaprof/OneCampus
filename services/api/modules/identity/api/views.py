@@ -1,3 +1,5 @@
+import logging
+
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.tokens import default_token_generator
@@ -7,7 +9,6 @@ from django.db.models import Q
 from django.utils import timezone
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
-import logging
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.exceptions import AuthenticationFailed
@@ -20,26 +21,27 @@ from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from modules.identity.models import OtpChallenge
-from modules.institutes.models import Institute, InstituteMembership
 from modules.identity.services import (
     eligible_session_memberships,
     issue_session_tokens,
     resolve_session_context,
 )
+from modules.institutes.models import Institute, InstituteMembership
 from platform_core.api.throttles import DynamicScopedRateThrottle
 
 from .errors import SessionContextInactive
 from .serializers import (
     OtpChallengeSerializer,
     OtpResendSerializer,
+    PasswordResetConfirmSerializer,
+    PasswordSetupSerializer,
+    PasswordResetRequestSerializer,
     SessionCreateSerializer,
     SessionCurrentSuccessSerializer,
     SessionLogoutSerializer,
     SessionLogoutSuccessSerializer,
     SessionRefreshSerializer,
     SessionSuccessSerializer,
-    PasswordResetRequestSerializer,
-    PasswordResetConfirmSerializer,
 )
 
 logger = logging.getLogger(__name__)
@@ -254,7 +256,7 @@ class SessionCreateView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        if user.otp_required:
+        if user.otp_required or not user.is_active or not user.has_usable_password():
             challenge = _issue_challenge(
                 user=user,
                 client=client,
@@ -341,15 +343,7 @@ class SessionOtpVerifyView(APIView):
                 )
 
             user = challenge.user
-            context = (
-                resolve_session_context(
-                    user=user,
-                    client=challenge.client,
-                    institute_id=challenge.institute_id,
-                )
-                if user.is_active
-                else None
-            )
+            context = resolve_session_context(user=user, client=challenge.client, institute_id=challenge.institute_id)
             if context is None:
                 return _otp_error(
                     "SESSION_CONTEXT_INACTIVE",
@@ -358,10 +352,16 @@ class SessionOtpVerifyView(APIView):
                 )
             challenge.consumed_at = timezone.now()
             challenge.save(update_fields=("consumed_at",))
+            needs_password_setup = not user.has_usable_password()
+            if not user.is_active:
+                user.is_active = True
+                user.save(update_fields=("is_active", "updated_at"))
             session_data = _with_onboarding_state(
                 issue_session_tokens(user=user, context=context, client=challenge.client),
                 context.membership.institute_id,
             )
+            if needs_password_setup:
+                session_data["passwordSetupRequired"] = True
 
         return Response({"success": True, "data": session_data})
 
@@ -390,7 +390,9 @@ class SessionOtpResendView(APIView):
                     "This verification request is no longer active.",
                     http_status=status.HTTP_409_CONFLICT,
                 )
-            if not challenge.user.is_active or not challenge.user.otp_required:
+            if (challenge.user.is_active and not challenge.user.otp_required) or (
+                not challenge.user.is_active and challenge.user.has_usable_password()
+            ):
                 return _otp_error(
                     "OTP_CHALLENGE_INVALID",
                     "This verification request is no longer active.",
@@ -403,6 +405,33 @@ class SessionOtpResendView(APIView):
             )
 
         return Response({"success": True, "data": _challenge_details(replacement)})
+
+
+class PasswordSetupView(APIView):
+    permission_classes = ()
+    authentication_classes = (JWTAuthentication,)
+
+    @extend_schema(request=PasswordSetupSerializer)
+    def post(self, request):
+        if not request.user.is_authenticated:
+            return _otp_error(
+                "AUTHENTICATION_REQUIRED",
+                "Verify the OTP before setting a password.",
+                http_status=status.HTTP_401_UNAUTHORIZED,
+            )
+        serializer = PasswordSetupSerializer(data=request.data, context={"user": request.user})
+        serializer.is_valid(raise_exception=True)
+        if request.user.has_usable_password() and not request.user.otp_required:
+            return _otp_error(
+                "PASSWORD_ALREADY_SET",
+                "This account already has a password.",
+                http_status=status.HTTP_409_CONFLICT,
+            )
+        request.user.set_password(serializer.validated_data["password"])
+        request.user.otp_required = False
+        request.user.is_active = True
+        request.user.save(update_fields=("password", "otp_required", "is_active", "updated_at"))
+        return Response({"success": True, "data": {"message": "Password set successfully. You can now sign in normally."}})
 
 
 class SessionRefreshView(APIView):
@@ -430,6 +459,7 @@ class SessionRefreshView(APIView):
                 user=user,
                 client=refresh.get("client"),
                 membership_id=refresh.get("membership_id"),
+                include_inactive_institute=True,
             )
             if user and refresh.get("client") and (refresh.get("membership_id") or refresh.get("client") == "platform-admin")
             else None
@@ -466,6 +496,7 @@ class SessionCurrentView(APIView):
             user=request.user,
             client=request.auth.get("client"),
             membership_id=request.auth.get("membership_id"),
+            include_inactive_institute=True,
         )
         if context is None:
             raise SessionContextInactive()

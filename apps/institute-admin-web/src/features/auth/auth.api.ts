@@ -12,6 +12,7 @@ export interface SessionData {
   accessToken: string
   refreshToken: string
   user: SessionUser
+  passwordSetupRequired?: boolean
   onboarding?: { completed: boolean; status?: string; instituteName?: string; slug?: string; publicUrl?: string; rejectionReason?: string }
 }
 
@@ -87,10 +88,10 @@ function normalizeFieldErrors(errors: Record<string, string[] | string> | undefi
   )
 }
 
-async function post<T>(path: string, body: object): Promise<T> {
+async function post<T>(path: string, body: object, accessToken?: string): Promise<T> {
   const response = await fetch(`${apiBaseUrl}${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}) },
     body: JSON.stringify(body),
   })
   const payload = (await response.json()) as ApiSuccess<T> | ApiFailure
@@ -106,12 +107,19 @@ async function post<T>(path: string, body: object): Promise<T> {
   return payload.data
 }
 
-export function signIn(email: string, password: string) {
+export function signIn(identifier: string, password = '') {
   return post<SessionData>('/api/v1/identity/sessions', {
-    email,
+    identifier,
     password,
     client: 'admin-web',
   })
+}
+
+export function setupPassword(accessToken: string, password: string, confirmPassword: string) {
+  return post<{ message: string }>('/api/v1/identity/sessions/password-setup', {
+    password,
+    confirmPassword,
+  }, accessToken)
 }
 
 export function requestPasswordReset(email: string) {

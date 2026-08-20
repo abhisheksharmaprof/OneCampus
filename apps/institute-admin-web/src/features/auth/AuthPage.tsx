@@ -6,6 +6,7 @@ import {
   createInstitute,
   requestPasswordReset,
   confirmPasswordReset,
+  setupPassword,
   resendOtp,
   signIn,
   verifyOtp,
@@ -34,6 +35,7 @@ function Field({
   type = 'text',
   value,
   autoComplete,
+  ariaLabel,
   error,
   onChange,
 }: {
@@ -42,6 +44,7 @@ function Field({
   type?: string
   value: string
   autoComplete?: string
+  ariaLabel?: string
   error?: string
   onChange: (value: string) => void
 }) {
@@ -54,6 +57,7 @@ function Field({
         type={type}
         value={value}
         autoComplete={autoComplete}
+        aria-label={ariaLabel}
         aria-invalid={Boolean(error)}
         aria-describedby={error ? errorId : undefined}
         onChange={(event) => onChange(event.target.value)}
@@ -87,12 +91,13 @@ export function AuthPage({ mode, onboardingStep, onNavigate, onAuthenticated }: 
   const [resending, setResending] = useState(false)
   const [instituteBrand, setInstituteBrand] = useState<PublicInstituteConfig | null>(null)
   const [resetNotice, setResetNotice] = useState('')
+  const [passwordSetupSession, setPasswordSetupSession] = useState<SessionData | null>(null)
 
   useEffect(() => {
     if (mode !== 'login') return
     const host = window.location.hostname.toLowerCase()
     const parts = host.split('.')
-    if (parts.length < 3 || ['www', 'admin', 'api', 'localhost'].includes(parts[0])) return
+    if (parts.length < 3 || ['www', 'admin', 'api', 'institute', 'platform', 'localhost'].includes(parts[0])) return
     void getPublicInstituteConfig(parts[0]).then(setInstituteBrand).catch(() => setInstituteBrand(null))
   }, [mode])
 
@@ -159,8 +164,8 @@ export function AuthPage({ mode, onboardingStep, onNavigate, onAuthenticated }: 
   const submit = async (event: FormEvent) => {
     event.preventDefault()
     const nextErrors: FieldErrors = {}
-    if (!emailPattern.test(values.email.trim())) nextErrors.email = 'Enter a valid email address.'
-    if (!values.password) nextErrors.password = 'Password is required.'
+    if (!values.email.trim()) nextErrors.email = 'Enter your registered email or mobile number.'
+    if (mode === 'onboarding' && !values.password) nextErrors.password = 'Password is required.'
     if (mode === 'onboarding') {
       if (!values.adminName.trim()) nextErrors.adminName = 'Your full name is required.'
       if (values.password.length < 8) nextErrors.password = 'Use at least 8 characters.'
@@ -222,13 +227,34 @@ export function AuthPage({ mode, onboardingStep, onNavigate, onAuthenticated }: 
     setOtpError('')
     setOtpNotice('')
     try {
-      onAuthenticated(await verifyOtp(otpChallenge.challengeId, otpCode))
+      const session = await verifyOtp(otpChallenge.challengeId, otpCode)
+      if (session.passwordSetupRequired) setPasswordSetupSession(session)
+      else onAuthenticated(session)
     } catch (error) {
       setOtpError(
         error instanceof ApiError
           ? error.fieldErrors.code ?? error.message
           : 'Unable to verify the code. Please try again.',
       )
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const submitPasswordSetup = async (event: FormEvent) => {
+    event.preventDefault()
+    if (!passwordSetupSession) return
+    const nextErrors: FieldErrors = {}
+    if (values.password.length < 8) nextErrors.password = 'Use at least 8 characters.'
+    if (values.password !== values.confirmPassword) nextErrors.confirmPassword = 'Passwords do not match.'
+    setErrors(nextErrors)
+    if (Object.keys(nextErrors).length) return
+    setSubmitting(true)
+    try {
+      await setupPassword(passwordSetupSession.accessToken, values.password, values.confirmPassword)
+      onAuthenticated({ ...passwordSetupSession, passwordSetupRequired: false })
+    } catch (error) {
+      setServerError(error instanceof ApiError ? error.message : 'Unable to set your password.')
     } finally {
       setSubmitting(false)
     }
@@ -280,7 +306,17 @@ export function AuthPage({ mode, onboardingStep, onNavigate, onAuthenticated }: 
         aria-label={otpChallenge ? 'OTP verification' : mode === 'login' ? 'Institute sign in' : 'Institute onboarding'}
       >
         <div className="auth-card">
-          {otpChallenge ? (
+          {passwordSetupSession ? (
+            <>
+              <div className="auth-heading"><p className="auth-eyebrow">Account setup</p><h1>Create your password</h1><p>Your identity is verified. Set a password to finish activating your account.</p></div>
+              <form className="auth-form" onSubmit={submitPasswordSetup} noValidate>
+                <Field label="New password" name="password" type="password" autoComplete="new-password" value={values.password} error={errors.password} onChange={(value) => update('password', value)} />
+                <Field label="Confirm password" name="confirmPassword" type="password" autoComplete="new-password" value={values.confirmPassword} error={errors.confirmPassword} onChange={(value) => update('confirmPassword', value)} />
+                {serverError ? <div className="auth-global-error" role="alert">{serverError}</div> : null}
+                <button className="auth-primary-button" type="submit" disabled={submitting}>{submitting ? 'Saving…' : 'Set password'}</button>
+              </form>
+            </>
+          ) : otpChallenge ? (
             <>
               <button className="auth-back" type="button" onClick={openLogin}>
                 <ArrowLeft aria-hidden="true" /> Back to sign in
@@ -330,10 +366,10 @@ export function AuthPage({ mode, onboardingStep, onNavigate, onAuthenticated }: 
                 {instituteBrand?.logoUrl ? <img className="auth-institute-logo" src={instituteBrand.logoUrl} alt={`${instituteBrand.name} logo`} /> : null}
                 <p className="auth-eyebrow">{instituteBrand?.name || 'Institute Admin'}</p>
                 <h1>Welcome back</h1>
-                <p>Sign in with your work email and password.</p>
+                <p>Sign in with your registered email or mobile number.</p>
               </div>
               <form className="auth-form" onSubmit={submit} noValidate>
-                <Field label="Email" name="email" type="email" autoComplete="email" value={values.email} error={errors.email} onChange={(value) => update('email', value)} />
+                <Field label="Email or mobile number" ariaLabel="Email" name="email" type="text" autoComplete="username" value={values.email} error={errors.email} onChange={(value) => update('email', value)} />
                 <Field label="Password" name="password" type="password" autoComplete="current-password" value={values.password} error={errors.password ?? errors.credentials} onChange={(value) => update('password', value)} />
                 {serverError ? <div className="auth-global-error" role="alert">{serverError}</div> : null}
                 <button className="auth-primary-button" type="submit" disabled={submitting}>

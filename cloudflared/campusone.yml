@@ -1,0 +1,11 @@
+tunnel: 8faafa67-be4b-41ce-94fe-79932b7d4483
+credentials-file: C:/Users/abhis/.cloudflared/8faafa67-be4b-41ce-94fe-79932b7d4483.json
+
+ingress:
+  - hostname: institute.snifply.com
+    service: http://127.0.0.1:5173
+  - hostname: platform.snifply.com
+    service: http://127.0.0.1:5174
+  - hostname: api.snifply.com
+    service: http://127.0.0.1:8000
+  - service: http_status:404

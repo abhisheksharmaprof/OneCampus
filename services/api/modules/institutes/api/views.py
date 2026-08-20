@@ -1,14 +1,18 @@
+from django.db import IntegrityError
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
-from django.db import IntegrityError
 
 from modules.identity.services import issue_session_tokens, resolve_session_context
 
-from .serializers import InstituteApplicationSerializer, InstituteOnboardingSerializer, InstituteOnboardingSuccessSerializer
+from .serializers import (
+    InstituteApplicationSerializer,
+    InstituteOnboardingSerializer,
+    InstituteOnboardingSuccessSerializer,
+)
 
 
 class InstituteApplicationView(APIView):
@@ -52,9 +56,14 @@ class InstituteOnboardingView(APIView):
             user=user,
             client="admin-web",
             membership_id=membership.id,
+            include_inactive_institute=True,
         )
         session = issue_session_tokens(user=user, context=context, client="admin-web")
-        session["onboarding"] = {"completed": True}
+        session["onboarding"] = {
+            "completed": False,
+            "status": "pending_review",
+            "instituteName": result["institute"].display_name or result["institute"].name,
+        }
         return Response(
             {
                 "success": True,

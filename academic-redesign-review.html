@@ -1,0 +1,666 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CampusOne — Academics Review</title>
+  <meta name="description" content="Interactive review prototype for the redesigned CampusOne academic workspace.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;750&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      color-scheme: light;
+      --primary: #2e5aac;
+      --primary-hover: #24478a;
+      --primary-soft: #edf3ff;
+      --primary-strong: #173b72;
+      --canvas: #f5f7fa;
+      --surface: #ffffff;
+      --surface-subtle: #f8fafc;
+      --border: #e2e6ec;
+      --border-strong: #d5dce6;
+      --ink: #172033;
+      --muted: #667085;
+      --muted-light: #8792a2;
+      --success: #17815b;
+      --success-soft: #eaf8f1;
+      --warning: #a76908;
+      --warning-soft: #fff6df;
+      --danger: #b53a49;
+      --danger-soft: #fff0f1;
+      --violet: #6847c2;
+      --violet-soft: #f2efff;
+      --teal: #0d7681;
+      --teal-soft: #e8f7f7;
+      --shadow-sm: 0 1px 2px rgba(20, 32, 54, .04), 0 6px 18px rgba(20, 32, 54, .04);
+      --shadow-md: 0 16px 42px rgba(20, 32, 54, .14);
+      --sidebar: 232px;
+      --topbar: 56px;
+      --radius: 12px;
+      --radius-sm: 8px;
+      --font: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    html { min-width: 320px; background: var(--canvas); }
+    body { margin: 0; color: var(--ink); background: var(--canvas); font-family: var(--font); font-size: 14px; -webkit-font-smoothing: antialiased; }
+    button, input, select, textarea { font: inherit; }
+    button, select { cursor: pointer; }
+    button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, a:focus-visible, summary:focus-visible {
+      outline: 3px solid rgba(46, 90, 172, .22);
+      outline-offset: 2px;
+    }
+    button:disabled { cursor: not-allowed; opacity: .55; }
+    [hidden] { display: none !important; }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+    .icon { width: 17px; height: 17px; stroke-width: 1.9; flex: 0 0 auto; }
+
+    .app-shell { min-height: 100vh; }
+    .topbar {
+      position: fixed; z-index: 30; inset: 0 0 auto 0; height: var(--topbar); display: grid;
+      grid-template-columns: var(--sidebar) minmax(0, 1fr); border-bottom: 1px solid var(--border); background: rgba(255, 255, 255, .98);
+    }
+    .brand { display: flex; align-items: center; gap: 10px; padding: 0 15px; border-right: 1px solid var(--border); font-weight: 750; letter-spacing: -.02em; }
+    .brand-mark { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 7px; color: #fff; background: var(--primary); }
+    .brand-mark .icon { width: 16px; }
+    .topbar-main { min-width: 0; display: flex; align-items: center; gap: 11px; padding: 0 16px; }
+    .menu-toggle { display: none; place-items: center; width: 38px; height: 38px; padding: 0; border: 0; border-radius: var(--radius-sm); color: var(--muted); background: transparent; }
+    .top-select { position: relative; }
+    .top-select select { min-height: 36px; padding: 0 34px 0 34px; border: 1px solid var(--border); border-radius: 8px; color: #344054; background: var(--surface); font-size: 12px; font-weight: 600; appearance: none; }
+    .top-select .icon:first-child { position: absolute; z-index: 1; left: 11px; top: 9px; width: 15px; color: var(--muted); pointer-events: none; }
+    .top-select .chevron { position: absolute; right: 9px; top: 10px; width: 14px; color: var(--muted); pointer-events: none; }
+    .global-search { flex: 1 1 360px; max-width: 540px; min-width: 160px; position: relative; margin-left: 2px; }
+    .global-search .icon { position: absolute; left: 11px; top: 9px; width: 16px; color: #8490a1; }
+    .global-search input { width: 100%; min-height: 36px; padding: 0 70px 0 36px; border: 1px solid var(--border); border-radius: 8px; color: var(--ink); background: #f9fafb; font-size: 12px; }
+    .global-search kbd { position: absolute; right: 7px; top: 7px; padding: 3px 6px; border: 1px solid var(--border); border-bottom-color: #cbd3de; border-radius: 5px; color: var(--muted-light); background: #fff; font: 10px var(--font); }
+    .top-actions { display: flex; align-items: center; gap: 3px; margin-left: auto; }
+    .icon-button { position: relative; display: grid; place-items: center; width: 38px; height: 38px; padding: 0; border: 1px solid transparent; border-radius: 9px; color: #5b6678; background: transparent; }
+    .icon-button:hover { border-color: var(--border); background: var(--surface-subtle); color: var(--primary); }
+    .notification-dot { position: absolute; top: 7px; right: 7px; width: 6px; height: 6px; border: 2px solid #fff; border-radius: 50%; background: #d74855; }
+    .profile { display: flex; align-items: center; gap: 8px; margin-left: 5px; padding-left: 10px; border-left: 1px solid var(--border); }
+    .avatar { display: grid; place-items: center; width: 31px; height: 31px; border-radius: 50%; color: var(--primary); background: var(--primary-soft); font-size: 11px; font-weight: 750; }
+    .profile > span:not(.avatar) { display: grid; gap: 1px; min-width: 84px; font-size: 11px; }
+    .profile strong { font-size: 12px; }
+    .profile small { color: var(--muted-light); font-size: 10px; }
+
+    .sidebar {
+      position: fixed; z-index: 25; inset: var(--topbar) auto 0 0; width: var(--sidebar); overflow-y: auto;
+      border-right: 1px solid var(--border); background: var(--surface); transition: transform 180ms ease;
+    }
+    .sidebar nav { padding: 10px 7px 80px; }
+    .nav-item, .nav-group-title, .academic-link {
+      width: 100%; display: flex; align-items: center; gap: 10px; min-height: 37px; padding: 0 11px;
+      border: 0; border-radius: 7px; color: #4d596b; background: transparent; text-align: left; font-size: 12px; font-weight: 500;
+    }
+    .nav-item:hover, .nav-group-title:hover { color: var(--primary); background: #f7f9fc; }
+    .nav-item .icon, .nav-group-title .icon { width: 16px; color: #697587; }
+    .nav-group-title .nav-chevron { width: 14px; margin-left: auto; }
+    .nav-group { margin: 2px 0; }
+    .nav-group.open > .nav-group-title { color: var(--primary); background: var(--primary-soft); font-weight: 650; }
+    .nav-group.open > .nav-group-title .icon { color: var(--primary); }
+    .nav-submenu { display: grid; gap: 2px; margin: 3px 0 6px 33px; }
+    .academic-link { position: relative; min-height: 34px; padding: 0 9px; color: #5d6879; font-size: 11px; }
+    .academic-link::before { content: ""; position: absolute; left: -13px; width: 1px; height: 100%; background: #e7ebf0; }
+    .academic-link::after { content: ""; position: absolute; left: -13px; width: 8px; height: 1px; background: #e7ebf0; }
+    .academic-link:hover { color: var(--primary); background: #f7f9fc; }
+    .academic-link.active { color: var(--primary); background: var(--primary-soft); font-weight: 700; }
+    .academic-link.active::before, .academic-link.active::after { background: var(--primary); }
+    .sidebar-footer { position: fixed; bottom: 0; left: 0; width: var(--sidebar); display: flex; justify-content: space-between; padding: 12px 15px; border-top: 1px solid var(--border); color: #8792a2; background: #fff; font-size: 10px; }
+    .sidebar-scrim { display: none; position: fixed; z-index: 20; inset: var(--topbar) 0 0; background: rgba(23, 32, 51, .36); }
+
+    .main { min-height: 100vh; margin-left: var(--sidebar); padding: calc(var(--topbar) + 22px) 28px 44px; }
+    .view { width: 100%; max-width: 1420px; margin: 0 auto; animation: view-in 180ms ease both; }
+    @keyframes view-in { from { opacity: 0; transform: translateY(4px); } }
+
+    .page-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 16px; }
+    .breadcrumbs { display: flex; align-items: center; gap: 7px; margin-bottom: 8px; color: #7b8797; font-size: 11px; font-weight: 550; }
+    .breadcrumbs .icon { width: 12px; }
+    .page-header h1 { margin: 0; font-size: 26px; line-height: 1.18; letter-spacing: -.035em; }
+    .page-header p { max-width: 720px; margin: 6px 0 0; color: var(--muted); font-size: 13px; line-height: 1.55; }
+    .header-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+    .button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 38px; padding: 0 13px; border: 1px solid var(--border-strong); border-radius: 8px; color: #344054; background: #fff; font-size: 12px; font-weight: 650; text-decoration: none; }
+    .button:hover { border-color: #bdc8d7; background: #f9fafb; }
+    .button.primary { border-color: var(--primary); color: #fff; background: var(--primary); }
+    .button.primary:hover { border-color: var(--primary-hover); background: var(--primary-hover); }
+    .button.ghost { border-color: transparent; background: transparent; }
+    .button.small { min-height: 32px; padding: 0 10px; font-size: 11px; }
+    .button .icon { width: 15px; }
+
+    .context-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 0; min-height: 48px; margin-bottom: 16px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); box-shadow: var(--shadow-sm); }
+    .context-item { display: flex; align-items: center; gap: 8px; min-height: 46px; padding: 0 15px; border-right: 1px solid var(--border); color: var(--muted); font-size: 11px; }
+    .context-item .icon { width: 15px; color: var(--primary); }
+    .context-item span { display: grid; gap: 1px; }
+    .context-item small { color: var(--muted-light); font-size: 9px; font-weight: 650; letter-spacing: .05em; text-transform: uppercase; }
+    .context-item strong { color: #344054; font-size: 11px; font-weight: 650; }
+    .context-health { display: flex; align-items: center; gap: 7px; margin-left: auto; padding: 0 15px; color: var(--success); font-size: 11px; font-weight: 650; }
+    .context-health .icon { width: 15px; }
+
+    .attention-strip { display: flex; align-items: center; gap: 11px; margin-bottom: 16px; padding: 11px 13px; border: 1px solid #f0d79c; border-radius: 10px; color: #6f4a07; background: #fffaf0; font-size: 12px; }
+    .attention-strip > .icon { width: 18px; color: var(--warning); }
+    .attention-strip strong { color: #583a06; }
+    .attention-strip button { margin-left: auto; border: 0; color: var(--warning); background: transparent; font-weight: 700; }
+
+    .metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
+    .metric { position: relative; min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 9px; min-height: 122px; padding: 15px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow-sm); }
+    .metric::before { content: ""; position: absolute; left: -1px; top: 16px; bottom: 16px; width: 3px; border-radius: 0 4px 4px 0; background: var(--primary); }
+    .metric.success::before { background: var(--success); }
+    .metric.warning::before { background: #d59016; }
+    .metric.violet::before { background: var(--violet); }
+    .metric-label { color: var(--muted); font-size: 11px; font-weight: 600; }
+    .metric-icon { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 9px; color: var(--primary); background: var(--primary-soft); }
+    .metric.success .metric-icon { color: var(--success); background: var(--success-soft); }
+    .metric.warning .metric-icon { color: var(--warning); background: var(--warning-soft); }
+    .metric.violet .metric-icon { color: var(--violet); background: var(--violet-soft); }
+    .metric-icon .icon { width: 16px; }
+    .metric-value { align-self: end; font-size: 23px; line-height: 1; letter-spacing: -.035em; }
+    .metric-hint { align-self: end; justify-self: end; color: var(--muted-light); font-size: 10px; text-align: right; }
+    .metric-hint.good { color: var(--success); }
+    .metric-hint.attention { color: var(--warning); }
+
+    .dashboard-grid { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(300px, .75fr); gap: 16px; margin-bottom: 16px; }
+    .bottom-grid { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(320px, .9fr); gap: 16px; }
+    .card { min-width: 0; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow-sm); }
+    .card-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 15px; padding: 15px 16px; border-bottom: 1px solid var(--border); }
+    .card-header h2 { margin: 0; font-size: 14px; letter-spacing: -.015em; }
+    .card-header p { margin: 4px 0 0; color: var(--muted); font-size: 10px; line-height: 1.45; }
+    .text-link { display: inline-flex; align-items: center; gap: 5px; padding: 0; border: 0; color: var(--primary); background: transparent; font-size: 11px; font-weight: 700; white-space: nowrap; }
+    .text-link .icon { width: 13px; }
+
+    .workflow-list { display: grid; }
+    .workflow-row { display: grid; grid-template-columns: auto minmax(150px, .85fr) minmax(180px, 1.25fr) auto; align-items: center; gap: 13px; padding: 13px 16px; border-bottom: 1px solid #edf0f4; }
+    .workflow-row:last-child { border-bottom: 0; }
+    .workflow-row:hover { background: #fbfcfe; }
+    .workflow-icon { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 9px; color: var(--primary); background: var(--primary-soft); }
+    .workflow-icon.teal { color: var(--teal); background: var(--teal-soft); }
+    .workflow-icon.violet { color: var(--violet); background: var(--violet-soft); }
+    .workflow-icon.warning { color: var(--warning); background: var(--warning-soft); }
+    .workflow-icon .icon { width: 17px; }
+    .workflow-name strong { display: block; font-size: 12px; }
+    .workflow-name small { display: block; margin-top: 3px; color: var(--muted-light); font-size: 10px; }
+    .progress-meta { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 7px; color: var(--muted); font-size: 10px; }
+    .progress-meta strong { color: #4d596b; font-weight: 650; }
+    .progress-track { overflow: hidden; height: 6px; border-radius: 999px; background: #edf0f4; }
+    .progress-track span { display: block; height: 100%; border-radius: inherit; background: var(--primary); }
+    .progress-track.teal span { background: var(--teal); }
+    .progress-track.violet span { background: var(--violet); }
+    .progress-track.warning span { background: #d59016; }
+
+    .agenda { display: grid; padding: 4px 16px 12px; }
+    .agenda-group { padding: 12px 0; border-bottom: 1px solid #edf0f4; }
+    .agenda-group:last-child { border-bottom: 0; }
+    .agenda-label { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; color: var(--muted-light); font-size: 9px; font-weight: 750; letter-spacing: .06em; text-transform: uppercase; }
+    .agenda-item { display: grid; grid-template-columns: 42px minmax(0, 1fr); gap: 10px; margin-top: 10px; }
+    .agenda-time { color: var(--primary); font-size: 10px; font-weight: 700; }
+    .agenda-item strong { display: block; overflow: hidden; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+    .agenda-item small { display: block; margin-top: 3px; color: var(--muted-light); font-size: 9px; }
+
+    .table-wrap { width: 100%; overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; }
+    th { padding: 10px 14px; color: #7b8797; background: #fafbfc; font-size: 9px; font-weight: 750; letter-spacing: .045em; text-align: left; text-transform: uppercase; white-space: nowrap; }
+    td { padding: 11px 14px; border-top: 1px solid #edf0f4; color: #4a5568; font-size: 11px; white-space: nowrap; }
+    td strong { color: #283447; font-weight: 650; }
+    .table-action { width: 32px; height: 32px; }
+    .status { display: inline-flex; align-items: center; min-height: 22px; padding: 0 8px; border-radius: 999px; color: #526075; background: #eef2f6; font-size: 9px; font-weight: 750; white-space: nowrap; }
+    .status.success { color: var(--success); background: var(--success-soft); }
+    .status.warning { color: var(--warning); background: var(--warning-soft); }
+    .status.danger { color: var(--danger); background: var(--danger-soft); }
+    .status.violet { color: var(--violet); background: var(--violet-soft); }
+    .status.blue { color: var(--primary); background: var(--primary-soft); }
+    .activity-list { display: grid; padding: 5px 16px 12px; }
+    .activity-item { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; gap: 10px; align-items: start; padding: 10px 0; border-bottom: 1px solid #edf0f4; }
+    .activity-item:last-child { border-bottom: 0; }
+    .activity-icon { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; color: var(--primary); background: var(--primary-soft); }
+    .activity-icon .icon { width: 13px; }
+    .activity-item p { margin: 0; color: #4d596b; font-size: 10px; line-height: 1.45; }
+    .activity-item p strong { color: #283447; }
+    .activity-item time { color: var(--muted-light); font-size: 9px; white-space: nowrap; }
+
+    .workspace-tabs { display: flex; gap: 2px; margin-bottom: 14px; padding: 4px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); box-shadow: var(--shadow-sm); }
+    .workspace-tabs button { min-height: 36px; padding: 0 14px; border: 0; border-radius: 7px; color: var(--muted); background: transparent; font-size: 11px; font-weight: 650; }
+    .workspace-tabs button:hover { color: var(--primary); background: #f6f8fb; }
+    .workspace-tabs button[aria-selected="true"] { color: var(--primary); background: var(--primary-soft); box-shadow: inset 0 0 0 1px #dbe6fa; }
+
+    .toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 11px 13px; border-bottom: 1px solid var(--border); }
+    .search-field { position: relative; flex: 1 1 240px; max-width: 390px; }
+    .search-field .icon { position: absolute; left: 10px; top: 9px; width: 15px; color: #8792a2; }
+    .search-field input, .toolbar select { min-height: 34px; border: 1px solid var(--border-strong); border-radius: 8px; color: #344054; background: #fff; font-size: 11px; }
+    .search-field input { width: 100%; padding: 0 10px 0 33px; }
+    .toolbar select { min-width: 125px; padding: 0 28px 0 10px; }
+    .toolbar-count { margin-left: auto; color: var(--muted-light); font-size: 10px; }
+
+    .record-list { display: grid; }
+    .record { display: grid; grid-template-columns: auto minmax(220px, 1.3fr) minmax(120px, .55fr) minmax(120px, .55fr) auto; align-items: center; gap: 14px; padding: 13px 15px; border-bottom: 1px solid #edf0f4; }
+    .record:last-child { border-bottom: 0; }
+    .record:hover { background: #fbfcfe; }
+    .record-badge { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 10px; color: var(--primary); background: var(--primary-soft); }
+    .record-badge .icon { width: 18px; }
+    .record-main { min-width: 0; }
+    .record-main h3 { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; margin: 0; font-size: 12px; }
+    .record-main p { overflow: hidden; margin: 4px 0 0; color: var(--muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+    .record-meta { display: grid; gap: 3px; }
+    .record-meta small { color: var(--muted-light); font-size: 9px; font-weight: 650; letter-spacing: .04em; text-transform: uppercase; }
+    .record-meta strong { color: #465165; font-size: 10px; font-weight: 600; }
+    .record-actions { display: flex; justify-content: flex-end; gap: 6px; }
+    .empty-filter { display: none; padding: 34px 16px; color: var(--muted); text-align: center; font-size: 11px; }
+    .empty-filter.visible { display: block; }
+
+    .panel-summary { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(280px, .55fr); gap: 16px; margin-bottom: 16px; }
+    .exam-timeline { display: grid; padding: 4px 16px 12px; }
+    .exam-row { display: grid; grid-template-columns: 58px minmax(170px, 1fr) minmax(100px, .55fr) auto; align-items: center; gap: 14px; padding: 12px 0; border-bottom: 1px solid #edf0f4; }
+    .exam-row:last-child { border-bottom: 0; }
+    .date-chip { display: grid; place-items: center; width: 48px; height: 49px; border-radius: 9px; color: var(--primary); background: var(--primary-soft); }
+    .date-chip strong { font-size: 16px; line-height: 1; }
+    .date-chip small { margin-top: 2px; font-size: 8px; font-weight: 750; text-transform: uppercase; }
+    .exam-row h3 { margin: 0; font-size: 11px; }
+    .exam-row p { margin: 4px 0 0; color: var(--muted-light); font-size: 9px; }
+    .exam-stat { display: grid; gap: 4px; }
+    .exam-stat small { color: var(--muted-light); font-size: 9px; }
+    .exam-stat strong { font-size: 11px; }
+    .readiness-list { display: grid; padding: 9px 16px 14px; }
+    .readiness-item { margin: 8px 0; }
+    .readiness-item header { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 7px; font-size: 10px; }
+    .readiness-item header span { color: var(--muted); }
+
+    .marks-cell { min-width: 130px; }
+    .marks-progress { display: flex; align-items: center; gap: 8px; }
+    .marks-progress .progress-track { flex: 1; min-width: 72px; }
+    .marks-progress strong { font-size: 10px; }
+    .student-stack { display: flex; align-items: center; }
+    .mini-avatar { display: grid; place-items: center; width: 25px; height: 25px; margin-left: -5px; border: 2px solid #fff; border-radius: 50%; color: var(--primary); background: #e8eef9; font-size: 8px; font-weight: 750; }
+    .mini-avatar:first-child { margin-left: 0; }
+
+    .report-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; padding: 14px; }
+    .report-card { display: grid; gap: 12px; padding: 14px; border: 1px solid var(--border); border-radius: 10px; background: #fbfcfe; }
+    .report-card header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+    .report-card h3 { margin: 0; font-size: 12px; }
+    .report-card p { margin: 4px 0 0; color: var(--muted-light); font-size: 9px; }
+    .report-stat { display: flex; justify-content: space-between; gap: 10px; color: var(--muted); font-size: 10px; }
+
+    .drawer-scrim { position: fixed; z-index: 60; inset: 0; background: rgba(23, 32, 51, .34); opacity: 0; pointer-events: none; transition: opacity 160ms ease; }
+    .drawer { position: fixed; z-index: 65; top: 0; right: 0; width: min(420px, 100vw); height: 100vh; display: flex; flex-direction: column; background: #fff; box-shadow: -16px 0 48px rgba(20, 32, 54, .18); transform: translateX(105%); transition: transform 180ms ease; }
+    .drawer[aria-hidden="false"] { transform: translateX(0); }
+    .drawer[aria-hidden="false"] + .drawer-scrim { opacity: 1; pointer-events: auto; }
+    .drawer-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 18px; border-bottom: 1px solid var(--border); }
+    .drawer-header span { color: var(--primary); font-size: 9px; font-weight: 750; letter-spacing: .06em; text-transform: uppercase; }
+    .drawer-header h2 { margin: 5px 0 0; font-size: 18px; }
+    .drawer-body { flex: 1; overflow-y: auto; padding: 18px; }
+    .detail-status { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; padding: 11px 12px; border-radius: 9px; color: var(--success); background: var(--success-soft); font-size: 11px; font-weight: 650; }
+    .detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 18px; }
+    .detail-field { padding: 11px; border: 1px solid var(--border); border-radius: 9px; }
+    .detail-field small { display: block; color: var(--muted-light); font-size: 8px; font-weight: 750; letter-spacing: .05em; text-transform: uppercase; }
+    .detail-field strong { display: block; margin-top: 5px; font-size: 11px; }
+    .detail-section { margin-top: 20px; }
+    .detail-section h3 { margin: 0 0 8px; font-size: 12px; }
+    .detail-section p { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.6; }
+    .objective-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+    .objective-list li { display: flex; gap: 8px; color: #4d596b; font-size: 10px; line-height: 1.45; }
+    .objective-list .icon { width: 14px; color: var(--success); }
+    .drawer-footer { display: flex; justify-content: flex-end; gap: 8px; padding: 14px 18px; border-top: 1px solid var(--border); }
+
+    .modal-layer { position: fixed; z-index: 80; inset: 0; display: grid; place-items: center; padding: 20px; background: rgba(23, 32, 51, .42); opacity: 0; pointer-events: none; transition: opacity 160ms ease; }
+    .modal-layer[aria-hidden="false"] { opacity: 1; pointer-events: auto; }
+    .modal { width: min(640px, 100%); max-height: calc(100vh - 40px); overflow-y: auto; border: 1px solid var(--border); border-radius: 13px; background: #fff; box-shadow: var(--shadow-md); transform: translateY(8px); transition: transform 160ms ease; }
+    .modal-layer[aria-hidden="false"] .modal { transform: translateY(0); }
+    .modal-header { display: flex; justify-content: space-between; gap: 16px; padding: 17px 18px; border-bottom: 1px solid var(--border); }
+    .modal-header h2 { margin: 0; font-size: 17px; }
+    .modal-header p { margin: 4px 0 0; color: var(--muted); font-size: 10px; }
+    .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 13px; padding: 18px; }
+    .field { display: grid; gap: 6px; color: #4d596b; font-size: 10px; font-weight: 650; }
+    .field.wide { grid-column: 1 / -1; }
+    .field input, .field select, .field textarea { width: 100%; min-height: 38px; padding: 8px 10px; border: 1px solid var(--border-strong); border-radius: 8px; color: var(--ink); background: #fff; font-size: 11px; font-weight: 400; }
+    .field textarea { min-height: 72px; resize: vertical; }
+    .modal-footer { display: flex; justify-content: flex-end; gap: 8px; padding: 13px 18px; border-top: 1px solid var(--border); }
+    .toast { position: fixed; z-index: 100; right: 22px; top: 72px; display: flex; align-items: center; gap: 9px; max-width: 360px; padding: 12px 14px; border: 1px solid #bfe3d2; border-radius: 10px; color: #176847; background: #f0fbf6; box-shadow: var(--shadow-md); font-size: 11px; font-weight: 650; transform: translateY(-8px); opacity: 0; pointer-events: none; transition: 180ms ease; }
+    .toast[aria-hidden="false"] { transform: translateY(0); opacity: 1; }
+    .toast .icon { width: 17px; }
+
+    @media (max-width: 1180px) {
+      :root { --sidebar: 216px; }
+      .main { padding-left: 22px; padding-right: 22px; }
+      .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .record { grid-template-columns: auto minmax(220px, 1fr) minmax(110px, .55fr) auto; }
+      .record-meta.secondary { display: none; }
+      .report-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+
+    @media (max-width: 900px) {
+      :root { --sidebar: 232px; }
+      .topbar { grid-template-columns: 1fr; }
+      .brand { display: none; }
+      .menu-toggle { display: grid; }
+      .top-select.year-select, .global-search, .profile > span:not(.avatar) { display: none; }
+      .sidebar { transform: translateX(-105%); }
+      body.sidebar-open .sidebar { transform: translateX(0); }
+      body.sidebar-open .sidebar-scrim { display: block; }
+      .main { margin-left: 0; padding-left: 18px; padding-right: 18px; }
+      .sidebar-footer { transform: translateX(-105%); transition: transform 180ms ease; }
+      body.sidebar-open .sidebar-footer { transform: translateX(0); }
+      .dashboard-grid, .bottom-grid, .panel-summary { grid-template-columns: 1fr; }
+      .record { grid-template-columns: auto minmax(190px, 1fr) auto; }
+      .record-meta { display: none; }
+    }
+
+    @media (max-width: 640px) {
+      .topbar-main { padding: 0 10px; }
+      .top-actions .icon-button:nth-child(-n+2) { display: none; }
+      .profile { min-width: auto; padding-left: 7px; }
+      .main { padding: calc(var(--topbar) + 16px) 12px 32px; }
+      .page-header { align-items: flex-start; flex-direction: column; gap: 13px; }
+      .page-header h1 { font-size: 23px; }
+      .header-actions { width: 100%; justify-content: flex-start; }
+      .header-actions .button { flex: 1 1 auto; }
+      .context-bar { align-items: stretch; }
+      .context-item { flex: 1 1 50%; border-bottom: 1px solid var(--border); }
+      .context-item:nth-child(2) { border-right: 0; }
+      .context-health { width: 100%; min-height: 40px; margin: 0; }
+      .attention-strip { align-items: flex-start; }
+      .attention-strip button { display: none; }
+      .metrics { grid-template-columns: 1fr; }
+      .metric { min-height: 105px; }
+      .workflow-row { grid-template-columns: auto minmax(0, 1fr) auto; }
+      .workflow-row > div:nth-child(3) { display: none; }
+      .workspace-tabs { overflow-x: auto; }
+      .workspace-tabs button { flex: 0 0 auto; }
+      .toolbar select { flex: 1 1 120px; min-width: 0; }
+      .toolbar-count { width: 100%; margin: 0; }
+      .record { grid-template-columns: auto minmax(0, 1fr); align-items: start; }
+      .record-actions { grid-column: 2; justify-content: flex-start; }
+      .exam-row { grid-template-columns: 52px minmax(0, 1fr) auto; }
+      .exam-stat { display: none; }
+      .report-grid { grid-template-columns: 1fr; }
+      .form-grid { grid-template-columns: 1fr; }
+      .field.wide { grid-column: auto; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand"><span class="brand-mark"><i class="icon" data-lucide="graduation-cap"></i></span><span>CampusOne</span></div>
+      <div class="topbar-main">
+        <button class="menu-toggle" type="button" aria-label="Open navigation" data-menu-toggle><i class="icon" data-lucide="menu"></i></button>
+        <label class="top-select">
+          <span class="sr-only">Institute</span><i class="icon" data-lucide="building-2"></i>
+          <select aria-label="Institute"><option>AB International</option></select><i class="icon chevron" data-lucide="chevron-down"></i>
+        </label>
+        <label class="top-select year-select">
+          <span class="sr-only">Academic year</span><i class="icon" data-lucide="calendar-days"></i>
+          <select aria-label="Academic year"><option>AY 2026–27</option><option>AY 2025–26</option></select><i class="icon chevron" data-lucide="chevron-down"></i>
+        </label>
+        <label class="global-search"><span class="sr-only">Global search</span><i class="icon" data-lucide="search"></i><input type="search" placeholder="Search students, staff, roles…"><kbd>/</kbd></label>
+        <div class="top-actions">
+          <button class="icon-button" type="button" aria-label="Tasks"><i class="icon" data-lucide="square-check-big"></i></button>
+          <button class="icon-button" type="button" aria-label="Notifications"><i class="icon" data-lucide="bell"></i><span class="notification-dot"></span></button>
+          <button class="icon-button" type="button" aria-label="Help"><i class="icon" data-lucide="circle-help"></i></button>
+          <div class="profile"><span class="avatar">AM</span><span><strong>Abhi Mehta</strong><small>Institute admin</small></span><i class="icon" data-lucide="chevron-down"></i></div>
+        </div>
+      </div>
+    </header>
+
+    <aside class="sidebar" aria-label="Primary navigation">
+      <nav>
+        <button class="nav-item" type="button"><i class="icon" data-lucide="layout-dashboard"></i>Dashboard</button>
+        <button class="nav-item" type="button"><i class="icon" data-lucide="building-2"></i>Institute Setup<i class="icon nav-chevron" data-lucide="chevron-right"></i></button>
+        <button class="nav-item" type="button"><i class="icon" data-lucide="shield-check"></i>Roles &amp; Permissions<i class="icon nav-chevron" data-lucide="chevron-right"></i></button>
+        <button class="nav-item" type="button"><i class="icon" data-lucide="users"></i>People<i class="icon nav-chevron" data-lucide="chevron-right"></i></button>
+        <button class="nav-item" type="button"><i class="icon" data-lucide="clipboard-list"></i>Admissions CRM<i class="icon nav-chevron" data-lucide="chevron-right"></i></button>
+        <button class="nav-item" type="button"><i class="icon" data-lucide="calendar-check"></i>Attendance<i class="icon nav-chevron" data-lucide="chevron-right"></i></button>
+        <section class="nav-group open">
+          <button class="nav-group-title" type="button"><i class="icon" data-lucide="book-open"></i>Academics<i class="icon nav-chevron" data-lucide="chevron-down"></i></button>
+          <div class="nav-submenu">
+            <button class="academic-link active" type="button" data-page-target="overview" aria-current="page">Academic Overview</button>
+            <button class="academic-link" type="button" data-page-target="teaching">Teaching &amp; Learning</button>
+            <button class="academic-link" type="button" data-page-target="assessment">Assessment &amp; Results</button>
+          </div>
+        </section>
+        <button class="nav-item" type="button"><i class="icon" data-lucide="bell-ring"></i>Communication<i class="icon nav-chevron" data-lucide="chevron-right"></i></button>
+        <button class="nav-item" type="button"><i class="icon" data-lucide="circle-dollar-sign"></i>Finance</button>
+        <button class="nav-item" type="button"><i class="icon" data-lucide="panels-top-left"></i>Template Studio</button>
+        <button class="nav-item" type="button"><i class="icon" data-lucide="calendar-range"></i>Timetable<i class="icon nav-chevron" data-lucide="chevron-right"></i></button>
+        <button class="nav-item" type="button"><i class="icon" data-lucide="gamepad-2"></i>Gamification<i class="icon nav-chevron" data-lucide="chevron-right"></i></button>
+        <button class="nav-item" type="button"><i class="icon" data-lucide="network"></i>Network<i class="icon nav-chevron" data-lucide="chevron-right"></i></button>
+        <button class="nav-item" type="button"><i class="icon" data-lucide="scroll-text"></i>Audit Log</button>
+        <button class="nav-item" type="button"><i class="icon" data-lucide="badge-check"></i>Compliance &amp; Consent</button>
+        <button class="nav-item" type="button"><i class="icon" data-lucide="settings"></i>Subscription &amp; Plan</button>
+        <button class="nav-item" type="button"><i class="icon" data-lucide="package-open"></i>Add-on Modules<i class="icon nav-chevron" data-lucide="chevron-right"></i></button>
+      </nav>
+      <div class="sidebar-footer"><span>CampusOne Admin</span><span>v0.1.0</span></div>
+    </aside>
+    <button class="sidebar-scrim" type="button" aria-label="Close navigation" data-menu-close></button>
+
+    <main class="main">
+      <section class="view" data-page="overview">
+        <header class="page-header">
+          <div><div class="breadcrumbs"><span>Academics</span><i class="icon" data-lucide="chevron-right"></i><span>Overview</span></div><h1>Academic Overview</h1><p>Monitor teaching delivery, assessments and result readiness across your institute.</p></div>
+          <div class="header-actions"><button class="button" type="button"><i class="icon" data-lucide="external-link"></i>Academic Structure</button><button class="button primary" type="button" data-open-modal><i class="icon" data-lucide="plus"></i>New academic activity</button></div>
+        </header>
+        <div class="context-bar" aria-label="Current academic context">
+          <div class="context-item"><i class="icon" data-lucide="building-2"></i><span><small>Branch</small><strong>Main Campus</strong></span></div>
+          <div class="context-item"><i class="icon" data-lucide="calendar-days"></i><span><small>Academic year</small><strong>2026–27</strong></span></div>
+          <div class="context-item"><i class="icon" data-lucide="clock-3"></i><span><small>Current term</small><strong>Term 1 · Week 7</strong></span></div>
+          <div class="context-health"><i class="icon" data-lucide="circle-check-big"></i>Academic setup healthy</div>
+        </div>
+        <div class="attention-strip"><i class="icon" data-lucide="triangle-alert"></i><span><strong>3 items need attention.</strong> Two lesson plans await approval and Grade 9 marks are due tomorrow.</span><button type="button">Review now</button></div>
+        <section class="metrics" aria-label="Academic summary">
+          <article class="metric"><span class="metric-label">Teaching plan coverage</span><span class="metric-icon"><i class="icon" data-lucide="notebook-tabs"></i></span><strong class="metric-value">92%</strong><span class="metric-hint good">+6% this week</span></article>
+          <article class="metric success"><span class="metric-label">Homework completion</span><span class="metric-icon"><i class="icon" data-lucide="clipboard-check"></i></span><strong class="metric-value">84%</strong><span class="metric-hint good">1,248 submitted</span></article>
+          <article class="metric warning"><span class="metric-label">Upcoming assessments</span><span class="metric-icon"><i class="icon" data-lucide="calendar-clock"></i></span><strong class="metric-value">8</strong><span class="metric-hint attention">Next 14 days</span></article>
+          <article class="metric violet"><span class="metric-label">Results published</span><span class="metric-icon"><i class="icon" data-lucide="badge-check"></i></span><strong class="metric-value">76%</strong><span class="metric-hint">12 of 16 classes</span></article>
+        </section>
+        <div class="dashboard-grid">
+          <article class="card">
+            <header class="card-header"><div><h2>Academic workflow health</h2><p>Progress through this term’s core academic cycle.</p></div><button class="text-link" type="button">View operations<i class="icon" data-lucide="arrow-right"></i></button></header>
+            <div class="workflow-list">
+              <div class="workflow-row"><span class="workflow-icon"><i class="icon" data-lucide="notebook-pen"></i></span><div class="workflow-name"><strong>Plan instruction</strong><small>Lesson plans · 24 teachers</small></div><div><div class="progress-meta"><span>44 of 48 plans ready</span><strong>92%</strong></div><div class="progress-track"><span style="width:92%"></span></div></div><span class="status warning">2 to review</span></div>
+              <div class="workflow-row"><span class="workflow-icon teal"><i class="icon" data-lucide="book-check"></i></span><div class="workflow-name"><strong>Deliver learning</strong><small>Homework · 16 classes</small></div><div><div class="progress-meta"><span>1,248 of 1,486 submissions</span><strong>84%</strong></div><div class="progress-track teal"><span style="width:84%"></span></div></div><span class="status danger">26 overdue</span></div>
+              <div class="workflow-row"><span class="workflow-icon warning"><i class="icon" data-lucide="files"></i></span><div class="workflow-name"><strong>Run assessments</strong><small>Exams · Term 1</small></div><div><div class="progress-meta"><span>Question papers and schedules</span><strong>71%</strong></div><div class="progress-track warning"><span style="width:71%"></span></div></div><span class="status warning">3 pending</span></div>
+              <div class="workflow-row"><span class="workflow-icon violet"><i class="icon" data-lucide="chart-no-axes-column-increasing"></i></span><div class="workflow-name"><strong>Publish results</strong><small>Marks and report cards</small></div><div><div class="progress-meta"><span>12 of 16 classes published</span><strong>76%</strong></div><div class="progress-track violet"><span style="width:76%"></span></div></div><span class="status violet">4 in progress</span></div>
+            </div>
+          </article>
+          <article class="card">
+            <header class="card-header"><div><h2>Today &amp; upcoming</h2><p>Priority academic milestones.</p></div><button class="icon-button table-action" type="button" aria-label="Open calendar"><i class="icon" data-lucide="calendar-days"></i></button></header>
+            <div class="agenda">
+              <div class="agenda-group"><div class="agenda-label"><span>Today · 20 Aug</span><span>3 items</span></div><div class="agenda-item"><span class="agenda-time">10:30</span><div><strong>Grade 8 lesson-plan review</strong><small>2 plans · Academic coordinator</small></div></div><div class="agenda-item"><span class="agenda-time">14:00</span><div><strong>Science practical submission</strong><small>Grade 9A · 4 pending</small></div></div></div>
+              <div class="agenda-group"><div class="agenda-label"><span>Next 7 days</span><span>5 items</span></div><div class="agenda-item"><span class="agenda-time">22 Aug</span><div><strong>Mathematics unit test</strong><small>Grade 10 · 96 students</small></div></div><div class="agenda-item"><span class="agenda-time">25 Aug</span><div><strong>Report-card publication</strong><small>Grades 6–8 · Term 1</small></div></div></div>
+            </div>
+          </article>
+        </div>
+        <div class="bottom-grid">
+          <article class="card">
+            <header class="card-header"><div><h2>Class readiness</h2><p>Where coordinators may need to intervene.</p></div><button class="text-link" type="button">View all classes<i class="icon" data-lucide="arrow-right"></i></button></header>
+            <div class="table-wrap"><table><thead><tr><th>Class</th><th>Plan coverage</th><th>Homework</th><th>Marks</th><th>Status</th></tr></thead><tbody><tr><td><strong>Grade 10 A</strong></td><td>96%</td><td>89%</td><td>100%</td><td><span class="status success">On track</span></td></tr><tr><td><strong>Grade 9 A</strong></td><td>88%</td><td>82%</td><td>68%</td><td><span class="status warning">Needs review</span></td></tr><tr><td><strong>Grade 8 B</strong></td><td>92%</td><td>76%</td><td>94%</td><td><span class="status blue">Monitoring</span></td></tr><tr><td><strong>Grade 7 A</strong></td><td>100%</td><td>91%</td><td>100%</td><td><span class="status success">On track</span></td></tr></tbody></table></div>
+          </article>
+          <article class="card">
+            <header class="card-header"><div><h2>Recent activity</h2><p>Latest changes across academic workflows.</p></div><button class="text-link" type="button">Activity log<i class="icon" data-lucide="arrow-right"></i></button></header>
+            <div class="activity-list"><div class="activity-item"><span class="activity-icon"><i class="icon" data-lucide="circle-check-big"></i></span><p><strong>Riya Kapoor</strong> approved the Grade 8 Science lesson plan.</p><time>8 min</time></div><div class="activity-item"><span class="activity-icon"><i class="icon" data-lucide="file-pen-line"></i></span><p><strong>Anil Sharma</strong> entered Grade 9 Mathematics marks.</p><time>24 min</time></div><div class="activity-item"><span class="activity-icon"><i class="icon" data-lucide="calendar-plus"></i></span><p><strong>Priya Nair</strong> scheduled the English unit test.</p><time>1 hr</time></div><div class="activity-item"><span class="activity-icon"><i class="icon" data-lucide="send"></i></span><p><strong>Report cards</strong> were published for Grade 7 A.</p><time>2 hr</time></div></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="view" data-page="teaching" hidden>
+        <header class="page-header"><div><div class="breadcrumbs"><span>Academics</span><i class="icon" data-lucide="chevron-right"></i><span>Teaching &amp; Learning</span></div><h1>Teaching &amp; Learning</h1><p>Plan instruction, review delivery and keep learning work visible across every class.</p></div><div class="header-actions"><button class="button" type="button"><i class="icon" data-lucide="download"></i>Export</button><button class="button primary" type="button" data-open-modal><i class="icon" data-lucide="plus"></i>Create activity</button></div></header>
+        <div class="context-bar"><div class="context-item"><i class="icon" data-lucide="building-2"></i><span><small>Branch</small><strong>Main Campus</strong></span></div><div class="context-item"><i class="icon" data-lucide="calendar-days"></i><span><small>Academic year</small><strong>2026–27</strong></span></div><div class="context-item"><i class="icon" data-lucide="clock-3"></i><span><small>Current week</small><strong>Term 1 · Week 7</strong></span></div><div class="context-health"><i class="icon" data-lucide="users"></i>24 active teachers</div></div>
+        <nav class="workspace-tabs" aria-label="Teaching and learning views"><button type="button" data-tab-target="lesson-plans" data-tab-scope="teaching" aria-selected="true">Lesson plans</button><button type="button" data-tab-target="homework" data-tab-scope="teaching" aria-selected="false">Homework</button></nav>
+
+        <div data-tab-panel="lesson-plans" data-tab-scope="teaching">
+          <section class="metrics"><article class="metric"><span class="metric-label">Plans this week</span><span class="metric-icon"><i class="icon" data-lucide="notebook-tabs"></i></span><strong class="metric-value">48</strong><span class="metric-hint">Across 16 classes</span></article><article class="metric warning"><span class="metric-label">Awaiting review</span><span class="metric-icon"><i class="icon" data-lucide="clock-3"></i></span><strong class="metric-value">2</strong><span class="metric-hint attention">Action needed</span></article><article class="metric success"><span class="metric-label">Approved</span><span class="metric-icon"><i class="icon" data-lucide="circle-check-big"></i></span><strong class="metric-value">44</strong><span class="metric-hint good">92% coverage</span></article><article class="metric violet"><span class="metric-label">Teacher coverage</span><span class="metric-icon"><i class="icon" data-lucide="users-round"></i></span><strong class="metric-value">24/26</strong><span class="metric-hint">2 drafts missing</span></article></section>
+          <article class="card" data-filter-group="lesson-plans">
+            <div class="toolbar"><label class="search-field"><span class="sr-only">Search lesson plans</span><i class="icon" data-lucide="search"></i><input type="search" placeholder="Search lesson plans…" data-filter-input="lesson-plans"></label><select aria-label="Class filter"><option>All classes</option><option>Grade 8 A</option><option>Grade 9 A</option></select><select aria-label="Status filter"><option>All statuses</option><option>Draft</option><option>Submitted</option><option>Approved</option></select><span class="toolbar-count">48 lesson plans</span></div>
+            <div class="record-list">
+              <article class="record" data-search="fractions decimals grade 8 mathematics riya kapoor approved"><span class="record-badge"><i class="icon" data-lucide="notebook-pen"></i></span><div class="record-main"><h3>Fractions and decimals <span class="status success">Approved</span></h3><p>Mathematics · Grade 8 A · Riya Kapoor</p></div><div class="record-meta"><small>Scheduled</small><strong>20 Aug · Period 2</strong></div><div class="record-meta secondary"><small>Resources</small><strong>3 attachments</strong></div><div class="record-actions"><button class="button small" type="button" data-details data-title="Fractions and decimals">View plan</button><button class="icon-button table-action" type="button" aria-label="More actions"><i class="icon" data-lucide="ellipsis"></i></button></div></article>
+              <article class="record" data-search="geometry triangles grade 9 mathematics anil sharma submitted"><span class="record-badge"><i class="icon" data-lucide="notebook-pen"></i></span><div class="record-main"><h3>Geometry: properties of triangles <span class="status violet">Submitted</span></h3><p>Mathematics · Grade 9 A · Anil Sharma</p></div><div class="record-meta"><small>Scheduled</small><strong>21 Aug · Period 1</strong></div><div class="record-meta secondary"><small>Resources</small><strong>2 attachments</strong></div><div class="record-actions"><button class="button small primary" type="button">Review</button><button class="icon-button table-action" type="button" aria-label="More actions"><i class="icon" data-lucide="ellipsis"></i></button></div></article>
+              <article class="record" data-search="photosynthesis lab grade 8 science priya nair draft"><span class="record-badge"><i class="icon" data-lucide="flask-conical"></i></span><div class="record-main"><h3>Photosynthesis lab <span class="status warning">Draft</span></h3><p>Science · Grade 8 B · Priya Nair</p></div><div class="record-meta"><small>Scheduled</small><strong>22 Aug · Period 4</strong></div><div class="record-meta secondary"><small>Resources</small><strong>1 attachment</strong></div><div class="record-actions"><button class="button small" type="button">Edit draft</button><button class="icon-button table-action" type="button" aria-label="More actions"><i class="icon" data-lucide="ellipsis"></i></button></div></article>
+              <article class="record" data-search="creative writing grade 7 english meera joseph approved"><span class="record-badge"><i class="icon" data-lucide="book-open-text"></i></span><div class="record-main"><h3>Creative writing: character voice <span class="status success">Approved</span></h3><p>English · Grade 7 A · Meera Joseph</p></div><div class="record-meta"><small>Scheduled</small><strong>22 Aug · Period 3</strong></div><div class="record-meta secondary"><small>Resources</small><strong>4 attachments</strong></div><div class="record-actions"><button class="button small" type="button">View plan</button><button class="icon-button table-action" type="button" aria-label="More actions"><i class="icon" data-lucide="ellipsis"></i></button></div></article>
+            </div>
+            <div class="empty-filter" data-empty-state>No lesson plans match this search.</div>
+          </article>
+        </div>
+
+        <div data-tab-panel="homework" data-tab-scope="teaching" hidden>
+          <section class="metrics"><article class="metric"><span class="metric-label">Active assignments</span><span class="metric-icon"><i class="icon" data-lucide="clipboard-list"></i></span><strong class="metric-value">18</strong><span class="metric-hint">Across 12 subjects</span></article><article class="metric success"><span class="metric-label">Submission rate</span><span class="metric-icon"><i class="icon" data-lucide="circle-check-big"></i></span><strong class="metric-value">84%</strong><span class="metric-hint good">+3% this week</span></article><article class="metric warning"><span class="metric-label">Due today</span><span class="metric-icon"><i class="icon" data-lucide="clock-alert"></i></span><strong class="metric-value">4</strong><span class="metric-hint attention">312 students</span></article><article class="metric violet"><span class="metric-label">Needs follow-up</span><span class="metric-icon"><i class="icon" data-lucide="user-round-search"></i></span><strong class="metric-value">26</strong><span class="metric-hint">Overdue submissions</span></article></section>
+          <article class="card"><div class="toolbar"><label class="search-field"><span class="sr-only">Search homework</span><i class="icon" data-lucide="search"></i><input type="search" placeholder="Search homework…"></label><select aria-label="Homework class filter"><option>All classes</option></select><select aria-label="Homework due filter"><option>All due dates</option><option>Due today</option><option>Overdue</option></select><span class="toolbar-count">18 assignments</span></div><div class="record-list"><article class="record"><span class="record-badge"><i class="icon" data-lucide="book-check"></i></span><div class="record-main"><h3>Algebra practice set 4 <span class="status warning">Due today</span></h3><p>Mathematics · Grade 9 A · Anil Sharma</p></div><div class="record-meta"><small>Submitted</small><strong>42 of 48</strong></div><div class="record-meta secondary"><small>Completion</small><strong>88%</strong></div><div class="record-actions"><button class="button small" type="button">Track submissions</button></div></article><article class="record"><span class="record-badge"><i class="icon" data-lucide="book-check"></i></span><div class="record-main"><h3>Plant-cell observation journal <span class="status blue">Active</span></h3><p>Science · Grade 8 B · Priya Nair</p></div><div class="record-meta"><small>Submitted</small><strong>35 of 41</strong></div><div class="record-meta secondary"><small>Due</small><strong>22 Aug</strong></div><div class="record-actions"><button class="button small" type="button">Track submissions</button></div></article><article class="record"><span class="record-badge"><i class="icon" data-lucide="book-check"></i></span><div class="record-main"><h3>Reading reflection: The Blue Umbrella <span class="status danger">Overdue</span></h3><p>English · Grade 7 A · Meera Joseph</p></div><div class="record-meta"><small>Submitted</small><strong>28 of 36</strong></div><div class="record-meta secondary"><small>Overdue</small><strong>8 students</strong></div><div class="record-actions"><button class="button small" type="button">Send reminder</button></div></article></div></article>
+        </div>
+      </section>
+
+      <section class="view" data-page="assessment" hidden>
+        <header class="page-header"><div><div class="breadcrumbs"><span>Academics</span><i class="icon" data-lucide="chevron-right"></i><span>Assessment &amp; Results</span></div><h1>Assessment &amp; Results</h1><p>Coordinate exams, complete marks and publish trustworthy results for every class.</p></div><div class="header-actions"><button class="button" type="button"><i class="icon" data-lucide="download"></i>Export results</button><button class="button primary" type="button" data-open-modal><i class="icon" data-lucide="plus"></i>New assessment</button></div></header>
+        <div class="context-bar"><div class="context-item"><i class="icon" data-lucide="building-2"></i><span><small>Branch</small><strong>Main Campus</strong></span></div><div class="context-item"><i class="icon" data-lucide="calendar-days"></i><span><small>Academic year</small><strong>2026–27</strong></span></div><div class="context-item"><i class="icon" data-lucide="layers-3"></i><span><small>Assessment cycle</small><strong>Term 1</strong></span></div><div class="context-health"><i class="icon" data-lucide="shield-check"></i>Grading policy active</div></div>
+        <nav class="workspace-tabs" aria-label="Assessment and results views"><button type="button" data-tab-target="exams" data-tab-scope="assessment" aria-selected="true">Exams</button><button type="button" data-tab-target="marks" data-tab-scope="assessment" aria-selected="false">Marks entry</button><button type="button" data-tab-target="report-cards" data-tab-scope="assessment" aria-selected="false">Report cards</button></nav>
+
+        <div data-tab-panel="exams" data-tab-scope="assessment">
+          <section class="metrics"><article class="metric"><span class="metric-label">Scheduled exams</span><span class="metric-icon"><i class="icon" data-lucide="calendar-range"></i></span><strong class="metric-value">8</strong><span class="metric-hint">Next 14 days</span></article><article class="metric success"><span class="metric-label">Ready to conduct</span><span class="metric-icon"><i class="icon" data-lucide="circle-check-big"></i></span><strong class="metric-value">5</strong><span class="metric-hint good">Papers verified</span></article><article class="metric warning"><span class="metric-label">Pending papers</span><span class="metric-icon"><i class="icon" data-lucide="files"></i></span><strong class="metric-value">3</strong><span class="metric-hint attention">Needs approval</span></article><article class="metric violet"><span class="metric-label">Students scheduled</span><span class="metric-icon"><i class="icon" data-lucide="users-round"></i></span><strong class="metric-value">642</strong><span class="metric-hint">Grades 6–10</span></article></section>
+          <div class="panel-summary"><article class="card"><header class="card-header"><div><h2>Upcoming examinations</h2><p>Schedule and preparation status.</p></div><button class="text-link" type="button">Full schedule<i class="icon" data-lucide="arrow-right"></i></button></header><div class="exam-timeline"><div class="exam-row"><span class="date-chip"><strong>22</strong><small>Aug</small></span><div><h3>Mathematics Unit Test</h3><p>Grade 10 · 96 students · 09:00–10:30</p></div><div class="exam-stat"><small>Question paper</small><strong>Approved</strong></div><span class="status success">Ready</span></div><div class="exam-row"><span class="date-chip"><strong>24</strong><small>Aug</small></span><div><h3>Science Practical</h3><p>Grade 9 · 88 students · 10:00–12:00</p></div><div class="exam-stat"><small>Question paper</small><strong>In review</strong></div><span class="status warning">Preparing</span></div><div class="exam-row"><span class="date-chip"><strong>28</strong><small>Aug</small></span><div><h3>English Language Assessment</h3><p>Grade 8 · 82 students · 09:00–11:00</p></div><div class="exam-stat"><small>Question paper</small><strong>Draft</strong></div><span class="status violet">Planning</span></div></div></article><article class="card"><header class="card-header"><div><h2>Exam readiness</h2><p>Completion by preparation step.</p></div></header><div class="readiness-list"><div class="readiness-item"><header><span>Schedule published</span><strong>100%</strong></header><div class="progress-track"><span style="width:100%"></span></div></div><div class="readiness-item"><header><span>Question papers</span><strong>71%</strong></header><div class="progress-track warning"><span style="width:71%"></span></div></div><div class="readiness-item"><header><span>Room allocation</span><strong>88%</strong></header><div class="progress-track teal"><span style="width:88%"></span></div></div><div class="readiness-item"><header><span>Invigilators assigned</span><strong>75%</strong></header><div class="progress-track violet"><span style="width:75%"></span></div></div></div></article></div>
+          <article class="card"><header class="card-header"><div><h2>Assessment register</h2><p>All current assessment records.</p></div></header><div class="table-wrap"><table><thead><tr><th>Assessment</th><th>Class</th><th>Date</th><th>Duration</th><th>Marks</th><th>Status</th><th></th></tr></thead><tbody><tr><td><strong>Mathematics Unit Test</strong></td><td>Grade 10 A</td><td>22 Aug 2026</td><td>90 min</td><td>50</td><td><span class="status success">Ready</span></td><td><button class="icon-button table-action" type="button" aria-label="Open Mathematics Unit Test"><i class="icon" data-lucide="chevron-right"></i></button></td></tr><tr><td><strong>Science Practical</strong></td><td>Grade 9 A</td><td>24 Aug 2026</td><td>120 min</td><td>40</td><td><span class="status warning">Preparing</span></td><td><button class="icon-button table-action" type="button" aria-label="Open Science Practical"><i class="icon" data-lucide="chevron-right"></i></button></td></tr><tr><td><strong>English Language Assessment</strong></td><td>Grade 8 A</td><td>28 Aug 2026</td><td>120 min</td><td>80</td><td><span class="status violet">Planning</span></td><td><button class="icon-button table-action" type="button" aria-label="Open English assessment"><i class="icon" data-lucide="chevron-right"></i></button></td></tr></tbody></table></div></article>
+        </div>
+
+        <div data-tab-panel="marks" data-tab-scope="assessment" hidden>
+          <section class="metrics"><article class="metric"><span class="metric-label">Marks completion</span><span class="metric-icon"><i class="icon" data-lucide="file-pen-line"></i></span><strong class="metric-value">86%</strong><span class="metric-hint">1,422 of 1,656</span></article><article class="metric success"><span class="metric-label">Class average</span><span class="metric-icon"><i class="icon" data-lucide="chart-no-axes-column-increasing"></i></span><strong class="metric-value">78.4%</strong><span class="metric-hint good">+2.1% vs Term 3</span></article><article class="metric warning"><span class="metric-label">Pending verification</span><span class="metric-icon"><i class="icon" data-lucide="scan-search"></i></span><strong class="metric-value">4</strong><span class="metric-hint attention">Subject records</span></article><article class="metric violet"><span class="metric-label">Needs support</span><span class="metric-icon"><i class="icon" data-lucide="user-round-search"></i></span><strong class="metric-value">18</strong><span class="metric-hint">Students below 40%</span></article></section>
+          <article class="card"><div class="toolbar"><label class="search-field"><span class="sr-only">Search marks records</span><i class="icon" data-lucide="search"></i><input type="search" placeholder="Search class or subject…"></label><select aria-label="Marks class filter"><option>All classes</option></select><select aria-label="Marks status filter"><option>All statuses</option></select><span class="toolbar-count">16 class records</span></div><div class="table-wrap"><table><thead><tr><th>Class &amp; subject</th><th>Teacher</th><th>Entered</th><th>Class average</th><th>Students needing support</th><th>Status</th><th></th></tr></thead><tbody><tr><td><strong>Grade 10 A · Mathematics</strong></td><td>Anil Sharma</td><td class="marks-cell"><div class="marks-progress"><div class="progress-track"><span style="width:100%"></span></div><strong>48/48</strong></div></td><td>81.2%</td><td><div class="student-stack"><span class="mini-avatar">RK</span><span class="mini-avatar">AS</span><span class="mini-avatar">+2</span></div></td><td><span class="status success">Verified</span></td><td><button class="button small" type="button">View marks</button></td></tr><tr><td><strong>Grade 9 A · Science</strong></td><td>Priya Nair</td><td class="marks-cell"><div class="marks-progress"><div class="progress-track warning"><span style="width:77%"></span></div><strong>37/48</strong></div></td><td>74.6%</td><td><div class="student-stack"><span class="mini-avatar">PS</span><span class="mini-avatar">VK</span><span class="mini-avatar">+4</span></div></td><td><span class="status warning">In progress</span></td><td><button class="button small primary" type="button">Continue entry</button></td></tr><tr><td><strong>Grade 8 B · English</strong></td><td>Meera Joseph</td><td class="marks-cell"><div class="marks-progress"><div class="progress-track violet"><span style="width:100%"></span></div><strong>41/41</strong></div></td><td>79.8%</td><td><div class="student-stack"><span class="mini-avatar">AM</span><span class="mini-avatar">+1</span></div></td><td><span class="status violet">Pending review</span></td><td><button class="button small" type="button">Review</button></td></tr></tbody></table></div></article>
+        </div>
+
+        <div data-tab-panel="report-cards" data-tab-scope="assessment" hidden>
+          <section class="metrics"><article class="metric"><span class="metric-label">Report cards</span><span class="metric-icon"><i class="icon" data-lucide="files"></i></span><strong class="metric-value">642</strong><span class="metric-hint">Term 1 total</span></article><article class="metric success"><span class="metric-label">Published</span><span class="metric-icon"><i class="icon" data-lucide="send"></i></span><strong class="metric-value">486</strong><span class="metric-hint good">76% complete</span></article><article class="metric warning"><span class="metric-label">Ready to publish</span><span class="metric-icon"><i class="icon" data-lucide="circle-check-big"></i></span><strong class="metric-value">118</strong><span class="metric-hint attention">Awaiting release</span></article><article class="metric violet"><span class="metric-label">Incomplete</span><span class="metric-icon"><i class="icon" data-lucide="clock-3"></i></span><strong class="metric-value">38</strong><span class="metric-hint">Marks or remarks pending</span></article></section>
+          <article class="card"><header class="card-header"><div><h2>Report-card batches</h2><p>Generation and publication status by class.</p></div><button class="button small primary" type="button"><i class="icon" data-lucide="sparkles"></i>Generate report cards</button></header><div class="report-grid"><article class="report-card"><header><div><h3>Grade 10 A</h3><p>48 students · Term 1</p></div><span class="status success">Published</span></header><div class="report-stat"><span>Generated</span><strong>48 of 48</strong></div><div class="progress-track teal"><span style="width:100%"></span></div><button class="button small" type="button">View batch</button></article><article class="report-card"><header><div><h3>Grade 9 A</h3><p>48 students · Term 1</p></div><span class="status warning">In progress</span></header><div class="report-stat"><span>Generated</span><strong>37 of 48</strong></div><div class="progress-track warning"><span style="width:77%"></span></div><button class="button small primary" type="button">Complete batch</button></article><article class="report-card"><header><div><h3>Grade 8 B</h3><p>41 students · Term 1</p></div><span class="status violet">Ready</span></header><div class="report-stat"><span>Generated</span><strong>41 of 41</strong></div><div class="progress-track violet"><span style="width:100%"></span></div><button class="button small" type="button">Publish batch</button></article></div></article>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <aside class="drawer" role="dialog" aria-modal="true" aria-label="Academic record details" aria-hidden="true" data-drawer>
+    <header class="drawer-header"><div><span>Lesson plan details</span><h2 data-drawer-title>Fractions and decimals</h2></div><button class="icon-button" type="button" aria-label="Close details" data-close-drawer><i class="icon" data-lucide="x"></i></button></header>
+    <div class="drawer-body"><div class="detail-status"><span>Approved and ready to teach</span><i class="icon" data-lucide="circle-check-big"></i></div><div class="detail-grid"><div class="detail-field"><small>Teacher</small><strong>Riya Kapoor</strong></div><div class="detail-field"><small>Class</small><strong>Grade 8 A</strong></div><div class="detail-field"><small>Subject</small><strong>Mathematics</strong></div><div class="detail-field"><small>Schedule</small><strong>20 Aug · Period 2</strong></div></div><section class="detail-section"><h3>Learning intent</h3><p>Students will compare, order and convert fractions and decimals through guided examples and a short collaborative practice activity.</p></section><section class="detail-section"><h3>Learning objectives</h3><ul class="objective-list"><li><i class="icon" data-lucide="circle-check"></i>Convert common fractions to decimals accurately.</li><li><i class="icon" data-lucide="circle-check"></i>Compare mixed sets of fractions and decimals.</li><li><i class="icon" data-lucide="circle-check"></i>Explain the chosen conversion strategy.</li></ul></section><section class="detail-section"><h3>Resources</h3><p>Practice worksheet, fraction wall and interactive whiteboard activity.</p></section></div>
+    <footer class="drawer-footer"><button class="button" type="button" data-close-drawer>Close</button><button class="button primary" type="button"><i class="icon" data-lucide="pencil"></i>Edit plan</button></footer>
+  </aside><button class="drawer-scrim" type="button" aria-label="Close details" data-close-drawer></button>
+
+  <div class="modal-layer" role="presentation" aria-hidden="true" data-modal>
+    <section class="modal" role="dialog" aria-modal="true" aria-labelledby="create-title">
+      <header class="modal-header"><div><h2 id="create-title">Create academic activity</h2><p>Add a review record to the current academic context.</p></div><button class="icon-button" type="button" aria-label="Close modal" data-close-modal><i class="icon" data-lucide="x"></i></button></header>
+      <form data-create-form><div class="form-grid"><label class="field"><span>Activity type</span><select name="type"><option>Lesson plan</option><option>Homework</option><option>Assessment</option></select></label><label class="field"><span>Status</span><select name="status"><option>Draft</option><option>Submit for review</option></select></label><label class="field wide"><span>Title</span><input name="title" required maxlength="120" placeholder="e.g. Linear equations recap"></label><label class="field"><span>Class</span><select name="class"><option>Grade 8 A</option><option>Grade 9 A</option><option>Grade 10 A</option></select></label><label class="field"><span>Subject</span><select name="subject"><option>Mathematics</option><option>Science</option><option>English</option></select></label><label class="field"><span>Teacher</span><select name="teacher"><option>Riya Kapoor</option><option>Anil Sharma</option><option>Priya Nair</option></select></label><label class="field"><span>Date</span><input type="date" name="date" value="2026-08-24"></label><label class="field wide"><span>Notes</span><textarea name="notes" placeholder="Add teaching goals, instructions or review notes"></textarea></label></div><footer class="modal-footer"><button class="button" type="button" data-close-modal>Cancel</button><button class="button primary" type="button" data-submit-create><i class="icon" data-lucide="plus"></i>Create activity</button></footer></form>
+    </section>
+  </div>
+
+  <div class="toast" role="status" aria-live="polite" aria-hidden="true" data-toast><i class="icon" data-lucide="circle-check-big"></i><span data-toast-message>Activity created.</span></div>
+
+  <script>
+    (() => {
+      const doc = document
+      const pageButtons = [...doc.querySelectorAll('[data-page-target]')]
+      const pages = [...doc.querySelectorAll('[data-page]')]
+      const drawer = doc.querySelector('[data-drawer]')
+      const modal = doc.querySelector('[data-modal]')
+      const toast = doc.querySelector('[data-toast]')
+      let returnFocus = null
+      let toastTimer = null
+
+      const refreshIcons = () => {
+        if (window.lucide && typeof window.lucide.createIcons === 'function') window.lucide.createIcons()
+      }
+
+      const showPage = (name, updateHash = true) => {
+        const safeName = pages.some((page) => page.dataset.page === name) ? name : 'overview'
+        pages.forEach((page) => { page.hidden = page.dataset.page !== safeName })
+        pageButtons.forEach((button) => {
+          const active = button.dataset.pageTarget === safeName
+          button.classList.toggle('active', active)
+          if (active) button.setAttribute('aria-current', 'page')
+          else button.removeAttribute('aria-current')
+        })
+        doc.body.classList.remove('sidebar-open')
+        if (updateHash) history.replaceState(null, '', `#${safeName}`)
+        doc.querySelector(`[data-page="${safeName}"] h1`)?.focus?.({ preventScroll: true })
+        doc.documentElement.scrollTop = 0
+        doc.body.scrollTop = 0
+      }
+
+      pageButtons.forEach((button) => button.addEventListener('click', () => showPage(button.dataset.pageTarget)))
+
+      const initialPage = location.hash.replace('#', '')
+      if (initialPage && initialPage !== 'overview') showPage(initialPage, false)
+
+      doc.querySelectorAll('[data-tab-target]').forEach((button) => {
+        button.addEventListener('click', () => {
+          const scope = button.dataset.tabScope
+          const target = button.dataset.tabTarget
+          doc.querySelectorAll(`[data-tab-target][data-tab-scope="${scope}"]`).forEach((tab) => tab.setAttribute('aria-selected', String(tab === button)))
+          doc.querySelectorAll(`[data-tab-panel][data-tab-scope="${scope}"]`).forEach((panel) => { panel.hidden = panel.dataset.tabPanel !== target })
+        })
+      })
+
+      doc.querySelectorAll('[data-filter-input]').forEach((input) => {
+        input.addEventListener('input', () => {
+          const group = doc.querySelector(`[data-filter-group="${input.dataset.filterInput}"]`)
+          const query = input.value.trim().toLowerCase()
+          const rows = [...group.querySelectorAll('[data-search]')]
+          rows.forEach((row) => { row.hidden = !row.dataset.search.includes(query) })
+          const visible = rows.filter((row) => !row.hidden).length
+          group.querySelector('[data-empty-state]')?.classList.toggle('visible', visible === 0)
+        })
+      })
+
+      const openDrawer = (button) => {
+        returnFocus = button
+        const title = button.dataset.title || 'Academic record'
+        drawer.querySelector('[data-drawer-title]').textContent = title
+        drawer.setAttribute('aria-hidden', 'false')
+        drawer.querySelector('[data-close-drawer]')?.focus()
+      }
+      const closeDrawer = () => {
+        if (drawer.getAttribute('aria-hidden') === 'true') return
+        drawer.setAttribute('aria-hidden', 'true')
+        returnFocus?.focus?.()
+      }
+      doc.querySelectorAll('[data-details]').forEach((button) => button.addEventListener('click', () => openDrawer(button)))
+      doc.querySelectorAll('[data-close-drawer]').forEach((button) => button.addEventListener('click', closeDrawer))
+
+      const openModal = (button) => {
+        returnFocus = button
+        modal.setAttribute('aria-hidden', 'false')
+        modal.querySelector('input[name="title"]')?.focus()
+      }
+      const closeModal = () => {
+        if (modal.getAttribute('aria-hidden') === 'true') return
+        modal.setAttribute('aria-hidden', 'true')
+        returnFocus?.focus?.()
+      }
+      doc.querySelectorAll('[data-open-modal]').forEach((button) => button.addEventListener('click', () => openModal(button)))
+      doc.querySelectorAll('[data-close-modal]').forEach((button) => button.addEventListener('click', closeModal))
+      modal.addEventListener('click', (event) => { if (event.target === modal) closeModal() })
+
+      const createForm = doc.querySelector('[data-create-form]')
+      const completeCreate = (form) => {
+        if (!form.reportValidity()) return
+        const title = String(new FormData(form).get('title') || 'Academic activity')
+        closeModal()
+        doc.querySelector('[data-toast-message]').textContent = `${title} created as a review draft.`
+        toast.setAttribute('aria-hidden', 'false')
+        clearTimeout(toastTimer)
+        toastTimer = setTimeout(() => toast.setAttribute('aria-hidden', 'true'), 3600)
+        form.reset()
+      }
+      createForm.addEventListener('submit', (event) => {
+        event.preventDefault()
+        completeCreate(event.currentTarget)
+      })
+      createForm.querySelector('[data-submit-create]').addEventListener('click', () => completeCreate(createForm))
+
+      doc.querySelector('[data-menu-toggle]').addEventListener('click', () => doc.body.classList.add('sidebar-open'))
+      doc.querySelector('[data-menu-close]').addEventListener('click', () => doc.body.classList.remove('sidebar-open'))
+      doc.addEventListener('keydown', (event) => {
+        if (event.key !== 'Escape') return
+        closeDrawer()
+        closeModal()
+        doc.body.classList.remove('sidebar-open')
+      })
+
+      refreshIcons()
+      window.addEventListener('load', refreshIcons, { once: true })
+    })()
+  </script>
+  <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js" defer></script>
+</body>
+</html>

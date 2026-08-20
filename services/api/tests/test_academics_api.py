@@ -2,7 +2,7 @@ from datetime import date
 
 import pytest
 
-from modules.academics.models import AcademicOperation, AcademicYear, ClassSection, Grade
+from modules.academics.models import AcademicOperation, AcademicYear, ClassSection, Grade, Subject
 from modules.identity.models import User
 from modules.institutes.models import Branch, Institute, InstituteMembership
 from modules.people.models import Student
@@ -216,3 +216,132 @@ def test_academic_operations_are_persisted_tenant_scoped_and_editable(api_client
         f"/operations/{operation_id}", {"kind": "EXAM"}, format="json"
     )
     assert rejected_kind_change.status_code == 400
+
+
+def test_subject_api_reports_duplicate_code_as_a_friendly_field_error(api_client):
+    institute = Institute.objects.create(name="Northstar Academy", code="NSA")
+    branch = Branch.objects.create(institute=institute, name="Main", code="MAIN")
+    Subject.objects.create(institute=institute, branch=branch, name="Mathematics", subject_code="MATHS-PP3")
+    authenticate_admin(api_client, institute=institute, email="admin@northstar.test")
+
+    rejected = api_client.post(
+        "/subjects",
+        {"name": "Maths", "subjectCode": "Maths-pp3", "branchId": str(branch.id)},
+        format="json",
+    )
+
+    assert rejected.status_code == 400
+    payload = rejected.json()["error"]
+    assert payload["fieldErrors"] == {
+        "subjectCode": [
+            "This subject code is already in use in this branch. Please choose a different code."
+        ]
+    }
+    assert "uq_subject_code_per_institute" not in str(payload)
+
+
+def test_subject_api_allows_duplicate_names_when_codes_are_unique(api_client):
+    institute = Institute.objects.create(name="Northstar Academy", code="NSA")
+    branch = Branch.objects.create(institute=institute, name="Main", code="MAIN")
+    Subject.objects.create(institute=institute, branch=branch, name="Mathematics", subject_code="MATHS-PP3")
+    authenticate_admin(api_client, institute=institute, email="admin@northstar.test")
+
+    created = api_client.post(
+        "/subjects",
+        {"name": "Mathematics", "subjectCode": "MATHS-CLASS-8", "branchId": str(branch.id)},
+        format="json",
+    )
+
+    assert created.status_code == 201
+    assert created.json()["data"]["name"] == "Mathematics"
+    assert created.json()["data"]["subjectCode"] == "MATHS-CLASS-8"
+
+
+def test_subject_creation_can_assign_the_subject_to_a_class(api_client):
+    institute = Institute.objects.create(name="Northstar Academy", code="NSA")
+    grade = Grade.objects.create(institute=institute, name="Class 8")
+    branch = Branch.objects.create(institute=institute, name="Main", code="MAIN")
+    year = AcademicYear.objects.create(
+        institute=institute, name="2026-27", start_date=date(2026, 4, 1), end_date=date(2027, 3, 31), is_current=True
+    )
+    authenticate_admin(api_client, institute=institute, email="admin@northstar.test")
+
+    created = api_client.post(
+        "/subjects",
+        {"name": "Mathematics", "subjectCode": "MATHS-8", "branchId": str(branch.id)},
+        format="json",
+    )
+    assert created.status_code == 201
+
+    mapped = api_client.post(
+        "/class-subjects",
+        {
+            "classId": str(grade.id),
+            "subjectId": created.json()["data"]["id"],
+            "branchId": str(branch.id),
+            "periodsPerWeek": 5,
+            "isElective": False,
+            "isLab": False,
+            "roomId": None,
+        },
+        format="json",
+    )
+    assert mapped.status_code == 201
+
+    listed = api_client.get(f"/subjects?pageSize=100&branchId={branch.id}")
+    assert listed.status_code == 200
+    assert listed.json()["data"]["items"][0]["classesCount"] == 1
+
+    curriculum = api_client.get(f"/class-subjects?branchId={branch.id}&pageSize=100")
+    assert curriculum.status_code == 200
+    assert curriculum.json()["data"]["items"][0]["sectionLabel"] == "Class 8 – Default"
+
+
+def test_subject_delete_explains_mapping_dependency(api_client):
+    institute = Institute.objects.create(name="Northstar Academy", code="NSA")
+    branch = Branch.objects.create(institute=institute, name="Main", code="MAIN")
+    grade = Grade.objects.create(institute=institute, name="Class 8")
+    AcademicYear.objects.create(
+        institute=institute,
+        name="2026-27",
+        start_date=date(2026, 4, 1),
+        end_date=date(2027, 3, 31),
+        is_current=True,
+    )
+    authenticate_admin(api_client, institute=institute, email="admin@northstar.test")
+
+    created = api_client.post(
+        "/subjects",
+        {"name": "Mathematics", "subjectCode": "MATHS-8", "branchId": str(branch.id)},
+        format="json",
+    )
+    subject_id = created.json()["data"]["id"]
+    mapped = api_client.post(
+        "/class-subjects",
+        {"classId": str(grade.id), "subjectId": subject_id, "branchId": str(branch.id)},
+        format="json",
+    )
+
+    rejected = api_client.delete(f"/subjects/{subject_id}")
+    assert rejected.status_code == 400
+    assert rejected.json()["error"]["fieldErrors"] == {
+        "nonFieldErrors": [
+            "Remove this subject from all class and section mappings before deleting it."
+        ]
+    }
+
+    assert api_client.delete(f"/class-subjects/{mapped.json()['data']['id']}").status_code == 204
+    assert api_client.delete(f"/subjects/{subject_id}").status_code == 204
+
+
+def test_subject_codes_are_unique_per_branch_not_institute(api_client):
+    institute = Institute.objects.create(name="Northstar Academy", code="NSA")
+    first = Branch.objects.create(institute=institute, name="Main", code="MAIN")
+    second = Branch.objects.create(institute=institute, name="West", code="WEST")
+    authenticate_admin(api_client, institute=institute, email="admin@northstar.test")
+
+    first_subject = api_client.post("/subjects", {"name": "Mathematics", "subjectCode": "MATH", "branchId": str(first.id)}, format="json")
+    second_subject = api_client.post("/subjects", {"name": "Mathematics", "subjectCode": "MATH", "branchId": str(second.id)}, format="json")
+
+    assert first_subject.status_code == 201
+    assert second_subject.status_code == 201

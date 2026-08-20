@@ -146,25 +146,50 @@ class GradeWriteSerializer(StrictSerializer):
 
 class SubjectSerializer(serializers.ModelSerializer):
     subjectCode = serializers.CharField(source="subject_code")
+    branchId = serializers.UUIDField(source="branch_id", allow_null=True)
     createdAt = serializers.DateTimeField(source="created_at", read_only=True)
     updatedAt = serializers.DateTimeField(source="updated_at", read_only=True)
     classesCount = serializers.IntegerField(source="classes_count", read_only=True, default=0)
 
     class Meta:
         model = Subject
-        fields = ("id", "name", "subjectCode", "classesCount", "createdAt", "updatedAt")
+        fields = ("id", "name", "subjectCode", "branchId", "classesCount", "createdAt", "updatedAt")
 
 
 class SubjectWriteSerializer(StrictSerializer):
     name = serializers.CharField(min_length=1, max_length=100, trim_whitespace=True)
+    branchId = serializers.UUIDField(source="branch_id", required=False, allow_null=True)
     subjectCode = serializers.CharField(
         source="subject_code", max_length=20, required=False, allow_blank=True, trim_whitespace=True
     )
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        institute = self.context.get("institute")
+        subject_code = attrs.get("subject_code", getattr(self.instance, "subject_code", ""))
+        branch_id = attrs.get("branch_id", getattr(self.instance, "branch_id", None))
+        if self.instance is None and not branch_id:
+            raise serializers.ValidationError({"branchId": ["Select a branch before adding a subject."]})
+        if branch_id and not Branch.objects.filter(id=branch_id, institute=institute, is_active=True).exists():
+            raise serializers.ValidationError({"branchId": ["Select an active branch from this institute."]})
+        queryset = Subject.objects.filter(institute=institute, branch_id=branch_id)
+        if self.instance:
+            queryset = queryset.exclude(pk=self.instance.pk)
+
+        if subject_code and queryset.filter(subject_code__iexact=subject_code.strip()).exists():
+            raise serializers.ValidationError({
+                "subjectCode": [
+                    "This subject code is already in use in this branch. Please choose a different code."
+                ]
+            })
+        return attrs
 
 
 class ClassSubjectSerializer(serializers.ModelSerializer):
     classId = serializers.UUIDField(source="grade_id")
     subjectId = serializers.UUIDField(source="subject_id")
+    sectionId = serializers.UUIDField(source="class_section_id", allow_null=True)
+    sectionLabel = serializers.SerializerMethodField()
     subject = serializers.SerializerMethodField()
     subjectCode = serializers.SerializerMethodField()
     subjectCodeOverride = serializers.CharField(source="subject_code_override", allow_blank=True)
@@ -177,7 +202,7 @@ class ClassSubjectSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ClassSubject
-        fields = ("id", "classId", "subjectId", "subject", "subjectCode", "subjectCodeOverride", "isElective", "isLab", "periodsPerWeek", "defaultMaxMarks", "sortOrder", "roomId")
+        fields = ("id", "classId", "subjectId", "sectionId", "sectionLabel", "subject", "subjectCode", "subjectCodeOverride", "isElective", "isLab", "periodsPerWeek", "defaultMaxMarks", "sortOrder", "roomId")
 
     def get_subjectCode(self, obj):
         return obj.subject_code_override or obj.subject.subject_code
@@ -185,10 +210,17 @@ class ClassSubjectSerializer(serializers.ModelSerializer):
     def get_subject(self, obj):
         return {"id": str(obj.subject_id), "name": obj.subject.name, "subjectCode": obj.subject.subject_code}
 
+    def get_sectionLabel(self, obj):
+        if not obj.class_section_id:
+            return None
+        return f"{obj.class_section.grade.name} – {obj.class_section.section_name}"
+
 
 class ClassSubjectWriteSerializer(StrictSerializer):
     classId = serializers.UUIDField(source="grade_id")
     subjectId = serializers.UUIDField(source="subject_id")
+    sectionId = serializers.UUIDField(source="class_section_id", required=False, allow_null=True)
+    branchId = serializers.UUIDField(source="branch_id", required=False, allow_null=True, write_only=True)
     subjectCodeOverride = serializers.CharField(source="subject_code_override", max_length=20, required=False, allow_blank=True)
     isElective = serializers.BooleanField(source="is_elective", required=False)
     periodsPerWeek = serializers.IntegerField(source="periods_per_week", required=False, allow_null=True, min_value=1)

@@ -201,6 +201,7 @@ class StudentWriteSerializer(serializers.Serializer):
     mobileNumber = serializers.CharField(max_length=20, required=False, allow_blank=True)
     emailAddress = serializers.EmailField(required=False, allow_blank=True, allow_null=True)
     academicYearId = serializers.UUIDField(required=False, allow_null=True)
+    classId = serializers.UUIDField(required=False, allow_null=True)
     classSectionId = serializers.UUIDField(required=False, allow_null=True)
 
     def validate_firstName(self, value):

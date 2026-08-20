@@ -1,11 +1,12 @@
-from django.db import migrations, models
-import django.db.models.deletion
 import uuid
+
+import django.db.models.deletion
+from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
     dependencies = [("school_calendar", "0001_initial")]
-    operations = [
+    state_operations = [
         migrations.AddField(model_name="academiccalendarevent", name="source_provider", field=models.CharField(blank=True, max_length=24)),
         migrations.AddField(model_name="academiccalendarevent", name="source_event_id", field=models.CharField(blank=True, max_length=512)),
         migrations.AddConstraint(model_name="academiccalendarevent", constraint=models.UniqueConstraint(condition=~models.Q(source_event_id=""), fields=("institute", "source_provider", "source_event_id"), name="uq_calendar_external_event")),
@@ -18,4 +19,14 @@ class Migration(migrations.Migration):
             ("id", models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)), ("state", models.CharField(max_length=128, unique=True)), ("expires_at", models.DateTimeField()), ("used_at", models.DateTimeField(blank=True, null=True)), ("provider", models.CharField(choices=[("google", "Google Calendar"), ("microsoft", "Outlook / Microsoft 365"), ("ics", "ICS subscription")], max_length=24)),
             ("institute", models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to="institutes.institute")), ("user", models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to="identity.user")),
         ]),
+    ]
+
+    # These integration models were removed by 0003 and are not used by the
+    # current API. Keep their historical state for migration compatibility,
+    # but do not create tables that may already exist in a drifted database.
+    operations = [
+        migrations.SeparateDatabaseAndState(
+            state_operations=state_operations,
+            database_operations=[],
+        )
     ]

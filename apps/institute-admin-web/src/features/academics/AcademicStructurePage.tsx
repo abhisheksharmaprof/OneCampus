@@ -1,13 +1,11 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
-import { Building2, BookOpen, CalendarDays, CheckCircle2, ChevronRight, Download, Eye, Pencil, Plus, Search, Settings, Users, GraduationCap, School, Check, TrendingUp, Clock, Star } from 'lucide-react'
+import { Building2, BookOpen, CalendarDays, CheckCircle2, ChevronRight, Download, Eye, Pencil, Plus, Search, Settings, Users, GraduationCap, School, Check, TrendingUp, Clock, Star, Trash2 } from 'lucide-react'
 import {
   DataTable,
-  ErrorSummary,
   FormField,
   Modal,
   Tabs,
   type DataTableColumn,
-  type FormError,
 } from '../../components/admin-ui'
 import { BoneScreen } from '../../components/admin-ui'
 import {
@@ -15,6 +13,7 @@ import {
   createAcademicRecord,
   createClassSubject,
   deleteClassSubject,
+  deleteSubject,
   updateClassSubject,
   listAcademicYears,
   listAcademicTerms,
@@ -251,19 +250,22 @@ function AcademicYearsReference({ accessToken, years, onAdd, onEdit }: { accessT
   return <div className="years-reference"><table className="sr-only"><caption>Academic years</caption><thead><tr><th>Year</th><th>Dates</th><th>Status</th></tr></thead><tbody>{years.map((year) => <tr key={year.id}><td>{year.name}</td><td>{formatDate(year.startDate)} — {formatDate(year.endDate)}</td><td>{year.isCurrent ? 'Current' : 'Archived'}</td></tr>)}</tbody></table><div className="classes-reference-actions"><button className="button-secondary" type="button" onClick={() => document.getElementById('academic-working-days')?.scrollIntoView({ behavior: 'smooth' })}><Settings size={16} /> Settings</button><button className="button-primary" type="button" onClick={onAdd}><Plus size={16} /> Add Year</button></div><div className="classes-kpis"><ReferenceMetric label="Current Year" value={current?.name ?? '—'} hint="▲ Term 2 in progress" icon={<CalendarDays size={19} />} /><ReferenceMetric label="Year Progress" value={`${elapsed}%`} hint="▲ academic year" icon={<TrendingUp size={19} />} /><ReferenceMetric label="Working Days" value={workingDays} hint="▲ calculated excluding Sundays" icon={<Clock size={19} />} /><ReferenceMetric label="Holidays" value={0} hint="▲ manage in calendar" icon={<Star size={19} />} /></div>{current ? <section className="year-progress-card"><header><strong><CalendarDays size={17} /> Year Progress — {current.name}</strong><span>Active Year</span></header><div><p><small>{formatDate(current.startDate)}</small><small>Today</small><small>{formatDate(current.endDate)}</small></p><i><em style={{ width: `${elapsed}%` }} /></i><small>{elapsed}% of academic year elapsed</small><div className="term-grid">{terms.map((term) => <Term key={term.id} title={term.name} start={term.startDate} end={term.endDate} value={0} active={false} onEdit={() => setTermEditor(term)} />)}{!terms.length && <p className="section-caption">No terms configured yet. Add the first term below.</p>}</div></div></section> : null}<div className="year-list">{years.map((year) => <section className="year-reference-card" key={year.id}><header><div><b>AY</b><span><strong>{year.name}</strong><small>{formatDate(year.startDate)} — {formatDate(year.endDate)} · {year.isCurrent ? workingDays : '—'} working days</small></span></div><aside><em className={year.isCurrent ? 'active' : ''}>{year.isCurrent ? 'Active' : 'Archived'}</em><button className="button-secondary btn-sm" type="button" onClick={() => onEdit(year)}><Pencil size={14} /> Edit</button></aside></header><div className="year-details">{terms.map((term) => <YearCell key={term.id} title={term.name} text={`${formatDate(term.startDate)} — ${formatDate(term.endDate)}`} />)}<YearCell title="Active Branches" text={year.isCurrent ? 'All' : '0'} /><YearCell title="Holidays" text="Manage in calendar" /></div>{year.isCurrent ? <footer id="academic-working-days"><button className="button-secondary btn-sm" type="button" onClick={() => setTermEditor('new')}><Plus size={14} /> Add Term</button><button className="button-secondary btn-sm" type="button" onClick={() => document.getElementById('academic-working-days')?.scrollIntoView({ behavior: 'smooth' })}>Working Days</button><button className="button-secondary btn-sm" type="button" onClick={() => { window.location.href = '/setup/holidays-calendar' }}>Holidays</button></footer> : <small className="archive-note">Archived · Data preserved for historical reports</small>}</section>)}</div><TermEditor accessToken={accessToken} year={current} editor={termEditor} onClose={() => setTermEditor(null)} onSaved={() => { setTermEditor(null); setTermsRevision((value) => value + 1) }} /></div>
 }
 
-function SubjectsReference({ accessToken, branchId, curriculum, classes, loadingReference, onAdd, onEdit, refreshKey }: { accessToken: string; branchId?: string; curriculum: ClassSubject[]; classes: AcademicClass[]; loadingReference: boolean; onAdd: () => void; onEdit: (subject: Subject) => void; refreshKey: number }) {
+function SubjectsReference({ accessToken, branchId, curriculum, classes, sections, loadingReference, onAdd, onEdit, refreshKey }: { accessToken: string; branchId?: string; curriculum: ClassSubject[]; classes: AcademicClass[]; sections: ClassSection[]; loadingReference: boolean; onAdd: () => void; onEdit: (subject: Subject) => void; refreshKey: number }) {
   const [subjects, setSubjects] = useState<Subject[]>([])
   const [loadingSubjects, setLoadingSubjects] = useState(true)
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('All Categories')
   const [tab, setTab] = useState(() => new URLSearchParams(window.location.search).get('tab') === 'teacher-mapping' ? 'Teacher Mapping' : 'Subjects')
   const [viewing, setViewing] = useState<Subject | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [deleteError, setDeleteError] = useState('')
   useEffect(() => { const controller = new AbortController(); setLoadingSubjects(true); void listSubjects(accessToken, { page: 1, pageSize: 100, branchId }, controller.signal).then((result) => setSubjects(result.items)).catch(() => { if (!controller.signal.aborted) setSubjects([]) }).finally(() => { if (!controller.signal.aborted) setLoadingSubjects(false) }); return () => controller.abort() }, [accessToken, branchId, refreshKey])
   const info = (subject: Subject) => {
     const mappings = curriculum.filter((item) => item.subjectId === subject.id)
     const name = subject.name.toLowerCase()
     const categoryName = mappings.some((item) => item.isElective) ? 'Elective' : /english|hindi|kannada|sanskrit|language/.test(name) ? 'Language' : /physical|art|music|yoga/.test(name) ? 'Co-curricular' : 'Core'
-    return { mappings, categoryName, periods: mappings.length ? Math.round(mappings.reduce((sum, item) => sum + (item.periodsPerWeek ?? 0), 0) / mappings.length) : 0, lab: mappings.some((item) => item.isLab) || /science|physics|chemistry|biology|computer/.test(name) }
+    const classLabels = mappings.map((item) => item.sectionLabel ?? 'Class mapping')
+    return { mappings, classLabels, categoryName, periods: mappings.length ? Math.round(mappings.reduce((sum, item) => sum + (item.periodsPerWeek ?? 0), 0) / mappings.length) : 0, lab: mappings.some((item) => item.isLab) || /science|physics|chemistry|biology|computer/.test(name) }
   }
   const rows = subjects.filter((subject) => { const details = info(subject); return (!search || `${subject.name} ${subject.subjectCode}`.toLowerCase().includes(search.toLowerCase())) && (category === 'All Categories' || details.categoryName === category) })
   const totals = subjects.reduce((all, subject) => { const details = info(subject); all[details.categoryName] = (all[details.categoryName] ?? 0) + 1; return all }, {} as Record<string, number>)
@@ -271,15 +273,31 @@ function SubjectsReference({ accessToken, branchId, curriculum, classes, loading
     const text = ['Code,Subject,Category,Weekly periods,Lab,Classes', ...rows.map((subject) => { const details = info(subject); return [subject.subjectCode, subject.name, details.categoryName, details.periods, details.lab ? 'Yes' : 'No', subject.classesCount].map((value) => `"${String(value).replaceAll('"', '""')}"`).join(',') })].join('\n')
     const url = URL.createObjectURL(new Blob([text], { type: 'text/csv' })); const link = document.createElement('a'); link.href = url; link.download = 'subjects.csv'; link.click(); URL.revokeObjectURL(url)
   }
+  const removeSubject = async (subject: Subject) => {
+    if (!window.confirm(`Delete ${subject.name}? This cannot be undone.`)) return
+    setDeletingId(subject.id)
+    setDeleteError('')
+    try {
+      await deleteSubject(accessToken, subject.id)
+      setViewing(null)
+      window.location.reload()
+    } catch (cause) {
+      const message = cause instanceof AcademicsApiError ? cause.message : 'The subject could not be deleted.'
+      setDeleteError(message.includes('in use') ? 'Remove this subject from all class and section mappings before deleting it.' : message)
+    } finally {
+      setDeletingId(null)
+    }
+  }
   if (loadingReference || loadingSubjects) return <AcademicWorkspaceSkeleton />
   return <section className="subjects-reference" aria-label="Subjects and curriculum">
     <div className="subject-reference-tabs" role="tablist">{['Subjects', 'Class Mapping', 'Teacher Mapping', 'Curriculum'].map((label) => <button key={label} type="button" role="tab" aria-selected={tab === label} className={tab === label ? 'active' : ''} onClick={() => setTab(label)}>{label}</button>)}</div>
     {tab === 'Subjects' ? <>
       <div className="subject-reference-filters"><input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search subjects..." aria-label="Search subjects" /><select value={category} onChange={(event) => setCategory(event.target.value)} aria-label="Filter subject category">{['All Categories', 'Language', 'Core', 'Elective', 'Co-curricular'].map((item) => <option key={item}>{item}</option>)}</select><div><button className="button-secondary btn-sm" type="button" onClick={exportRows}><Download size={14} /> Export</button><button aria-label="Add subject" className="button-primary btn-sm" type="button" onClick={onAdd}><Plus size={14} /> Add Subject</button></div></div>
       <div className="classes-kpis"><ReferenceMetric label="Total Subjects" value={subjects.length} hint="▲ This branch" icon={<BookOpen size={19} />} /><ReferenceMetric label="Core Subjects" value={totals.Core ?? 0} hint="▲ Required subjects" icon={<CheckCircle2 size={19} />} /><ReferenceMetric label="Lab Subjects" value={subjects.filter((subject) => info(subject).lab).length} hint="▲ Require lab rooms" icon={<School size={19} />} /><ReferenceMetric label="Electives" value={totals.Elective ?? 0} hint="▲ Optional subjects" icon={<Star size={19} />} /></div>
-      <div className="subject-table-wrap"><table className="subject-reference-table"><thead><tr><th>Code</th><th>Subject</th><th>Category</th><th>Weekly Periods</th><th>Lab</th><th>Classes</th><th>Teachers</th><th>Actions</th></tr></thead><tbody>{rows.map((subject) => { const details = info(subject); return <tr key={subject.id}><td><code>{subject.subjectCode}</code></td><td><strong>{subject.name}</strong></td><td><span className={`subject-category ${details.categoryName.toLowerCase().replaceAll(' ', '-')}`}>{details.categoryName}</span></td><td><b>{details.periods}</b> <small>per week</small></td><td>{details.lab ? <span className="yes-pill"><Check size={13} /> Yes</span> : '—'}</td><td>{subject.classesCount || details.mappings.length} classes</td><td><span className="teacher-pill">0 assigned</span></td><td><span className="academics-row-actions"><button className="button-secondary btn-sm" type="button" aria-label={`View ${subject.name}`} onClick={() => setViewing(subject)}><Eye size={15} /></button><button className="button-secondary btn-sm" type="button" aria-label={`Edit ${subject.name}`} onClick={() => onEdit(subject)}><Pencil size={15} /></button></span></td></tr> })}</tbody></table>{!rows.length ? <p className="subject-empty">No subjects match the selected filters.</p> : null}</div>
-    </> : tab === 'Class Mapping' ? <ClassMapping accessToken={accessToken} curriculum={curriculum} subjects={subjects} classes={classes} /> : tab === 'Teacher Mapping' ? <TeacherMapping accessToken={accessToken} branchId={branchId} subjects={subjects} curriculum={curriculum} classes={classes} /> : <CurriculumOverview curriculum={curriculum} subjects={subjects} classes={classes} onOpenMapping={() => setTab('Class Mapping')} />}
-    <Modal open={Boolean(viewing)} title={viewing?.name ?? 'Subject'} description="Subject details" onClose={() => setViewing(null)} footer={<button className="button-primary" type="button" onClick={() => { if (viewing) onEdit(viewing); setViewing(null) }}>Edit subject</button>}>{viewing ? <div className="subject-modal"><p><b>Code:</b> {viewing.subjectCode}</p><p><b>Category:</b> {info(viewing).categoryName}</p><p><b>Weekly periods:</b> {info(viewing).periods}</p><p><b>Mapped classes:</b> {viewing.classesCount || info(viewing).mappings.length}</p></div> : null}</Modal>
+      {deleteError && <p className="form-error" role="alert">{deleteError}</p>}
+      <div className="subject-table-wrap"><table className="subject-reference-table"><thead><tr><th>Code</th><th>Subject</th><th>Category</th><th>Weekly Periods</th><th>Lab</th><th>Classes / sections</th><th>Teachers</th><th>Actions</th></tr></thead><tbody>{rows.map((subject) => { const details = info(subject); return <tr key={subject.id}><td><code>{subject.subjectCode}</code></td><td><strong>{subject.name}</strong></td><td><span className={`subject-category ${details.categoryName.toLowerCase().replaceAll(' ', '-')}`}>{details.categoryName}</span></td><td><b>{details.periods}</b> <small>per week</small></td><td>{details.lab ? <span className="yes-pill"><Check size={13} /> Yes</span> : '—'}</td><td><strong>{subject.classesCount || details.mappings.length}</strong>{details.classLabels.length ? <small className="subject-mapping-labels">{details.classLabels.join(' · ')}</small> : <small className="subject-mapping-labels">Not assigned</small>}</td><td><span className="teacher-pill">0 assigned</span></td><td><span className="academics-row-actions"><button className="button-secondary btn-sm" type="button" aria-label={`View ${subject.name}`} onClick={() => setViewing(subject)}><Eye size={15} /></button><button className="button-secondary btn-sm" type="button" aria-label={`Edit ${subject.name}`} onClick={() => onEdit(subject)}><Pencil size={15} /></button><button className="button-secondary btn-sm danger-text" type="button" aria-label={`Delete ${subject.name}`} disabled={deletingId === subject.id} onClick={() => void removeSubject(subject)}><Trash2 size={15} /></button></span></td></tr> })}</tbody></table>{!rows.length ? <p className="subject-empty">No subjects match the selected filters.</p> : null}</div>
+    </> : tab === 'Class Mapping' ? <ClassMapping accessToken={accessToken} branchId={branchId} curriculum={curriculum} subjects={subjects} classes={classes} sections={sections} /> : tab === 'Teacher Mapping' ? <TeacherMapping accessToken={accessToken} branchId={branchId} subjects={subjects} curriculum={curriculum} classes={classes} /> : <CurriculumOverview curriculum={curriculum} subjects={subjects} classes={classes} onOpenMapping={() => setTab('Class Mapping')} />}
+    <Modal open={Boolean(viewing)} title={viewing?.name ?? 'Subject'} description="Subject details" onClose={() => setViewing(null)} footer={<button className="button-primary" type="button" onClick={() => { if (viewing) onEdit(viewing); setViewing(null) }}>Edit subject</button>}>{viewing ? <div className="subject-modal"><p><b>Code:</b> {viewing.subjectCode}</p><p><b>Category:</b> {info(viewing).categoryName}</p><p><b>Weekly periods:</b> {info(viewing).periods}</p><p><b>Mapped classes:</b> {viewing.classesCount || info(viewing).mappings.length}</p><p><b>Class / sections:</b> {info(viewing).classLabels.length ? info(viewing).classLabels.join(', ') : 'Not assigned'}</p></div> : null}</Modal>
   </section>
 }
 
@@ -349,9 +367,10 @@ function TeacherMapping({ accessToken, branchId, subjects, curriculum, classes }
 
 function Term({ title, start, end, value, active, onEdit }: { title: string; start: string; end: string; value: number; active: boolean; onEdit?: () => void }) { return <article><strong>{title}</strong><em className={active ? 'active' : ''}>{active ? 'Current' : 'Upcoming'}</em><small>{formatDate(start)} — {formatDate(end)}</small><i><b style={{ width: `${value}%` }} /></i><small>{Math.round(value)}% complete</small>{onEdit && <button className="button-secondary btn-sm" type="button" onClick={onEdit}><Pencil size={13} /> Edit</button>}</article> }
 
-function ClassMapping({ accessToken, curriculum, subjects, classes }: { accessToken: string; curriculum: ClassSubject[]; subjects: Subject[]; classes: AcademicClass[] }) {
+function ClassMapping({ accessToken, branchId, curriculum, subjects, classes, sections }: { accessToken: string; branchId?: string; curriculum: ClassSubject[]; subjects: Subject[]; classes: AcademicClass[]; sections: ClassSection[] }) {
   const [selectedClass, setSelectedClass] = useState('')
   const [selectedSubject, setSelectedSubject] = useState('')
+  const [selectedSection, setSelectedSection] = useState('')
   const [periods, setPeriods] = useState('5')
   const [maxMarks, setMaxMarks] = useState('100')
   const [elective, setElective] = useState(false)
@@ -364,7 +383,7 @@ function ClassMapping({ accessToken, curriculum, subjects, classes }: { accessTo
       setError('Select both a class and a subject before mapping.')
       return
     }
-    const duplicate = curriculum.some((mapping) => mapping.classId === selectedClass && mapping.subjectId === selectedSubject && mapping.id !== editing?.id)
+    const duplicate = curriculum.some((mapping) => mapping.classId === selectedClass && mapping.subjectId === selectedSubject && (mapping.sectionId ?? '') === selectedSection && mapping.id !== editing?.id)
     if (duplicate) {
       setError('This subject is already mapped to the selected class.')
       return
@@ -372,18 +391,19 @@ function ClassMapping({ accessToken, curriculum, subjects, classes }: { accessTo
     setBusy(true)
     setError('')
     try {
-      const input = { classId: selectedClass, subjectId: selectedSubject, periodsPerWeek: Number(periods), isElective: elective, defaultMaxMarks: Number(maxMarks), sortOrder: editing?.sortOrder ?? 0 }
+      const input = { classId: selectedClass, subjectId: selectedSubject, sectionId: selectedSection || null, branchId: branchId ?? null, periodsPerWeek: Number(periods), isElective: elective, defaultMaxMarks: Number(maxMarks), sortOrder: editing?.sortOrder ?? 0 }
       if (editing) await updateClassSubject(accessToken, editing.id, input)
       else await createClassSubject(accessToken, input)
-      setEditing(null); setSelectedClass(''); setSelectedSubject(''); setPeriods('5'); setMaxMarks('100'); setElective(false); window.location.reload()
+      setEditing(null); setSelectedClass(''); setSelectedSection(''); setSelectedSubject(''); setPeriods('5'); setMaxMarks('100'); setElective(false); window.location.reload()
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'The class-subject mapping could not be saved.')
     } finally { setBusy(false) }
   }
-  const editMapping = (mapping: ClassSubject) => { setError(''); setEditing(mapping); setSelectedClass(mapping.classId); setSelectedSubject(mapping.subjectId); setPeriods(String(mapping.periodsPerWeek ?? 5)); setMaxMarks(String(mapping.defaultMaxMarks ?? 100)); setElective(mapping.isElective) }
-  const removeMapping = async (mapping: ClassSubject) => { if (!window.confirm(`Remove ${mapping.subject.name} from ${className(mapping.classId)}?`)) return; setBusy(true); setError(''); try { await deleteClassSubject(accessToken, mapping.id); window.location.reload() } catch (cause) { setError(cause instanceof Error ? cause.message : 'The mapping could not be removed.') } finally { setBusy(false) } }
-  const cancelMapping = () => { setEditing(null); setSelectedClass(''); setSelectedSubject(''); setPeriods('5'); setMaxMarks('100'); setElective(false); setError('') }
-  return <section className="class-mapping-panel"><div className="class-mapping-toolbar"><div><strong>Class mapping</strong><p>Assign subjects to classes and edit their weekly periods, marks, and elective status.</p></div><div className="class-mapping-controls"><select aria-label="Mapping class" value={selectedClass} onChange={(event) => { setError(''); setSelectedClass(event.target.value) }}><option value="">Select class</option>{classes.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select><select aria-label="Mapping subject" value={selectedSubject} onChange={(event) => { setError(''); setSelectedSubject(event.target.value) }}><option value="">Select subject</option>{subjects.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select><button className="button-primary btn-sm" type="button" disabled={busy} onClick={() => void saveMapping()}><Plus size={14} /> {editing ? 'Save mapping' : 'Map subject'}</button>{(editing || selectedClass || selectedSubject) && <button className="button-secondary btn-sm" type="button" disabled={busy} onClick={cancelMapping}>Cancel</button>}</div></div>{error && <p className="form-error" role="alert">{error}</p>}<div className="subject-table-wrap"><table className="subject-reference-table"><thead><tr><th>Class</th><th>Subject</th><th>Code</th><th>Weekly periods</th><th>Max marks</th><th>Type</th><th>Actions</th></tr></thead><tbody>{curriculum.map((mapping) => <tr key={mapping.id}><td><strong>{className(mapping.classId)}</strong></td><td>{mapping.subject.name}</td><td><code>{mapping.subjectCode}</code></td><td>{mapping.periodsPerWeek ?? '—'}</td><td>{mapping.defaultMaxMarks ?? '—'}</td><td>{mapping.isElective ? 'Elective' : 'Core'}</td><td><span className="academics-row-actions"><button className="button-secondary btn-sm" type="button" onClick={() => editMapping(mapping)}><Pencil size={14} /> Edit</button><button className="button-secondary btn-sm danger-text" type="button" disabled={busy} onClick={() => void removeMapping(mapping)}>Remove</button></span></td></tr>)}</tbody></table>{!curriculum.length && <p className="subject-empty">No mappings yet. Select a class and subject above to create the first mapping.</p>}</div><small className="section-caption">Showing {curriculum.length} mapping{curriculum.length === 1 ? '' : 's'} · refreshed with catalogue changes.</small></section>
+  const editMapping = (mapping: ClassSubject) => { setError(''); setEditing(mapping); setSelectedClass(mapping.classId); setSelectedSection(mapping.sectionId ?? ''); setSelectedSubject(mapping.subjectId); setPeriods(String(mapping.periodsPerWeek ?? 5)); setMaxMarks(String(mapping.defaultMaxMarks ?? 100)); setElective(mapping.isElective) }
+  const removeMapping = async (mapping: ClassSubject) => { if (!window.confirm(`Remove ${mapping.subject.name} from ${mapping.sectionLabel ?? className(mapping.classId)}?`)) return; setBusy(true); setError(''); try { await deleteClassSubject(accessToken, mapping.id); window.location.reload() } catch (cause) { setError(cause instanceof Error ? cause.message : 'The mapping could not be removed.') } finally { setBusy(false) } }
+  const cancelMapping = () => { setEditing(null); setSelectedClass(''); setSelectedSection(''); setSelectedSubject(''); setPeriods('5'); setMaxMarks('100'); setElective(false); setError('') }
+  const classSections = sections.filter((section) => section.grade.id === selectedClass)
+  return <section className="class-mapping-panel"><div className="class-mapping-toolbar"><div><strong>Class mapping</strong><p>Assign subjects to specific sections. A class without a selection uses its Default section.</p></div><div className="class-mapping-controls"><select aria-label="Mapping class" value={selectedClass} onChange={(event) => { setError(''); setSelectedClass(event.target.value); setSelectedSection('') }}><option value="">Select class</option>{classes.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select><select aria-label="Mapping section" value={selectedSection} onChange={(event) => { setError(''); setSelectedSection(event.target.value) }} disabled={!selectedClass}><option value="">Use Default section</option>{classSections.map((section) => <option key={section.id} value={section.id}>{section.grade.name} – {section.sectionName}</option>)}</select><select aria-label="Mapping subject" value={selectedSubject} onChange={(event) => { setError(''); setSelectedSubject(event.target.value) }}><option value="">Select subject</option>{subjects.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select><button className="button-primary btn-sm" type="button" disabled={busy} onClick={() => void saveMapping()}><Plus size={14} /> {editing ? 'Save mapping' : 'Map subject'}</button>{(editing || selectedClass || selectedSubject) && <button className="button-secondary btn-sm" type="button" disabled={busy} onClick={cancelMapping}>Cancel</button>}</div></div>{error && <p className="form-error" role="alert">{error}</p>}<div className="subject-table-wrap"><table className="subject-reference-table"><thead><tr><th>Class / section</th><th>Subject</th><th>Code</th><th>Weekly periods</th><th>Max marks</th><th>Type</th><th>Actions</th></tr></thead><tbody>{curriculum.map((mapping) => <tr key={mapping.id}><td><strong>{mapping.sectionLabel ?? className(mapping.classId)}</strong></td><td>{mapping.subject.name}</td><td><code>{mapping.subjectCode}</code></td><td>{mapping.periodsPerWeek ?? '—'}</td><td>{mapping.defaultMaxMarks ?? '—'}</td><td>{mapping.isElective ? 'Elective' : 'Core'}</td><td><span className="academics-row-actions"><button className="button-secondary btn-sm" type="button" onClick={() => editMapping(mapping)}><Pencil size={14} /> Edit</button><button className="button-secondary btn-sm danger-text" type="button" disabled={busy} onClick={() => void removeMapping(mapping)}>Remove</button></span></td></tr>)}</tbody></table>{!curriculum.length && <p className="subject-empty">No mappings yet. Select a class, section, and subject above to create the first mapping.</p>}</div><small className="section-caption">Showing {curriculum.length} mapping{curriculum.length === 1 ? '' : 's'} · refreshed with catalogue changes.</small></section>
 }
 
 function TermEditor({ accessToken, year, editor, onClose, onSaved }: { accessToken: string; year?: AcademicYear; editor: AcademicTerm | 'new' | null; onClose: () => void; onSaved: () => void }) {
@@ -402,33 +422,6 @@ function YearCell({ title, text }: { title: string; text: string }) { return <di
 
 function ReferenceMetric({ label, value, hint, icon }: { label: string; value: string | number; hint: string; icon: ReactNode }) { return <div><span>{label}</span><i>{icon}</i><strong>{typeof value === 'number' ? value.toLocaleString() : value}</strong><small>{hint}</small></div> }
 
-function fieldErrors(error: AcademicsApiError | null): FormError[] {
-  if (!error) return []
-  const labels: Record<string, string> = {
-    name: 'Name',
-    startDate: 'Start date',
-    endDate: 'End date',
-    sortOrder: 'Sort order',
-    subjectCode: 'Subject code',
-    branchId: 'Branch',
-    gradeId: 'Class',
-    academicYearId: 'Academic year',
-    sectionName: 'Section name',
-    classTeacherId: 'Class teacher',
-    maxStrength: 'Maximum strength',
-    nonFieldErrors: 'Form',
-  }
-  const entries: FormError[] = Object.entries(error.fieldErrors).flatMap(([field, messages]) =>
-    messages.map((message) => ({
-      fieldId: `academics-field-${field}`,
-      label: labels[field] ?? field,
-      message,
-    }))
-  )
-  if (!entries.length) entries.push({ fieldId: 'academics-editor-form', message: error.message })
-  return entries
-}
-
 function AcademicEditor({
   accessToken,
   editor,
@@ -436,6 +429,7 @@ function AcademicEditor({
   teachers,
   years,
   classes,
+  sections,
   rooms,
   curriculum,
   selectedBranch,
@@ -448,6 +442,7 @@ function AcademicEditor({
   teachers: readonly AcademicTeacherOption[]
   years: readonly AcademicYear[]
   classes: readonly AcademicClass[]
+  sections: readonly ClassSection[]
   rooms: readonly Room[]
   curriculum: readonly ClassSubject[]
   selectedBranch: string
@@ -487,7 +482,7 @@ function AcademicEditor({
     } else if (editor.resource === 'classes') {
       input = { name: form.get('name'), sortOrder: Number(form.get('sortOrder') || 0) }
     } else if (editor.resource === 'subjects') {
-      input = { name: form.get('name'), subjectCode: form.get('subjectCode') }
+      input = { name: form.get('name'), subjectCode: form.get('subjectCode'), branchId: selectedBranch === 'all' ? (form.get('branchId') || null) : selectedBranch }
     } else {
       input = {
         branchId: form.get('branchId'),
@@ -505,12 +500,12 @@ function AcademicEditor({
       else {
         const created = await createAcademicRecord<Subject>(accessToken, editor.resource, input as never)
         const classId = editor.resource === 'subjects' ? String(form.get('classId') || '') : ''
-        if (classId) await createClassSubject(accessToken, { classId, subjectId: created.id, periodsPerWeek: Number(form.get('periodsPerWeek') || 5), isElective: form.get('isElective') === 'on', isLab: form.get('isLab') === 'on', roomId: form.get('roomId') || null })
+        if (classId) await createClassSubject(accessToken, { classId, subjectId: created.id, sectionId: form.get('sectionId') || null, branchId: selectedBranch === 'all' ? (form.get('branchId') || null) : selectedBranch, periodsPerWeek: Number(form.get('periodsPerWeek') || 5), isElective: form.get('isElective') === 'on', isLab: form.get('isLab') === 'on', roomId: form.get('roomId') || null })
       }
       if (editor.resource === 'subjects' && record) {
         const mapping = curriculum.find((item) => item.subjectId === record.id)
         const classId = String(form.get('classId') || '')
-        if (mapping && classId) await updateClassSubject(accessToken, mapping.id, { classId, subjectId: record.id, periodsPerWeek: Number(form.get('periodsPerWeek') || 5), isElective: form.get('isElective') === 'on', isLab: form.get('isLab') === 'on', roomId: form.get('roomId') || null })
+        if (mapping && classId) await updateClassSubject(accessToken, mapping.id, { classId, subjectId: record.id, sectionId: form.get('sectionId') || null, branchId: selectedBranch === 'all' ? (form.get('branchId') || null) : selectedBranch, periodsPerWeek: Number(form.get('periodsPerWeek') || 5), isElective: form.get('isElective') === 'on', isLab: form.get('isLab') === 'on', roomId: form.get('roomId') || null })
       }
       onSaved()
     } catch (cause) {
@@ -543,7 +538,6 @@ function AcademicEditor({
       }
     >
       <form id="academics-editor-form" className="academics-form" noValidate onSubmit={submit}>
-        <ErrorSummary errors={fieldErrors(error)} />
         {error?.traceId ? <p className="academics-trace academics-form__wide">Reference: {error.traceId}</p> : null}
         {editor.resource === 'academic-years' && (
           <AcademicYearFields record={record as AcademicYear | undefined} errors={error?.fieldErrors} />
@@ -552,7 +546,7 @@ function AcademicEditor({
           <ClassFields record={record as AcademicClass | undefined} errors={error?.fieldErrors} />
         )}
         {editor.resource === 'subjects' && (
-          <SubjectFields record={record as Subject | undefined} classes={classes} rooms={rooms} mapping={curriculum.find((item) => item.subjectId === record?.id)} errors={error?.fieldErrors} />
+          <SubjectFields record={record as Subject | undefined} branches={branches} selectedBranch={selectedBranch} classes={classes} sections={sections} rooms={rooms} mapping={curriculum.find((item) => item.subjectId === record?.id)} errors={error?.fieldErrors} />
         )}
         {editor.resource === 'sections' && (
           <SectionFields
@@ -603,7 +597,7 @@ function ClassFields({ record, errors }: { record?: AcademicClass; errors?: Reco
   )
 }
 
-function SubjectFields({ record, classes, rooms, mapping, errors }: { record?: Subject; classes: readonly AcademicClass[]; rooms: readonly Room[]; mapping?: ClassSubject; errors?: Record<string, string[]> }) {
+function SubjectFields({ record, branches, selectedBranch, classes, sections, rooms, mapping, errors }: { record?: Subject; branches: readonly AcademicBranchOption[]; selectedBranch: string; classes: readonly AcademicClass[]; sections: readonly ClassSection[]; rooms: readonly Room[]; mapping?: ClassSubject; errors?: Record<string, string[]> }) {
   const [isLab, setIsLab] = useState(mapping?.isLab ?? false)
   return (
     <>
@@ -613,9 +607,15 @@ function SubjectFields({ record, classes, rooms, mapping, errors }: { record?: S
       <FormField id="academics-field-subjectCode" label="Subject code" error={firstError(errors, 'subjectCode')} hint="Short code, e.g. MATH">
         <input name="subjectCode" defaultValue={record?.subjectCode} maxLength={20} placeholder="MATH" />
       </FormField>
+      {selectedBranch === 'all' && <FormField id="academics-field-branchId" label="Branch" required error={firstError(errors, 'branchId')}>
+        <select name="branchId" defaultValue={record?.branchId ?? ''} required><option value="">Select branch</option>{branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</select>
+      </FormField>}
       <>
         <FormField id="academics-field-classId" label="Add to class" hint="Optional. The subject will also be added to this class curriculum.">
           <select name="classId" defaultValue={mapping?.classId ?? ''}><option value="">Do not assign yet</option>{classes.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select>
+        </FormField>
+        <FormField id="academics-field-sectionId" label="Add to section" hint="If no section is selected, the class Default section is used.">
+          <select name="sectionId" defaultValue={mapping?.sectionId ?? ''}><option value="">Use class Default section</option>{sections.map((item) => <option key={item.id} value={item.id}>{item.grade.name} – {item.sectionName} · {item.branch.name}</option>)}</select>
         </FormField>
         <FormField id="academics-field-periodsPerWeek" label="Weekly periods" hint="How many periods this subject has each week.">
           <input name="periodsPerWeek" type="number" min={1} max={60} defaultValue={mapping?.periodsPerWeek ?? 5} required />
@@ -713,6 +713,7 @@ export function AcademicStructurePage({ accessToken, branches, selectedBranch, t
   const [refreshKey, setRefreshKey] = useState(0)
   const [years, setYears] = useState<AcademicYear[]>([])
   const [classesList, setClassesList] = useState<AcademicClass[]>([])
+  const [sectionsList, setSectionsList] = useState<ClassSection[]>([])
   const [curriculum, setCurriculum] = useState<ClassSubject[]>([])
   const [rooms, setRooms] = useState<Room[]>([])
   const [loadingClasses, setLoadingClasses] = useState(true)
@@ -732,6 +733,14 @@ export function AcademicStructurePage({ accessToken, branches, selectedBranch, t
       .then((page) => { setClassesList(page.items); setActionError(null) })
       .catch((cause: unknown) => { if (!controller.signal.aborted) setActionError(asApiError(cause, 'Classes could not be loaded.')) })
       .finally(() => { if (!controller.signal.aborted) setLoadingClasses(false) })
+    return () => controller.abort()
+  }, [accessToken, branchId, refreshKey])
+
+  useEffect(() => {
+    const controller = new AbortController()
+    void listSections(accessToken, { page: 1, pageSize: 100, branchId }, controller.signal)
+      .then((page) => setSectionsList(page.items))
+      .catch(() => { if (!controller.signal.aborted) setSectionsList([]) })
     return () => controller.abort()
   }, [accessToken, branchId, refreshKey])
 
@@ -783,7 +792,7 @@ export function AcademicStructurePage({ accessToken, branches, selectedBranch, t
       id: 'subjects',
       label: 'Subjects',
       panel: (
-        <SubjectsReference accessToken={accessToken} branchId={branchId} curriculum={curriculum} classes={classesList} loadingReference={loadingClasses || loadingCurriculum} onAdd={() => setEditor({ resource: 'subjects' })} onEdit={(subject) => edit('subjects', subject)} refreshKey={refreshKey} />
+        <SubjectsReference accessToken={accessToken} branchId={branchId} curriculum={curriculum} classes={classesList} sections={sectionsList} loadingReference={loadingClasses || loadingCurriculum} onAdd={() => setEditor({ resource: 'subjects' })} onEdit={(subject) => edit('subjects', subject)} refreshKey={refreshKey} />
       ),
     },
     {
@@ -875,6 +884,7 @@ export function AcademicStructurePage({ accessToken, branches, selectedBranch, t
         teachers={teachers}
         years={years}
         classes={classesList}
+        sections={sectionsList}
         rooms={rooms}
         curriculum={curriculum}
         selectedBranch={selectedBranch}
@@ -889,8 +899,10 @@ function CurriculumManager({ accessToken, grade, subjects, onClose, onSaved }: {
   const [catalog, setCatalog] = useState<Subject[]>([])
   const [subjectId, setSubjectId] = useState('')
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
   useEffect(() => { void listSubjects(accessToken, { page: 1, pageSize: 100 }).then((result) => setCatalog(result.items)).catch(() => undefined) }, [accessToken])
   const available = catalog.filter((subject) => !subjects.some((item) => item.subjectId === subject.id))
-  const add = async () => { if (!subjectId) return; setSaving(true); try { await createClassSubject(accessToken, { classId: grade.id, subjectId, periodsPerWeek: 5 }); onSaved() } finally { setSaving(false) } }
-  return <Card className="curriculum-manager"><div className="academics-panel__heading"><div><h2>{grade.name} curriculum</h2><p>Choose subjects from the institute catalogue and set weekly periods.</p></div><button className="button-secondary" type="button" onClick={onClose}>Close</button></div><div className="curriculum-add"><select aria-label="Subject to add" value={subjectId} onChange={(event) => setSubjectId(event.target.value)}><option value="">Select subject</option>{available.map((subject) => <option key={subject.id} value={subject.id}>{subject.name} {subject.subjectCode ? `(${subject.subjectCode})` : ''}</option>)}</select><button className="button-primary" type="button" disabled={!subjectId || saving} onClick={() => void add()}>+ Add subject</button></div><div className="curriculum-list">{subjects.length ? subjects.map((item) => <div className="curriculum-row" key={item.id}><strong>{item.subject.name}</strong><span>{item.subjectCode || 'No code'}</span><span>{item.isElective ? 'Elective' : 'Core'}</span><span>{item.periodsPerWeek ?? '—'} periods/week</span><button className="button-secondary btn-sm" type="button" onClick={() => void deleteClassSubject(accessToken, item.id).then(onSaved)}>Remove</button></div>) : <p className="section-caption">No subjects assigned yet.</p>}</div></Card>
+  const add = async () => { if (!subjectId) return; setSaving(true); setError(''); try { await createClassSubject(accessToken, { classId: grade.id, subjectId, periodsPerWeek: 5 }); onSaved() } catch (cause) { setError(cause instanceof Error ? cause.message : 'The subject could not be added to this class.') } finally { setSaving(false) } }
+  const remove = async (item: ClassSubject) => { if (!window.confirm(`Remove ${item.subject.name} from ${grade.name}?`)) return; setSaving(true); setError(''); try { await deleteClassSubject(accessToken, item.id); onSaved() } catch (cause) { setError(cause instanceof Error ? cause.message : 'The subject mapping could not be removed.') } finally { setSaving(false) } }
+  return <Card className="curriculum-manager"><div className="academics-panel__heading"><div><h2>{grade.name} curriculum</h2><p>Choose subjects from the institute catalogue and set weekly periods.</p></div><button className="button-secondary" type="button" onClick={onClose}>Close</button></div><div className="curriculum-add"><select aria-label="Subject to add" value={subjectId} onChange={(event) => setSubjectId(event.target.value)}><option value="">Select subject</option>{available.map((subject) => <option key={subject.id} value={subject.id}>{subject.name} {subject.subjectCode ? `(${subject.subjectCode})` : ''}</option>)}</select><button className="button-primary" type="button" disabled={!subjectId || saving} onClick={() => void add()}>+ Add subject</button></div>{error && <p className="form-error" role="alert">{error}</p>}<div className="curriculum-list">{subjects.length ? subjects.map((item) => <div className="curriculum-row" key={item.id}><strong>{item.subject.name}</strong><span>{item.subjectCode || 'No code'}</span><span>{item.isElective ? 'Elective' : 'Core'}</span><span>{item.periodsPerWeek ?? '—'} periods/week</span><button className="button-secondary btn-sm danger-text" type="button" disabled={saving} onClick={() => void remove(item)}>Remove</button></div>) : <p className="section-caption">No subjects assigned yet.</p>}</div></Card>
 }

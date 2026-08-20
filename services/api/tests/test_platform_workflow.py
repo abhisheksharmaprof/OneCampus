@@ -47,3 +47,29 @@ def test_platform_admin_can_approve_and_expose_public_institute_config(api_clien
     public = api_client.get("/api/v1/institute-onboarding/public/oakridge")
     assert public.status_code == 200
     assert public.data["data"]["publicUrl"] == "https://oakridge.arkailabs.com"
+
+
+@pytest.mark.django_db
+def test_legacy_registration_is_visible_in_platform_queue_with_institute_name(api_client):
+    response = api_client.post(
+        "/api/v1/institute-onboarding/registrations",
+        {
+            "instituteName": "Sunrise Public School",
+            "branchName": "Main Campus",
+            "adminName": "Neha Sharma",
+            "email": "neha@sunrise.test",
+            "password": "StrongPass123!",
+        },
+        format="json",
+    )
+    assert response.status_code == 201
+    institute = Institute.objects.get(name="Sunrise Public School")
+
+    admin = get_user_model().objects.create_superuser(email="platform-queue@example.test", password="StrongPass123!")
+    login = api_client.post("/api/v1/identity/sessions", {"email": admin.email, "password": "StrongPass123!", "client": "platform-admin"}, format="json")
+    api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {login.data['data']['accessToken']}")
+
+    queue = api_client.get("/api/v1/admin/platform/registrations")
+    assert queue.status_code == 200
+    assert queue.data["data"]["count"] == 1
+    assert queue.data["data"]["items"][0]["displayName"] == "Sunrise Public School"

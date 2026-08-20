@@ -73,6 +73,7 @@ class Student(TimeStampedModel):
     is_active = models.BooleanField(default=True)
 
     class Meta:
+        db_table = "students"
         ordering = ("first_name", "last_name", "admission_number")
         constraints = [
             models.UniqueConstraint(

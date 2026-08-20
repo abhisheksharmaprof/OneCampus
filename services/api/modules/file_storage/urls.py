@@ -1,6 +1,6 @@
-from django.urls import path
+from django.urls import include, path
 
-from .api import (
+from .legacy_api import (
     FileAssetDetailView,
     FileAssetListCreateView,
     InstituteDocumentUploadView,
@@ -14,6 +14,7 @@ from .api import (
 )
 
 urlpatterns = [
+    path("", include("modules.file_storage.api.urls")),
     path("files", FileAssetListCreateView.as_view(), name="file-assets"),
     path("files/<uuid:asset_id>", FileAssetDetailView.as_view(), name="file-asset-detail"),
     path(

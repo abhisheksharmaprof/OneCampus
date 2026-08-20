@@ -126,7 +126,10 @@ class InstituteOnboardingSerializer(serializers.Serializer):
         code_prefix = slugify(institute_name).upper()[:19] or "SCHOOL"
         institute = Institute.objects.create(
             name=institute_name,
+            display_name=institute_name,
             code=f"{code_prefix}-{token_hex(6).upper()}",
+            is_active=False,
+            onboarding_status=Institute.OnboardingStatus.PENDING_REVIEW,
         )
         branch = Branch.objects.create(
             institute=institute,

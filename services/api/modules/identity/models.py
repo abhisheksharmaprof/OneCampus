@@ -53,6 +53,7 @@ class User(AbstractUser):
     objects = UserManager()
 
     class Meta:
+        db_table = "users"
         ordering = ("email",)
         constraints = [
             models.UniqueConstraint(Lower("email"), name="uq_user_email_ci"),

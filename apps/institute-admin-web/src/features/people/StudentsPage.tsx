@@ -258,6 +258,7 @@ function QuickStudentModal({ open, accessToken, branches, selectedBranch, classe
           admissionNumber: String(raw.get('admissionNumber') ?? '').trim() || undefined,
           mobileNumber: String(raw.get('mobileNumber') ?? '').trim() || undefined,
           emailAddress: String(raw.get('emailAddress') ?? '').trim() || undefined,
+          classId: classId || undefined,
           ...(sectionId ? { classSectionId: sectionId } : {}),
         }),
       })
@@ -501,6 +502,8 @@ export function StudentsPage({ accessToken, branches = [], selectedBranch, selec
           vitaminASupplement:          bool('vitaminASupplement'),
           mobileNumber:                str('mobileNumber'),
           emailAddress:                str('emailAddress'),
+          academicYearId:              str('academicYearId'),
+          classId:                     str('classId'),
           classSectionId:              str('sectionId'),
         }),
       })
@@ -894,7 +897,7 @@ export function StudentsPage({ accessToken, branches = [], selectedBranch, selec
                   ) : (
                     <div className="auto-assigned-field" style={{ borderColor: 'var(--color-warning)' }}>
                       <span>Section</span>
-                      <strong style={{ color: 'var(--color-warning)' }}>No section exists for this class</strong>
+                      <strong style={{ color: 'var(--color-warning)' }}>Default section will be created automatically</strong>
                     </div>
                   )}
                 </div>

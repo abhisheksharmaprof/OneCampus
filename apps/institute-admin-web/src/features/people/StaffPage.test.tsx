@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { BrowserRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -40,8 +40,41 @@ describe('StaffPage timetable availability', () => {
       expect.objectContaining({
         method: 'POST',
         body: JSON.stringify({
-          fullName: 'Meera Iyer', email: 'meera@northstar.test', branchId: 'branch-1', role: 'TEACHER', employeeCode: '',
-          employmentType: 'PART_TIME', availableDays: ['MON', 'WED', 'THU', 'FRI', 'SAT', 'SUN'], availablePeriods: [1, 2, 3, 4], maxPeriodsPerDay: 3, maxPeriodsPerWeek: 18,
+          fullName: 'Meera Iyer', email: 'meera@northstar.test', phone: '', branchId: 'branch-1', role: 'TEACHER', department: '',
+          employmentType: 'PART_TIME', availableDays: ['MON', 'WED', 'THU', 'FRI', 'SAT'], availablePeriods: [1, 2, 3, 4], maxPeriodsPerDay: 3, maxPeriodsPerWeek: 15,
+        }),
+      }),
+    ))
+  })
+
+  it('shows only generic fields for Staff and omits scheduling data', async () => {
+    const user = userEvent.setup()
+    render(<BrowserRouter><StaffPage accessToken="access-token" selectedBranch="branch-1" branches={[{ id: 'branch-1', name: 'Main Campus' }]} /></BrowserRouter>)
+
+    await user.click(await screen.findByRole('button', { name: /add staff/i }))
+    const roleSelect = screen.getByRole('combobox', { name: 'Role *' })
+    expect(roleSelect).toHaveValue('TEACHER')
+    expect(screen.getByRole('group', { name: /available working days/i })).toBeInTheDocument()
+
+    await user.selectOptions(roleSelect, 'STAFF')
+
+    expect(roleSelect).toHaveValue('STAFF')
+    expect(screen.queryByRole('group', { name: /available working days/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('combobox', { name: /employment type/i })).not.toBeInTheDocument()
+    expect(within(roleSelect).getByRole('option', { name: 'Teacher' })).toBeInTheDocument()
+    expect(within(roleSelect).getByRole('option', { name: 'Staff' })).toBeInTheDocument()
+    expect(within(roleSelect).getAllByRole('option')).toHaveLength(2)
+
+    await user.type(screen.getByRole('textbox', { name: /full name/i }), 'Anita Rao')
+    await user.type(screen.getByRole('textbox', { name: /work email/i }), 'anita@northstar.test')
+    await user.click(screen.getByRole('button', { name: /add staff member/i }))
+
+    await waitFor(() => expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/v1/admin/staff'),
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({
+          fullName: 'Anita Rao', email: 'anita@northstar.test', phone: '', branchId: 'branch-1', role: 'STAFF', department: '',
         }),
       }),
     ))

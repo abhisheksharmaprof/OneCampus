@@ -19,8 +19,9 @@ def deliver_staff_setup_invitation(*, invitation, raw_token):
         subject=f"Set up your {profile.institute.name} CampusOne account",
         message=(
             f"You have been invited to join {profile.institute.name} on CampusOne.\n\n"
-            f"Set your password: {_setup_url(raw_token)}\n\n"
-            f"This link expires at {invitation.expires_at.isoformat()} and can be used once. "
+            "Sign in with your registered email or mobile number. CampusOne will send you a one-time "
+            "verification code, then prompt you to create your password.\n\n"
+            f"This invitation expires at {invitation.expires_at.isoformat()}. "
             "If you were not expecting this invitation, you can ignore this email."
         ),
         from_email=settings.DEFAULT_FROM_EMAIL,

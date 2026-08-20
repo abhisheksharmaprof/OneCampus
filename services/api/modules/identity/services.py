@@ -22,12 +22,14 @@ class SessionContext:
     profile: dict
 
 
-def eligible_session_memberships(*, user, client=None, membership_id=None, institute_id=None):
+def eligible_session_memberships(
+    *, user, client=None, membership_id=None, institute_id=None, include_inactive_institute=False
+):
+    memberships = user.institute_memberships.filter(is_active=True)
+    if not include_inactive_institute:
+        memberships = memberships.filter(institute__is_active=True)
     memberships = (
-        user.institute_memberships.filter(
-            is_active=True,
-            institute__is_active=True,
-        )
+        memberships
         .filter(Q(valid_until__isnull=True) | Q(valid_until__gt=timezone.now()))
         .filter(Q(branch__isnull=True) | Q(branch__is_active=True))
         .select_related("institute", "branch")
@@ -45,7 +47,9 @@ def eligible_session_memberships(*, user, client=None, membership_id=None, insti
     return accepted
 
 
-def resolve_session_context(*, user, client=None, membership_id=None, institute_id=None):
+def resolve_session_context(
+    *, user, client=None, membership_id=None, institute_id=None, include_inactive_institute=False
+):
     if client == "platform-admin" and user and (user.is_superuser or user.user_type == "platform_admin"):
         return SessionContext(
             membership=None,
@@ -63,6 +67,7 @@ def resolve_session_context(*, user, client=None, membership_id=None, institute_
         client=client,
         membership_id=membership_id,
         institute_id=institute_id,
+        include_inactive_institute=include_inactive_institute,
     )
     if not accepted:
         return None
