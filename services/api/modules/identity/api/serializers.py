@@ -18,15 +18,17 @@ class SessionCreateSerializer(serializers.Serializer):
         if not identifier:
             raise serializers.ValidationError({"identifier": ["Enter your registered email or mobile number."]})
         User = get_user_model()
-        normalized_phone = re.sub(r"\D", "", identifier)
-        lookup = Q(email__iexact=identifier)
-        if normalized_phone:
-            lookup |= (
-                Q(phone=identifier)
-                | Q(phone=normalized_phone)
-                | Q(phone=f"+{normalized_phone}")
-                | Q(phone__endswith=normalized_phone)
-            )
+        if "@" in identifier:
+            lookup = Q(email__iexact=identifier)
+        else:
+            normalized_phone = re.sub(r"\D", "", identifier)
+            lookup = Q(phone=identifier)
+            if normalized_phone:
+                lookup |= (
+                    Q(phone=normalized_phone)
+                    | Q(phone=f"+{normalized_phone}")
+                    | Q(phone__endswith=normalized_phone)
+                )
         user = User.objects.filter(lookup).first()
         if user is None:
             raise serializers.ValidationError({"identifier": ["This user is not registered. Please use your registered email or mobile number."]})

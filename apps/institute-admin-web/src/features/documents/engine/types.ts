@@ -82,6 +82,8 @@ export interface DocumentData {
   /** Pre-generated QR data URLs keyed by element id (QR generation is async; render is sync). */
   qrDataUrls?: Record<string, string>
   status?: string
+  /** Concrete invoice values used by totals rows instead of preset sample constants. */
+  financialTotals?: { discount: number; tax: number }
 }
 
 export function defaultLayout(sizeId: PageSizeId = 'A4P', pageCount: 1 | 2 = 1): LayoutV2 {

@@ -25,6 +25,7 @@ from modules.finance.api.views import (
     FeeInvoiceDetailView,
     FeeInvoiceListCreateView,
     FeePaymentListCreateView,
+    FinanceRecordDetailView,
     FinanceRecordListCreateView,
 )
 from modules.finance.api.plans_views import FeePlanDetailView, FeePlanListCreateView
@@ -104,6 +105,7 @@ urlpatterns = [
     path("fees/dues/export", FeeDuesExportView.as_view(), name="admin-fee-dues-export"),
     path("fees/dues", FeeDuesView.as_view(), name="admin-fee-dues"),
     path("finance/records", FinanceRecordListCreateView.as_view(), name="admin-finance-records"),
+    path("finance/records/<uuid:record_id>", FinanceRecordDetailView.as_view(), name="admin-finance-record-detail"),
     path("finance/settings", FinanceSettingsView.as_view(), name="admin-finance-settings"),
     path("calendar/events", CalendarEventListCreateView.as_view(), name="admin-calendar-events"),
     path("institute", CurrentInstituteView.as_view(), name="admin-current-institute"),

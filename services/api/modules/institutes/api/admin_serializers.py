@@ -2,6 +2,7 @@ from secrets import token_hex
 import re
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+from django.conf import settings
 from django.utils.text import slugify
 from rest_framework import serializers
 
@@ -76,7 +77,7 @@ class InstituteSerializer(serializers.ModelSerializer):
     contactEmail = serializers.EmailField(source="contact_email", allow_blank=True)
 
     def get_publicUrl(self, obj):
-        return f"https://{obj.slug}.arkailabs.com" if obj.slug else None
+        return f"https://{obj.slug}.{settings.PUBLIC_APP_DOMAIN}" if obj.slug else None
 
     class Meta:
         model = Institute
@@ -221,7 +222,7 @@ class BranchSerializer(serializers.ModelSerializer):
     instituteUrl = serializers.SerializerMethodField()
 
     def get_instituteUrl(self, obj):
-        return f"https://{obj.institute.slug}.arkailabs.com" if obj.institute.slug else None
+        return f"https://{obj.institute.slug}.{settings.PUBLIC_APP_DOMAIN}" if obj.institute.slug else None
 
     class Meta:
         model = Branch

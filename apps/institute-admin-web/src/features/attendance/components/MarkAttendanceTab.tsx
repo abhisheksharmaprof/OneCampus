@@ -27,8 +27,6 @@ export function MarkAttendanceTab({
   const [classId, setClassId] = useState(initialClassId)
   const [sectionId, setSectionId] = useState(initialSectionId)
   const [search, setSearch] = useState('')
-  const [periodLabel, setPeriodLabel] = useState('')
-  const [subjectId, setSubjectId] = useState('')
   const [captureMode, setCaptureMode] = useState('manual')
   const [settings, setSettings] = useState<AttendanceSettings | null>(null)
   
@@ -42,7 +40,6 @@ export function MarkAttendanceTab({
   
   const [classes, setClasses] = useState<Array<{ id: string; name: string; displayName?: string }>>([])
   const [sections, setSections] = useState<Array<{ id: string; gradeId: string; sectionName: string }>>([])
-  const [subjects, setSubjects] = useState<Array<{ id: string; name: string }>>([])
 
   // Modal state for student remark
   const [remarkModalStudent, setRemarkModalStudent] = useState<StudentRosterItem | null>(null)
@@ -83,13 +80,11 @@ export function MarkAttendanceTab({
     Promise.all([
       adminRequest<{ items?: Array<{ id: string; name: string }> }>(accessToken, 'academics/classes?page=1&pageSize=100', { signal: controller.signal }),
       adminRequest<{ items?: Array<{ id: string; gradeId: string; sectionName: string }> }>(accessToken, `academics/sections?page=1&pageSize=100${branch ? `&branchId=${branch}` : ''}`, { signal: controller.signal }),
-      adminRequest<{ items?: Array<{ id: string; name: string }> }>(accessToken, 'academics/subjects?page=1&pageSize=100', { signal: controller.signal }),
     ])
-      .then(([classData, sectionData, subjectData]) => {
+      .then(([classData, sectionData]) => {
         const normalizedSections = normalizeSections(sectionData.items)
         setSections(normalizedSections)
         setClasses(labelDuplicateClasses(classData.items, normalizedSections))
-        setSubjects(subjectData.items ?? [])
       })
       .catch(() => undefined)
     return () => controller.abort()
@@ -99,13 +94,8 @@ export function MarkAttendanceTab({
     const controller = new AbortController()
     void getAttendanceSettings(accessToken, undefined, controller.signal)
       .then((value) => {
-        setSettings(value)
-        const modes = value.enabledCaptureModes?.length ? value.enabledCaptureModes : ['manual']
-        setCaptureMode((current) => modes.includes(current) ? current : modes[0])
-        if (!value.periodWiseEnabled) {
-          setPeriodLabel('')
-          setSubjectId('')
-        }
+        setSettings({ ...value, enabledCaptureModes: ['manual'], periodWiseEnabled: false })
+        setCaptureMode('manual')
       })
       .catch(() => undefined)
     return () => controller.abort()
@@ -180,8 +170,6 @@ export function MarkAttendanceTab({
     date: selectedDate,
     classSectionId: sectionId || undefined,
     captureMode,
-    periodLabel: settings?.periodWiseEnabled ? periodLabel || undefined : undefined,
-    subjectId: settings?.periodWiseEnabled ? subjectId || undefined : undefined,
     // NOT_MARKED is a UI-only state and ON_LEAVE is locked by the API.
     // Never send either value to the bulk endpoint; only persisted attendance
     // statuses belong in a write payload.
@@ -365,27 +353,6 @@ export function MarkAttendanceTab({
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Name or admission number"
           />
-        </label>
-        {settings?.periodWiseEnabled && <>
-          <label>
-            Subject (optional)
-            <select value={subjectId} onChange={(e) => setSubjectId(e.target.value)}>
-              <option value="">Daily attendance</option>
-              {subjects.map((sub) => <option key={sub.id} value={sub.id}>{sub.name}</option>)}
-            </select>
-          </label>
-          <label>
-            Period (optional)
-            <input value={periodLabel} onChange={(e) => setPeriodLabel(e.target.value)} placeholder="e.g. Period 1 / Mathematics" />
-          </label>
-        </>}
-        <label>
-          Capture mode
-          <select value={captureMode} onChange={(e) => setCaptureMode(e.target.value)}>
-            {(settings?.enabledCaptureModes?.length ? settings.enabledCaptureModes : ['manual']).map((mode) => (
-              <option key={mode} value={mode}>{mode === 'qr' ? 'QR Scan' : mode === 'rfid' ? 'RFID Card' : mode === 'biometric' ? 'Biometric Scanner' : mode === 'face' ? 'Face Recognition' : 'Manual Tap'}</option>
-            ))}
-          </select>
         </label>
       </div>
 

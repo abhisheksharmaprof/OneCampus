@@ -2,10 +2,17 @@
 -- SCHOOL MANAGEMENT & CRM PLATFORM — PHASE 1 DATABASE SCHEMA
 -- PostgreSQL 14+
 --
--- REFERENCE SNAPSHOT ONLY — DJANGO MIGRATIONS ARE THE DEPLOYABLE AUTHORITY.
--- Snapshot revision: 2026-07-18 (identity 0003, access_control 0002,
--- academics 0001, admin_console 0001). Do not deploy this file in place of
--- `manage.py migrate`.
+-- DATABASE SETUP SNAPSHOT — UPDATE THIS FILE FOR EVERY DATABASE CHANGE.
+--
+-- Django migrations in services/api/modules/*/migrations remain the runtime
+-- deployment mechanism used by local startup and production deploys. This file
+-- is the single SQL setup snapshot for reviewing or recreating the intended
+-- Supabase/PostgreSQL schema outside Django. Any change that adds, removes, or
+-- alters tables, columns, indexes, constraints, seed permissions, or database
+-- functions must update this file in the same change.
+--
+-- Snapshot revision: keep this line current with the latest included Django
+-- migrations whenever the schema changes.
 -- ============================================================================
 -- Design principles:
 --  1. UUID primary keys everywhere (gen_random_uuid()) — never leak sequence
@@ -1303,4 +1310,3 @@ INSERT INTO batch_definitions (institute_id, category_id, name, description, cri
 -- SECTION 14: ATTENDANCE & LEAVE MANAGEMENT ADDITIONS
 -- ============================================================================
 -- (Consolidated into Section 6C)
-

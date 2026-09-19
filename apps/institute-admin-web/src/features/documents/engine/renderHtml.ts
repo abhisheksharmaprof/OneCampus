@@ -71,8 +71,15 @@ export function renderElementInner(el: CanvasElement, ctx: RenderContext): strin
       return `<table class="doc-table" style="font-size:${safePct(el.style.fontSize)}px"><thead><tr style="background:${safeColor(el.style.headerBg)};color:${safeColor(el.style.headerColor, '#FFFFFF')}">${header}</tr></thead><tbody>${body}</tbody></table>`
     }
     case 'totals': {
-      const results = computeTotals(el.rows, ctx.table)
-      return `<div class="doc-totals">${el.rows.map((row) => {
+      const concreteRows = el.rows.map((row) => {
+        if (row.kind !== 'value' || !ctx.data.financialTotals) return row
+        const label = row.label.trim().toLowerCase()
+        if (label === 'discount') return { ...row, value: ctx.data.financialTotals.discount }
+        if (label === 'tax') return { ...row, value: ctx.data.financialTotals.tax }
+        return row
+      })
+      const results = computeTotals(concreteRows, ctx.table)
+      return `<div class="doc-totals">${concreteRows.map((row) => {
         const value = results[row.id]
         const display = value === '#ERR' ? '#ERR' : formatNumber(value)
         return `<div class="doc-totals-row${row.emphasize ? ' is-grand' : ''}"><span>${escapeHtml(row.label)}</span><span>${display}</span></div>`

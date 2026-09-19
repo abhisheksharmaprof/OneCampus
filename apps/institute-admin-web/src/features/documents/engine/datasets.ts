@@ -14,7 +14,7 @@ export interface CategoryConfig {
   datasets: DatasetDef[]
 }
 
-const SCHOOL_TOKENS: TokenGroup = { source: 'School', fields: ['school_name', 'school_address', 'school_gstin', 'authorised_signatory'] }
+const SCHOOL_TOKENS: TokenGroup = { source: 'School', fields: ['school_name', 'school_address', 'school_gstin', 'school_pan', 'school_phone', 'school_email', 'school_website', 'authorised_signatory'] }
 const STUDENT_TOKENS: TokenGroup = { source: 'Student', fields: ['student_name', 'student_id', 'class_section', 'roll_no', 'guardian_name'] }
 
 export const SAMPLE_TOKENS: Record<string, string> = {
@@ -25,7 +25,8 @@ export const SAMPLE_TOKENS: Record<string, string> = {
   exam_name: 'Term 1 Examination', event_name: 'Annual Science Fair', academic_year: 'AY 2026-27',
   issue_date: '13 Aug 2026',
   school_name: 'Step Next Academy', school_address: 'Jodhpur, Rajasthan',
-  school_gstin: '08AAAAA0000A1Z5', authorised_signatory: 'Principal',
+  school_gstin: '08AAAAA0000A1Z5', school_pan: 'AAAAA0000A', school_phone: '+91 98765 43210',
+  school_email: 'office@stepnext.test', school_website: 'stepnext.test', authorised_signatory: 'Principal',
 }
 
 const col = (id: string, label: string, extra: Partial<TableColumn> = {}): TableColumn => ({
@@ -140,19 +141,40 @@ export function invoiceToDocumentData(
   for (const group of CATEGORY_CONFIG[category].tokenGroups) {
     for (const field of group.fields) tokens[field] = ''
   }
+  const schoolAddress = [
+    branding.addressLine1,
+    branding.addressLine2,
+    [branding.city, branding.state, branding.postalCode].filter(Boolean).join(' '),
+    branding.country,
+  ].filter(Boolean).join(', ')
+  const authorisedSignatory = [branding.contactName, branding.contactDesignation].filter(Boolean).join(' · ')
   Object.assign(tokens, {
     student_name: invoice.studentName,
     student_id: invoice.admissionNumber,
     class_section: invoice.className,
     invoice_no: invoice.invoiceNumber,
-    invoice_date: invoice.issueDate ?? '',
+    invoice_date: payment?.paidAt?.slice(0, 10) ?? invoice.issueDate ?? '',
     due_date: invoice.dueDate,
     payment_status: invoice.status.replace('_', ' '),
     receipt_no: payment?.receiptNumber ?? '',
     payment_method: payment?.method ?? '',
     school_name: branding.name,
+    school_address: schoolAddress,
+    school_gstin: branding.gstNo ?? '',
+    school_pan: branding.panNo ?? '',
+    school_phone: branding.primaryPhone ?? '',
+    school_email: branding.primaryEmail ?? '',
+    school_website: branding.websiteUrl ?? '',
+    authorised_signatory: authorisedSignatory,
   })
-  const rows = invoice.lineItems.map((item, index) => {
+  const rows = payment ? [{
+    c1: `Payment against ${invoice.invoiceNumber}`,
+    c2: payment.reference || payment.method,
+    c3: 1,
+    c4: Number(payment.amount) || 0,
+    c6: Number(payment.amount) || 0,
+    id: 'payment-row',
+  }] : invoice.lineItems.map((item, index) => {
     const qty = Number(item.qty) || 1
     const rate = Number(item.amount) || 0
     return { c1: item.description, c2: item.period, c3: qty, c4: rate, c6: qty * rate, id: `row${index}` }
@@ -163,5 +185,9 @@ export function invoiceToDocumentData(
     rows,
     images: { 'institute-logo': branding.logoUrl, 'student-photo': null, 'staff-photo': null },
     status: invoice.status,
+    financialTotals: payment ? undefined : {
+      discount: Number(invoice.discountAmount || 0),
+      tax: Number(invoice.taxAmount || 0),
+    },
   }
 }

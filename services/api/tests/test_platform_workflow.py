@@ -23,6 +23,24 @@ def test_minimum_application_reserves_slug_without_creating_branch(api_client):
 
 
 @pytest.mark.django_db
+def test_slug_availability_reports_taken_available_and_reserved_names(api_client):
+    Institute.objects.create(name="Existing", display_name="Existing", slug="oakridge", code="EXISTING")
+
+    taken = api_client.get("/api/v1/institute-onboarding/slug-availability?slug=Oakridge")
+    assert taken.status_code == 200
+    assert taken.data == {"success": True, "data": {"slug": "oakridge", "available": False, "message": "This URL name is already taken."}}
+
+    available = api_client.get("/api/v1/institute-onboarding/slug-availability?slug=New-Academy")
+    assert available.status_code == 200
+    assert available.data["data"] == {"slug": "new-academy", "available": True, "message": "This URL name is available."}
+
+    reserved = api_client.get("/api/v1/institute-onboarding/slug-availability?slug=admin")
+    assert reserved.status_code == 200
+    assert reserved.data["data"]["available"] is False
+    assert reserved.data["data"]["message"] == "This URL name is reserved."
+
+
+@pytest.mark.django_db
 def test_platform_admin_can_approve_and_expose_public_institute_config(api_client):
     application = api_client.post(
         "/api/v1/institute-onboarding/applications",
@@ -46,7 +64,20 @@ def test_platform_admin_can_approve_and_expose_public_institute_config(api_clien
     assert institute.onboarding_status == Institute.OnboardingStatus.APPROVED
     public = api_client.get("/api/v1/institute-onboarding/public/oakridge")
     assert public.status_code == 200
-    assert public.data["data"]["publicUrl"] == "https://oakridge.arkailabs.com"
+    assert public.data["data"]["publicUrl"] == "https://oakridge.snifply.com"
+
+
+@pytest.mark.django_db
+def test_public_institute_config_allows_registered_slug_origin(api_client):
+    Institute.objects.create(name="AB International", display_name="AB International", slug="ab-international", code="AB-INTERNATIONAL")
+
+    response = api_client.get(
+        "/api/v1/institute-onboarding/public/ab-international",
+        HTTP_ORIGIN="https://ab-international.snifply.com",
+    )
+
+    assert response.status_code == 200
+    assert response["Access-Control-Allow-Origin"] == "https://ab-international.snifply.com"
 
 
 @pytest.mark.django_db

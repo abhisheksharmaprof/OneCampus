@@ -453,16 +453,36 @@ class Command(BaseCommand):
     def _finance(self, institute, branch, students):
         for index, student in enumerate(students, 1):
             amount = Decimal("38500.00") + Decimal((index % 3) * 2500)
-            invoice, _ = FeeInvoice.objects.get_or_create(
+            invoice, _ = FeeInvoice.objects.update_or_create(
                 institute=institute,
                 branch=branch,
                 student=student,
                 due_date=date(2026, 6, 10),
-                defaults={"amount": amount},
+                defaults={
+                    "invoice_number": f"INV-2026-{index:04d}",
+                    "status": FeeInvoice.Status.ISSUED,
+                    "issue_date": date(2026, 6, 1),
+                    "line_items": [{"description": "Tuition fee", "period": "Term 1", "qty": 1, "amount": str(amount)}],
+                    "subtotal": amount,
+                    "discount_amount": Decimal("0.00"),
+                    "tax_amount": Decimal("0.00"),
+                    "total": amount,
+                    "amount": amount,
+                    "notes": "Demo finance record",
+                },
             )
             if index % 7:
-                FeePayment.objects.get_or_create(
-                    invoice=invoice, amount=amount if index % 5 else amount / 2
+                paid_amount = amount if index % 5 else amount / 2
+                FeePayment.objects.update_or_create(
+                    invoice=invoice,
+                    amount=paid_amount,
+                    defaults={
+                        "institute": institute,
+                        "receipt_number": f"RCP-2026-{index:04d}",
+                        "method": (FeePayment.Method.UPI if index % 2 else FeePayment.Method.BANK),
+                        "reference": f"DEMO-{index:04d}",
+                        "remarks": "Demo payment",
+                    },
                 )
 
     def _calendar(self, institute, branch):

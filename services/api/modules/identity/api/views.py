@@ -166,7 +166,7 @@ def _with_onboarding_state(session_data, institute_id):
             "status": institute.onboarding_status,
             "instituteName": institute.display_name or institute.name,
             "slug": institute.slug,
-            "publicUrl": f"https://{institute.slug}.arkailabs.com" if institute.slug else None,
+            "publicUrl": f"https://{institute.slug}.{settings.PUBLIC_APP_DOMAIN}" if institute.slug else None,
             "rejectionReason": institute.rejection_reason,
         }
     return session_data

@@ -7,8 +7,7 @@ import { AdminApiError } from '../../admin/admin.api'
 import { listDocumentTemplates } from '../../documents/documents.api'
 import { invoiceToDocumentData } from '../../documents/engine/datasets'
 import { renderDocumentHtml } from '../../documents/engine/docRender'
-import { printFinanceDocument } from '../../documents/engine/printDocument'
-import { defaultLayout } from '../../documents/engine/types'
+import { financeFallbackLayout, printFinanceDocument } from '../../documents/engine/printDocument'
 import { inDays, money, StatePanel, today, useAbortableLoad } from './shared'
 
 type InvoiceEditorProps = {
@@ -82,7 +81,7 @@ export default function InvoiceEditor({ accessToken, onClose }: InvoiceEditorPro
       notes, templateId, totalPaid: '0.00',
     }
     const data = invoiceToDocumentData(draft, branding.data)
-    return renderDocumentHtml({ layout: template?.layout ?? defaultLayout('A4P'), data, mode: 'preview' })
+    return renderDocumentHtml({ layout: template?.layout ?? financeFallbackLayout('FEE_INVOICE', branding.data.brandColor), data, mode: 'preview' })
   }, [branding.data, student, items, subtotal, discount, tax, total, issueDate, dueDate, notes, template, templateId])
 
   // Debounced so a fast typist doesn't trigger a full iframe document.write() on every keystroke.

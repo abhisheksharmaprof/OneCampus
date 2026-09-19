@@ -6,6 +6,7 @@ from modules.admin_console.models import AdminRecord
 from modules.admin_console.registry import SCREEN_IDS
 from modules.identity.models import User
 from modules.institutes.models import Branch, Institute, InstituteMembership
+from modules.people.models import StaffProfile
 
 pytestmark = pytest.mark.django_db
 
@@ -71,6 +72,75 @@ def create_record(institute, branch, title, *, status="ACTIVE", screen_id="CM2")
         status=status,
         data={"permissions": ["students.read"]},
     )
+
+
+def test_staff_timetable_reads_published_snapshot_for_teachers_only(api_client):
+    institute, branch, _, admin, membership = make_tenant("TT", "admin@tt.test")
+    teacher_user = User.objects.create_user(
+        email="teacher@tt.test", first_name="Meera", last_name="Iyer"
+    )
+    InstituteMembership.objects.create(
+        user=teacher_user,
+        institute=institute,
+        branch=branch,
+        role=InstituteMembership.Role.TEACHER,
+    )
+    teacher = StaffProfile.objects.create(
+        institute=institute,
+        user=teacher_user,
+        invite_pending=False,
+    )
+    staff_user = User.objects.create_user(email="staff@tt.test")
+    InstituteMembership.objects.create(
+        user=staff_user,
+        institute=institute,
+        branch=branch,
+        role=InstituteMembership.Role.STAFF,
+    )
+    staff = StaffProfile.objects.create(
+        institute=institute,
+        user=staff_user,
+        invite_pending=False,
+    )
+    AdminRecord.objects.create(
+        institute=institute,
+        branch=None,
+        screen_id="TT1",
+        record_type="generated-timetable",
+        title="Published weekly timetable",
+        status="PUBLISHED",
+        data={
+            "bundle": {
+                "config": {
+                    "workingDays": ["MON"],
+                    "periods": [{"number": 1, "type": "teaching", "start": "09:00", "end": "09:45"}],
+                },
+                "classes": [{"id": "class-1", "name": "Class 8 - A"}],
+                "subjects": [{"id": "subject-1", "name": "Mathematics"}],
+                "rooms": [{"id": "room-1", "name": "Room 12"}],
+                "lastResult": {
+                    "entries": [{
+                        "teacherId": str(teacher_user.id),
+                        "day": "MON",
+                        "periods": [1],
+                        "classId": "class-1",
+                        "subjectId": "subject-1",
+                        "roomId": "room-1",
+                    }]
+                },
+            }
+        },
+    )
+    authenticate(api_client, admin, membership)
+
+    teacher_response = api_client.get(f"/staff/{teacher.id}/timetable?branchId={branch.id}")
+    staff_response = api_client.get(f"/staff/{staff.id}/timetable?branchId={branch.id}")
+
+    assert teacher_response.status_code == 200
+    assert teacher_response.json()["data"]["timetableTitle"] == "Published weekly timetable"
+    assert teacher_response.json()["data"]["slots"][0]["subjectName"] == "Mathematics"
+    assert staff_response.status_code == 403
+    assert staff_response.json()["error"]["code"] == "TEACHER_ONLY"
 
 
 def test_catalog_contains_every_non_auth_screen_with_ui_metadata(api_client):

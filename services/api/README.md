@@ -12,9 +12,9 @@ uv run python manage.py migrate
 uv run python manage.py runserver 0.0.0.0:8000
 ```
 
-The checked-in `.env.example` is safe to share. The local `.env` is ignored by Git. It currently enables SQLite and eager Celery only so the project can boot before Railway credentials are entered.
+The checked-in `.env.example` is safe to share. The local `.env` is ignored by Git. CampusOne uses Supabase/PostgreSQL for local development and deployment; keep `DJANGO_USE_SQLITE=false`.
 
-## Replace Railway credentials
+## Configure Supabase and Redis credentials
 
 Open `services/api/.env` and replace:
 
@@ -23,14 +23,16 @@ DJANGO_SECRET_KEY=<long-random-production-secret>
 DJANGO_ALLOWED_HOSTS=<your-api-domain>.up.railway.app
 CORS_ALLOWED_ORIGINS=https://<your-admin-web-domain>
 CSRF_TRUSTED_ORIGINS=https://<your-admin-web-domain>
-DATABASE_URL=${{Postgres.DATABASE_URL}}
+DATABASE_URL=<supabase-postgres-session-pooler-or-direct-url>
 DJANGO_USE_SQLITE=false
 DATABASE_SSL_REQUIRE=true
 REDIS_URL=${{Redis.REDIS_URL}}
 CELERY_TASK_ALWAYS_EAGER=false
 ```
 
-For Railway, set these as service variables rather than uploading the local `.env`. Railway reference-variable syntax such as `${{Postgres.DATABASE_URL}}` links the API service to the PostgreSQL/Redis services.
+For Railway, set these as service variables rather than uploading the local `.env`. If Redis is provided by Railway, reference-variable syntax such as `${{Redis.REDIS_URL}}` can link the API service to the Redis service. The database URL should come from Supabase.
+
+If the direct Supabase host fails with `failed to resolve host 'db.<project-ref>.supabase.co'`, copy the current session pooler connection string from Supabase Dashboard -> Project Settings -> Database -> Connection string and retry.
 
 Set the Railway service root directory to `/services/api`. `railway.json` uses the Dockerfile and checks `/api/v1/health`. The container start script applies migrations and collects static assets before starting Gunicorn.
 

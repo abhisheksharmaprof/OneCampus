@@ -10,7 +10,8 @@ Install:
 - [uv](https://docs.astral.sh/uv/)
 - Node.js 20+
 - npm
-- Optional PostgreSQL and Redis connection details, or Docker for local infrastructure
+- Supabase PostgreSQL connection details
+- Optional Redis connection details, or Docker for local Redis
 
 Run all commands from Git Bash, WSL, or another shell that supports the examples below.
 
@@ -25,9 +26,9 @@ cp .env.example .env
 
 Never commit `services/api/.env`. Replace the placeholder secret and service URLs in that file.
 
-### Option A: use Railway PostgreSQL and Redis
+### Supabase PostgreSQL and optional Redis
 
-Set the following values in `services/api/.env` using the credentials provided by Railway:
+Set the following values in `services/api/.env` using the credentials provided by Supabase:
 
 ```env
 DJANGO_ENV=development
@@ -36,33 +37,16 @@ DJANGO_SECRET_KEY=<long-random-local-secret>
 DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1
 CORS_ALLOWED_ORIGINS=http://localhost:5173
 CSRF_TRUSTED_ORIGINS=http://localhost:5173
-DATABASE_URL=<railway-postgresql-url>
+DATABASE_URL=<supabase-postgres-session-pooler-or-direct-url>
 DJANGO_USE_SQLITE=false
 DATABASE_SSL_REQUIRE=true
-REDIS_URL=<railway-redis-url>
-CELERY_TASK_ALWAYS_EAGER=false
+REDIS_URL=redis://127.0.0.1:6379/0
+CELERY_TASK_ALWAYS_EAGER=true
 ```
 
 Do not paste real credentials into documentation, source files, terminal screenshots, or commits.
 
-### Option B: use SQLite without external services
-
-SQLite with eager Celery is suitable for quick local development and automated tests. In this mode the readiness endpoint checks SQLite and reports Redis as `skipped`.
-
-Set these values in `services/api/.env`:
-
-```env
-DJANGO_ENV=development
-DJANGO_DEBUG=true
-DJANGO_SECRET_KEY=<long-random-local-secret>
-DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1
-CORS_ALLOWED_ORIGINS=http://localhost:5173
-CSRF_TRUSTED_ORIGINS=http://localhost:5173
-DJANGO_USE_SQLITE=true
-DATABASE_SSL_REQUIRE=false
-REDIS_URL=redis://127.0.0.1:6379/0
-CELERY_TASK_ALWAYS_EAGER=true
-```
+CampusOne is Supabase/Postgres-only. Do not use SQLite for local app runs. If the direct Supabase host fails with `failed to resolve host 'db.<project-ref>.supabase.co'`, use the current Supabase session pooler URL instead.
 
 ## 2. Install dependencies and prepare the database
 
@@ -139,7 +123,7 @@ Expected response:
 curl --fail --show-error http://127.0.0.1:8000/api/v1/ready
 ```
 
-A successful response reports the database as `ok` and Redis as either `ok` or `skipped` when eager Celery is enabled. If readiness fails while liveness succeeds, inspect `DATABASE_URL`, `DJANGO_USE_SQLITE`, and `REDIS_URL` in `services/api/.env`.
+A successful response reports the database as `ok` and Redis as either `ok` or `skipped` when eager Celery is enabled. If readiness fails while liveness succeeds, inspect `DATABASE_URL`, confirm `DJANGO_USE_SQLITE=false`, and check `REDIS_URL` in `services/api/.env`.
 
 ### Web server
 
@@ -193,7 +177,7 @@ npm run build --workspace @campusone/institute-admin-web
 
 ## 8. Optional: test a real Celery worker
 
-Celery runs tasks eagerly in the SQLite setup, so a worker is not required for the onboarding flow. To test Redis-backed background execution, first start Redis if you are not using Railway:
+Celery can run tasks eagerly during local development, so a worker is not required for the onboarding flow. To test Redis-backed background execution, first start Redis if you are not using a hosted Redis service:
 
 ```bash
 docker run --rm --name campusone-redis -p 6379:6379 redis:7-alpine

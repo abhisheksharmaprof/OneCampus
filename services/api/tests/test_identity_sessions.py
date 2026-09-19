@@ -67,6 +67,34 @@ def test_admin_credentials_are_rejected_from_staff_mobile(api_client):
 
 
 @pytest.mark.django_db
+def test_email_login_does_not_match_another_user_by_digits_in_email(api_client):
+    institute = Institute.objects.create(name="CampusOne Academy", code="COA")
+    admin = User.objects.create_user(
+        email="abhisheksharma10083@gmail.com",
+        password="StrongPass123!",
+    )
+    InstituteMembership.objects.create(
+        user=admin,
+        institute=institute,
+        role=InstituteMembership.Role.INSTITUTE_ADMIN,
+    )
+    User.objects.create_user(
+        email="unrelated@example.com",
+        password="OtherPass123!",
+        phone="10083",
+    )
+
+    response = api_client.post(
+        "/api/v1/identity/sessions",
+        {"email": admin.email, "password": "StrongPass123!", "client": "admin-web"},
+        format="json",
+    )
+
+    assert response.status_code == 200
+    assert response.json()["data"]["user"]["id"] == str(admin.id)
+
+
+@pytest.mark.django_db
 def test_multi_institute_admin_must_select_an_authorized_institute(api_client):
     first = Institute.objects.create(name="First Academy", code="FIRST")
     second = Institute.objects.create(name="Second Academy", code="SECOND")
@@ -135,5 +163,3 @@ def test_login_is_rate_limited(api_client):
 
 def test_refresh_tokens_expire_after_one_day():
     assert settings.SIMPLE_JWT["REFRESH_TOKEN_LIFETIME"] == timedelta(days=1)
-
-

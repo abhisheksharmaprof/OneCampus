@@ -54,6 +54,7 @@ def test_admin_can_create_and_list_tenant_scoped_staff(api_client):
     assert created.status_code == 201
     assert created.json()["data"]["fullName"] == "Meera Iyer"
     assert created.json()["data"]["status"] == "PENDING_INVITE"
+    assert created.json()["data"]["isTeacher"] is True
     assert created.json()["data"]["branch"]["id"] == str(branch.id)
     assert created.json()["data"]["employmentType"] == "PART_TIME"
     assert created.json()["data"]["availableDays"] == ["MON", "WED", "FRI"]

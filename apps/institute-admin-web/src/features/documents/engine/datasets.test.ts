@@ -54,6 +54,24 @@ describe('invoiceToDocumentData', () => {
     expect(data.category).toBe('FEE_RECEIPT')
     expect(data.tokens.receipt_no).toBe('RCP-2026-0007')
     expect(data.tokens.payment_method).toBe('UPI')
+    expect(data.rows).toHaveLength(1)
+    expect(data.rows[0]).toMatchObject({ c1: 'Payment against INV-2026-0042', c6: 3001 })
+  })
+
+  it('maps institute identity fields needed by printed finance documents', () => {
+    const data = invoiceToDocumentData(invoice, {
+      name: 'Northstar', logoUrl: 'https://cdn.test/logo.png', brandColor: '#143f5c',
+      addressLine1: '12 School Road', city: 'Jaipur', state: 'Rajasthan', postalCode: '302001',
+      gstNo: '08AAAAA0000A1Z5', panNo: 'AAAAA0000A', primaryPhone: '+91 98765 43210',
+      primaryEmail: 'office@northstar.test', contactName: 'Meera Iyer', contactDesignation: 'Principal',
+    })
+
+    expect(data.tokens.school_address).toContain('12 School Road')
+    expect(data.tokens.school_gstin).toBe('08AAAAA0000A1Z5')
+    expect(data.tokens.school_phone).toContain('98765')
+    expect(data.tokens.authorised_signatory).toBe('Meera Iyer · Principal')
+    expect(data.images['institute-logo']).toBe('https://cdn.test/logo.png')
+    expect(data.financialTotals).toEqual({ discount: 0, tax: 0 })
   })
 })
 

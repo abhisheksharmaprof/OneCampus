@@ -73,6 +73,7 @@ class StaffSerializer(serializers.ModelSerializer):
     attendancePct = serializers.SerializerMethodField()
     teachingAssignments = serializers.SerializerMethodField()
     profilePhotoUrl = serializers.SerializerMethodField()
+    isTeacher = serializers.SerializerMethodField()
     timetableSynced = serializers.SerializerMethodField()
 
     class Meta:
@@ -126,6 +127,7 @@ class StaffSerializer(serializers.ModelSerializer):
             "attendancePct",
             "teachingAssignments",
             "profilePhotoUrl",
+            "isTeacher",
             "timetableSynced",
         )
 
@@ -192,6 +194,15 @@ class StaffSerializer(serializers.ModelSerializer):
             return read_url(asset)
         except FileStorageError:
             return None
+
+    def get_isTeacher(self, value) -> bool:
+        memberships = getattr(value.user, "active_staff_memberships", None)
+        if memberships is None:
+            memberships = value.user.institute_memberships.filter(
+                institute=value.institute,
+                is_active=True,
+            )
+        return any(membership.role == InstituteMembership.Role.TEACHER for membership in memberships)
 
     def _assignment_rows(self, value) -> list[dict]:
         assignments = self.context.get("assignment_map", {})
@@ -726,29 +737,34 @@ class StaffDetailView(APIView):
             context={"request": request, "assignment_map": assignment_map, "attendance_map": {}},
         )
 
-        # Fetch published timetable for the teacher's branch
+        # Fetch published timetable only for teacher staff. Non-teacher staff
+        # profiles must not inherit teacher scheduling data.
         from modules.admin_console.models import AdminRecord
 
         timetable_data = None
         memberships = list(
             profile.user.institute_memberships.filter(
-                institute=institute, is_active=True
+                institute=institute,
+                is_active=True,
+                role=InstituteMembership.Role.TEACHER,
             ).select_related("branch")
         )
         branch = memberships[0].branch if memberships else None
 
-        timetable_qs = AdminRecord.objects.filter(
-            institute=institute,
-            screen_id="TT1",
-            status="PUBLISHED",
-            is_active=True,
-        ).order_by("-updated_at")
+        timetable_record = None
+        if memberships:
+            timetable_qs = AdminRecord.objects.filter(
+                institute=institute,
+                screen_id="TT1",
+                status="PUBLISHED",
+                is_active=True,
+            ).order_by("-updated_at")
 
-        if branch:
-            # Try branch-specific timetable first, then institute-wide
-            timetable_record = timetable_qs.filter(branch=branch).first() or timetable_qs.filter(branch__isnull=True).first()
-        else:
-            timetable_record = timetable_qs.filter(branch__isnull=True).first()
+            if branch:
+                # Try branch-specific timetable first, then institute-wide.
+                timetable_record = timetable_qs.filter(branch=branch).first() or timetable_qs.filter(branch__isnull=True).first()
+            else:
+                timetable_record = timetable_qs.filter(branch__isnull=True).first()
         if timetable_record:
             bundle = (timetable_record.data or {}).get("bundle", {})
             last_result = bundle.get("lastResult") or {}
@@ -766,26 +782,28 @@ class StaffDetailView(APIView):
             timetable_slots = []
             for entry in teacher_entries:
                 day = entry.get("day", "")
-                period_number = entry.get("period")
                 class_info = classes_map.get(entry.get("classId", ""), {})
                 subject_info = subjects_map.get(entry.get("subjectId", ""), {})
                 room_info = rooms_map.get(entry.get("roomId", ""), {})
-                period_def = next(
-                    (p for p in teaching_periods if p.get("number") == period_number), None
-                )
+                raw_periods = entry.get("periods")
+                period_numbers = raw_periods if isinstance(raw_periods, list) else [entry.get("period")]
+                for period_number in (period for period in period_numbers if period is not None):
+                    period_def = next(
+                        (p for p in teaching_periods if p.get("number") == period_number), None
+                    )
 
-                timetable_slots.append({
-                    "day": day,
-                    "period": period_number,
-                    "startTime": period_def.get("start") if period_def else None,
-                    "endTime": period_def.get("end") if period_def else None,
-                    "className": class_info.get("name", ""),
-                    "subjectName": subject_info.get("name", ""),
-                    "roomName": room_info.get("name", ""),
-                    "classId": entry.get("classId", ""),
-                    "subjectId": entry.get("subjectId", ""),
-                    "roomId": entry.get("roomId", ""),
-                })
+                    timetable_slots.append({
+                        "day": day,
+                        "period": period_number,
+                        "startTime": period_def.get("start") if period_def else None,
+                        "endTime": period_def.get("end") if period_def else None,
+                        "className": class_info.get("name", ""),
+                        "subjectName": subject_info.get("name", ""),
+                        "roomName": room_info.get("name", ""),
+                        "classId": entry.get("classId", ""),
+                        "subjectId": entry.get("subjectId", ""),
+                        "roomId": entry.get("roomId", ""),
+                    })
 
             day_order = {day: idx for idx, day in enumerate(working_days)}
             timetable_slots.sort(key=lambda s: (day_order.get(s["day"], 99), s["period"]))

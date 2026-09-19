@@ -2,6 +2,7 @@ import pytest
 
 from modules.identity.models import User
 from modules.institutes.models import Branch, Institute, InstituteMembership
+from modules.finance.models import FinanceRecord
 from platform_core.models import AuditEvent
 
 pytestmark = pytest.mark.django_db
@@ -78,3 +79,41 @@ def test_only_institute_admin_can_read_audit_log(api_client):
     assert not AuditEvent.objects.filter(
         institute=institute, event_type="AUDIT_LOG_VIEWED"
     ).exists()
+
+
+def test_finance_record_detail_is_tenant_scoped_and_mutable(api_client):
+    institute, branch, admin, membership = make_institute("NORTH", "admin@north.test")
+    other, other_branch, _, _ = make_institute("SOUTH", "admin@south.test")
+    record = FinanceRecord.objects.create(
+        institute=institute,
+        branch=branch,
+        kind=FinanceRecord.Kind.EXPENSE,
+        title="Power bill",
+        category="Utilities",
+        amount="100.00",
+        entry_date="2026-08-05",
+    )
+    foreign = FinanceRecord.objects.create(
+        institute=other,
+        branch=other_branch,
+        kind=FinanceRecord.Kind.EXPENSE,
+        title="Foreign bill",
+        amount="50.00",
+        entry_date="2026-08-05",
+    )
+    authenticate(api_client, admin, membership)
+
+    updated = api_client.patch(
+        f"/api/v1/admin/finance/records/{record.id}",
+        {"title": "Updated power bill", "amount": "125.00", "status": "Approved"},
+        format="json",
+    )
+    foreign_read = api_client.get(f"/api/v1/admin/finance/records/{foreign.id}")
+    deleted = api_client.delete(f"/api/v1/admin/finance/records/{record.id}")
+
+    assert updated.status_code == 200
+    assert updated.json()["data"]["title"] == "Updated power bill"
+    assert updated.json()["data"]["amount"] == "125.00"
+    assert foreign_read.status_code == 404
+    assert deleted.status_code == 204
+    assert not FinanceRecord.objects.filter(id=record.id).exists()

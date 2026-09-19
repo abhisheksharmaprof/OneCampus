@@ -17,7 +17,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from modules.institutes.api.permissions import IsCurrentInstituteAdmin
-from modules.institutes.models import Branch
+from modules.institutes.models import Branch, InstituteMembership
 
 from .models import AdminRecord
 from .serializers import AdminRecordSerializer
@@ -194,13 +194,33 @@ class StaffTimetableView(APIView):
         )
         user_id = str(staff_profile.user_id)
 
-        # Determine the staff member's branch for timetable matching
-        memberships = list(
+        # Timetables are a teacher-only capability. Keep this enforced at the
+        # API boundary as well as in the profile UI.
+        teacher_memberships = list(
             staff_profile.user.institute_memberships.filter(
-                institute=institute, is_active=True
+                institute=institute,
+                is_active=True,
+                role=InstituteMembership.Role.TEACHER,
             ).select_related("branch")
         )
-        staff_branch = memberships[0].branch if memberships else None
+        if not teacher_memberships:
+            return Response(
+                {
+                    "success": False,
+                    "error": {
+                        "code": "TEACHER_ONLY",
+                        "message": "A timetable is available only for teacher staff.",
+                    },
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        # Match the teacher's own branch first. An institute-wide published
+        # timetable remains a valid fallback when no branch snapshot exists.
+        staff_branch = next(
+            (membership.branch for membership in teacher_memberships if membership.branch_id),
+            None,
+        )
 
         # Find the published timetable — prefer branch-scoped match first,
         # then fall back to institute-wide (no branch) timetables
@@ -211,12 +231,13 @@ class StaffTimetableView(APIView):
             is_active=True,
         ).order_by("-updated_at")
 
+        requested_branch = None
         if branch_id and branch_id != "all":
-            branch = get_object_or_404(Branch, id=branch_id, institute=institute)
-            timetable_record = qs.filter(branch=branch).first()
-        elif staff_branch:
-            # Try branch-specific timetable first, then institute-wide
-            timetable_record = qs.filter(branch=staff_branch).first() or qs.filter(branch__isnull=True).first()
+            requested_branch = get_object_or_404(Branch, id=branch_id, institute=institute)
+
+        timetable_branch = staff_branch or requested_branch
+        if timetable_branch:
+            timetable_record = qs.filter(branch=timetable_branch).first() or qs.filter(branch__isnull=True).first()
         else:
             timetable_record = qs.filter(branch__isnull=True).first()
         if not timetable_record:
@@ -240,25 +261,28 @@ class StaffTimetableView(APIView):
         slots = []
         for entry in teacher_entries:
             day = entry.get("day", "")
-            period_number = entry.get("period")
             class_info = classes_map.get(entry.get("classId", ""), {})
             subject_info = subjects_map.get(entry.get("subjectId", ""), {})
             room_info = rooms_map.get(entry.get("roomId", ""), {})
 
-            period_def = next((p for p in teaching_periods if p.get("number") == period_number), None)
-
-            slots.append({
-                "day": day,
-                "period": period_number,
-                "startTime": period_def.get("start") if period_def else None,
-                "endTime": period_def.get("end") if period_def else None,
-                "className": class_info.get("name", ""),
-                "subjectName": subject_info.get("name", ""),
-                "roomName": room_info.get("name", ""),
-                "classId": entry.get("classId", ""),
-                "subjectId": entry.get("subjectId", ""),
-                "roomId": entry.get("roomId", ""),
-            })
+            # Generated snapshots store one or more period numbers in
+            # `periods`; accept the older singular `period` shape as well.
+            raw_periods = entry.get("periods")
+            period_numbers = raw_periods if isinstance(raw_periods, list) else [entry.get("period")]
+            for period_number in (period for period in period_numbers if period is not None):
+                period_def = next((p for p in teaching_periods if p.get("number") == period_number), None)
+                slots.append({
+                    "day": day,
+                    "period": period_number,
+                    "startTime": period_def.get("start") if period_def else None,
+                    "endTime": period_def.get("end") if period_def else None,
+                    "className": class_info.get("name", ""),
+                    "subjectName": subject_info.get("name", ""),
+                    "roomName": room_info.get("name", ""),
+                    "classId": entry.get("classId", ""),
+                    "subjectId": entry.get("subjectId", ""),
+                    "roomId": entry.get("roomId", ""),
+                })
 
         # Sort by day order then period
         day_order = {day: idx for idx, day in enumerate(working_days)}

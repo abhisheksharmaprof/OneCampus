@@ -115,6 +115,14 @@ export function signIn(identifier: string, password = '') {
   })
 }
 
+export interface SlugAvailability {
+  slug: string
+  available: boolean
+  message: string
+}
+
+export const publicAppDomain = String(import.meta.env.VITE_PUBLIC_APP_DOMAIN || 'snifply.com').toLowerCase()
+
 export function setupPassword(accessToken: string, password: string, confirmPassword: string) {
   return post<{ message: string }>('/api/v1/identity/sessions/password-setup', {
     password,
@@ -181,4 +189,20 @@ export async function getPublicInstituteConfig(slug: string): Promise<PublicInst
   const payload = (await response.json()) as ApiSuccess<PublicInstituteConfig> | ApiFailure
   if (!response.ok || !payload.success) throw new ApiError('Institute branding could not be loaded.')
   return payload.data
+}
+
+export async function checkSlugAvailability(slug: string, signal?: AbortSignal): Promise<SlugAvailability> {
+  const response = await fetch(`${apiBaseUrl}/api/v1/institute-onboarding/slug-availability?slug=${encodeURIComponent(slug)}`, { signal })
+  const payload = (await response.json()) as ApiSuccess<SlugAvailability> | ApiFailure
+  if (!response.ok || !payload.success) throw new ApiError('Slug availability could not be checked.')
+  return payload.data
+}
+
+export function getInstituteSlugFromHostname(hostname = window.location.hostname): string | null {
+  const host = hostname.trim().toLowerCase().split(':')[0]
+  const configuredDomain = publicAppDomain
+  if (host === `institute.${configuredDomain}`) return null
+  if (!host.endsWith(`.${configuredDomain}`)) return null
+  const prefix = host.slice(0, -(configuredDomain.length + 1))
+  return prefix && !prefix.includes('.') ? prefix : null
 }

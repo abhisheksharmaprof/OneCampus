@@ -1,4 +1,5 @@
 from django.db import IntegrityError
+from django.conf import settings
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.permissions import AllowAny
@@ -32,7 +33,7 @@ class InstituteApplicationView(APIView):
             raise
         context = resolve_session_context(user=result["user"], client="admin-web", membership_id=result["membership"].id)
         session = issue_session_tokens(user=result["user"], context=context, client="admin-web")
-        session["onboarding"] = {"completed": False, "status": "pending_review", "instituteName": result["institute"].display_name, "slug": result["institute"].slug, "publicUrl": f"https://{result['institute'].slug}.arkailabs.com"}
+        session["onboarding"] = {"completed": False, "status": "pending_review", "instituteName": result["institute"].display_name, "slug": result["institute"].slug, "publicUrl": f"https://{result['institute'].slug}.{settings.PUBLIC_APP_DOMAIN}"}
         return Response({"success": True, "data": session}, status=status.HTTP_201_CREATED)
 
 

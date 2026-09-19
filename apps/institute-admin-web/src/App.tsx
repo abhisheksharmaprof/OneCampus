@@ -21,7 +21,6 @@ import { CalendarPage } from './features/calendar/CalendarPage'
 import { DashboardPage } from './features/dashboard/DashboardPage'
 import { getDashboard, type DashboardData } from './features/dashboard/dashboard.api'
 import FinanceSuitePage, { type FinanceSection } from './features/finance/FinanceSuitePage'
-import { FinanceModulePage } from './features/finance/FinanceModulePage'
 import { InstituteProfilePage } from './features/institute/InstituteProfilePage'
 import { BrandingPage } from './features/institute/BrandingPage'
 import { SubscriptionPage } from './features/institute/SubscriptionPage'
@@ -54,6 +53,10 @@ const financeSectionByRoute: Record<string, FinanceSection> = {
   FDU1: 'dues',
   FFS1: 'plans',
   FST1: 'settings',
+  FEX1: 'expenses',
+  FPR1: 'payroll',
+  FBU1: 'budget',
+  FRP1: 'reports',
 }
 
 export function App() {
@@ -305,10 +308,6 @@ function RoutedApp() {
       {route?.view === 'admissions-funnel' && <AdmissionsFunnelPage data={dashboard} error={dashboardError} />}
       {attendanceInitialTab && <AttendancePage initialTab={attendanceInitialTab} onTabChange={handleAttendanceTabChange} accessToken={session.accessToken} selectedBranch={selectedBranch} selectedDate={attendanceDate} onDateChange={(date) => updateQuery('date', date)} />}
       {route?.id && financeSectionByRoute[route.id] && <FinanceSuitePage accessToken={session.accessToken} branches={visibleBranches} selectedBranch={selectedBranch} section={financeSectionByRoute[route.id]} onNavigate={navigateWithBranch} />}
-      {route?.id === 'FEX1' && <FinanceModulePage accessToken={session.accessToken} branches={visibleBranches} selectedBranch={selectedBranch} module="expenses" />}
-      {route?.id === 'FPR1' && <FinanceModulePage accessToken={session.accessToken} branches={visibleBranches} selectedBranch={selectedBranch} module="payroll" />}
-      {route?.id === 'FBU1' && <FinanceModulePage accessToken={session.accessToken} branches={visibleBranches} selectedBranch={selectedBranch} module="budget" />}
-      {route?.id === 'FRP1' && <FinanceModulePage accessToken={session.accessToken} branches={visibleBranches} selectedBranch={selectedBranch} module="reports" />}
       {route?.view === 'template-studio' && <TemplateStudioPage accessToken={session.accessToken} />}
       {route?.id === 'AL1' && <AuditLogPage accessToken={session.accessToken} selectedBranch={selectedBranch} />}
       {(route?.view === 'calendar' || route?.id === 'HC1') && <CalendarPage accessToken={session.accessToken} branches={visibleBranches} selectedBranch={selectedBranch} />}

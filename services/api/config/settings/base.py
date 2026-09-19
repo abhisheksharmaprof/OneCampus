@@ -58,6 +58,7 @@ LOGGING = {
     "root": {"handlers": ["api_file", "console"], "level": "ERROR"},
 }
 ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=["localhost", "127.0.0.1"])
+PUBLIC_APP_DOMAIN = env("PUBLIC_APP_DOMAIN", default="snifply.com").strip().lower().strip(".")
 
 DJANGO_APPS = [
     "django.contrib.admin",
@@ -183,10 +184,16 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 AUTH_USER_MODEL = "identity.User"
 
 CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS", default=["http://localhost:5173"])
+# Institute login pages use one subdomain per slug. Keep the wildcard scoped to
+# the configured public app domain instead of allowing arbitrary origins.
+_public_app_domain_pattern = re.escape(PUBLIC_APP_DOMAIN)
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    rf"^https://[a-z0-9](?:[a-z0-9-]{{1,78}}[a-z0-9])?\.{_public_app_domain_pattern}$",
+]
 # Vite may move to the next available port when another dev server is running.
-# Keep this convenience limited to local development; production still uses the
-# explicit CORS_ALLOWED_ORIGINS list above.
-CORS_ALLOWED_ORIGIN_REGEXES = [r"^https?://(localhost|127\.0\.0\.1):\d+$"] if DEBUG else []
+# Keep this convenience limited to local development.
+if DEBUG:
+    CORS_ALLOWED_ORIGIN_REGEXES.append(r"^https?://(localhost|127\.0\.0\.1):\d+$")
 CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=["http://localhost:5173"])
 
 REST_FRAMEWORK = {

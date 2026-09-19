@@ -11,6 +11,7 @@ const mockSettings = {
   enableAutoAlerts: true,
   consecutiveAbsentThreshold: 3,
   enabledCaptureModes: ['manual', 'qr'],
+  periodWiseEnabled: true,
   studentLeaveRouting: 'class_teacher' as const,
   staffLeaveRouting: 'branch_admin' as const,
 }
@@ -55,17 +56,18 @@ describe('SettingsTab', () => {
     vi.restoreAllMocks()
   })
 
-  it('renders capture modes toggle, threshold & recipient rules, approval routing, and leave catalog', async () => {
+  it('renders only manual capture mode in attendance settings', async () => {
     installFetchMock()
     render(<SettingsTab accessToken="test-token" />)
-
-    expect(screen.getByTestId('settings-tab')).toBeInTheDocument()
 
     // Capture modes
     const captureBox = await screen.findByTestId('capture-modes-toggle')
     expect(within(captureBox).getByLabelText('Manual Tap')).toBeChecked()
-    expect(within(captureBox).getByLabelText('QR Scan')).toBeChecked()
-    expect(within(captureBox).getByLabelText('RFID Card')).not.toBeChecked()
+    expect(within(captureBox).queryByLabelText('QR Scan')).not.toBeInTheDocument()
+    expect(within(captureBox).queryByLabelText('RFID Card')).not.toBeInTheDocument()
+    expect(within(captureBox).queryByLabelText('Biometric Scanner')).not.toBeInTheDocument()
+    expect(within(captureBox).queryByLabelText('Face Recognition')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Enable period / subject-wise attendance tracking')).not.toBeInTheDocument()
 
     // Threshold input
     expect(screen.getByLabelText('Low-attendance threshold')).toHaveValue(75)

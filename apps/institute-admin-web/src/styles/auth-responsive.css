@@ -1,9 +1,32 @@
 /* Prevent long auth helper content from widening the mobile grid. */
+.auth-page {
+  --color-primary: var(--auth-brand-color, #2457D6);
+}
+
 .auth-page,
 .auth-panel,
 .auth-card {
   min-width: 0;
 }
+
+.auth-institute-logo {
+  width: 4rem;
+  height: 4rem;
+  object-fit: contain;
+  border-radius: var(--radius-button);
+}
+
+.public-institute-notice .brand-mark {
+  width: 4rem;
+  height: 4rem;
+  color: var(--color-primary);
+  background: var(--color-primary-subtle);
+  display: inline-grid;
+  place-items: center;
+}
+
+.slug-status--available { color: var(--color-success); }
+.slug-status--unavailable, .slug-status--error { color: var(--color-danger); }
 
 .auth-page {
   overflow-x: hidden;

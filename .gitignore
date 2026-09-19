@@ -23,6 +23,7 @@ local_settings.py
 db.sqlite3
 services/api/staticfiles/
 services/api/test-institute-credentials.txt
+services/api/schema.yml
 
 # JavaScript/TypeScript tooling
 *.tsbuildinfo
@@ -36,8 +37,21 @@ _tmp_nodepty/
 .playwright-mcp/
 .agents/
 .claude/
+.gemini/
+.mcp.json
 .octogent/
 octogent-src/
+strix_runs/
+
+# Local tunnel configuration contains machine-specific credential paths.
+cloudflared/
+
+# Visual QA / generated review artifacts
+academic-screenshots/
+academic-design-comparison*.png
+academic-design-comparison*.jpg
+academic-redesign-*.png
+academic-redesign-*.jpg
 
 # Node
 node_modules/
@@ -48,3 +62,6 @@ dist/
 .idea/
 .DS_Store
 Thumbs.db
+
+# graft's local graph cache — regenerable, not committed (run `graft build`).
+graft/

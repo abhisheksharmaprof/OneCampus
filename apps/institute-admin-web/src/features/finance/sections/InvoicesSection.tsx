@@ -27,6 +27,7 @@ export default function InvoicesSection({ accessToken, branchId }: Props) {
   const [bulkOpen, setBulkOpen] = useState(false)
   const [payFor, setPayFor] = useState<Invoice | null>(null)
   const [cancellingId, setCancellingId] = useState<string | null>(null)
+  const [printingId, setPrintingId] = useState<string | null>(null)
 
   const invoices = useAbortableLoad(
     (signal) => listInvoices(accessToken, { page, branchId, status: statusFilter, classId: classFilter, search }, signal),
@@ -46,8 +47,13 @@ export default function InvoicesSection({ accessToken, branchId }: Props) {
   const printInvoice = async (invoice: Invoice) => {
     if (!branding.data) return
     setBusyMessage(null)
-    const printed = await printFinanceDocument({ invoice, branding: branding.data, template: templateFor(invoice) })
-    if (!printed) setBusyMessage('The print popup was blocked by the browser.')
+    setPrintingId(invoice.id)
+    try {
+      const printed = await printFinanceDocument({ invoice, branding: branding.data, template: templateFor(invoice) })
+      if (!printed) setBusyMessage('The print popup was blocked by the browser.')
+    } finally {
+      setPrintingId(null)
+    }
   }
 
   const cancelInvoice = (invoice: Invoice) => {
@@ -101,9 +107,13 @@ export default function InvoicesSection({ accessToken, branchId }: Props) {
                   <td><StatusBadge status={invoice.status} /></td>
                   <td>{invoice.dueDate}</td>
                   <td>
+                    {invoice.status !== 'CANCELLED' && (
+                      <>
+                        <button type="button" className="fin-btn" disabled={printingId === invoice.id} onClick={() => void printInvoice(invoice)}>{printingId === invoice.id ? 'Preparing…' : 'Print invoice'}</button>{' '}
+                      </>
+                    )}
                     {(invoice.status === 'ISSUED' || invoice.status === 'PARTIALLY_PAID') && (
                       <>
-                        <button type="button" className="fin-btn" onClick={() => void printInvoice(invoice)}>Print</button>{' '}
                         <button type="button" className="fin-btn" onClick={() => setPayFor(invoice)}>Record payment</button>{' '}
                       </>
                     )}

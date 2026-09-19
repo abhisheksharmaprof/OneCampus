@@ -99,6 +99,7 @@ type TeachingAssignment = {
 
 type StaffRec = Record<string, unknown> & {
   id?: string
+  isTeacher?: boolean
   branch?: { id?: string }
   branchId?: string
 }
@@ -936,7 +937,10 @@ function StaffProfilePage({ id, accessToken, onBack }: { id?: string; accessToke
   const [publishedTimetable, setPublishedTimetable] = useState<PublishedTimetable>(null)
   const [timetableLoading, setTimetableLoading] = useState(false)
 
-  const tabs = ['Overview', 'Timetable', 'Classes & Subjects', 'Roles & Permissions', 'Attendance', 'Salary']
+  // `isTeacher` is authoritative on newer APIs; the role fallback keeps the
+  // profile usable while an older admin API response is still cached.
+  const isTeacher = staffRecord?.isTeacher === true || String(staffRecord?.role ?? '').toUpperCase() === 'TEACHER'
+  const tabs = ['Overview', ...(isTeacher ? ['Timetable'] : []), 'Classes & Subjects', 'Roles & Permissions', 'Attendance', 'Salary']
 
   useEffect(() => {
     setProfileLoading(true)
@@ -970,19 +974,48 @@ function StaffProfilePage({ id, accessToken, onBack }: { id?: string; accessToke
     void adminRequest<{ items: Array<{ id: string; name: string }> }>(accessToken, 'academics/classes?page=1&pageSize=100').then((result) => setClasses(result.items)).catch(() => undefined)
   }, [accessToken, staffUserId])
 
-  // Fetch published timetable for this staff member
+  // The URL must be normalized when a stale non-teacher deep link requests
+  // the teacher-only tab.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
-    if (!staffRecord?.id) return
-    setTimetableLoading(true)
-    // Pass branch context so the backend can match branch-scoped timetables
-    const params = new URLSearchParams()
-    const branchId = staffRecord?.branch?.id ?? staffRecord?.branchId
-    if (branchId) params.set('branchId', String(branchId))
-    void adminRequest<{ data: PublishedTimetable }>(accessToken, `staff/${String(staffRecord.id)}/timetable?${params}`)
-      .then((result) => setPublishedTimetable(result.data))
-      .catch(() => setPublishedTimetable(null))
-      .finally(() => setTimetableLoading(false))
-  }, [accessToken, staffRecord?.id, staffRecord?.branch?.id, staffRecord?.branchId])
+    if (!staffRecord || isTeacher || tab !== 'Timetable') return
+    setTab('Overview')
+    const next = new URLSearchParams(searchParams)
+    next.set('tab', 'overview')
+    setSearchParams(next, { replace: true })
+  }, [isTeacher, searchParams, setSearchParams, staffRecord, tab])
+
+  // Fetch the latest published timetable whenever the teacher opens this tab
+  // or returns to the page after publishing from the timetable builder.
+  useEffect(() => {
+    if (!staffRecord?.id || !isTeacher || tab !== 'Timetable') return
+    let cancelled = false
+    const loadPublishedTimetable = async () => {
+      if (cancelled) return
+      setTimetableLoading(true)
+      const params = new URLSearchParams()
+      const branchId = staffRecord.branch?.id ?? staffRecord.branchId
+      if (branchId) params.set('branchId', String(branchId))
+      try {
+        const result = await adminRequest<PublishedTimetable>(accessToken, `staff/${String(staffRecord.id)}/timetable?${params}`)
+        if (!cancelled) setPublishedTimetable(result)
+      } catch {
+        if (!cancelled) setPublishedTimetable(null)
+      } finally {
+        if (!cancelled) setTimetableLoading(false)
+      }
+    }
+
+    void loadPublishedTimetable()
+    const refreshOnReturn = () => { void loadPublishedTimetable() }
+    window.addEventListener('focus', refreshOnReturn)
+    document.addEventListener('visibilitychange', refreshOnReturn)
+    return () => {
+      cancelled = true
+      window.removeEventListener('focus', refreshOnReturn)
+      document.removeEventListener('visibilitychange', refreshOnReturn)
+    }
+  }, [accessToken, isTeacher, staffRecord?.branch?.id, staffRecord?.branchId, staffRecord?.id, tab])
 
   useEffect(() => {
     if (!mappingClass) { setSubjects(allSubjects); return }
@@ -1046,7 +1079,7 @@ function StaffProfilePage({ id, accessToken, onBack }: { id?: string; accessToke
             onSaved={(updated) => { setStaffRecord(updated); setPerson({ name: String(updated.fullName ?? person.name), status: humanize(String(updated.status ?? person.status)), badge: humanize(String(updated.role ?? person.badge)), phone: String(updated.phone ?? person.phone), email: String(updated.email ?? person.email) }); setEditingStaff(false) }} />
         : <>
           {tab === 'Overview' && <StaffOverview staff={staffRecord} person={person} assignments={assignments} accessToken={accessToken} />}
-          {tab === 'Timetable' && <StaffTimetable staff={staffRecord} assignments={assignments} publishedTimetable={publishedTimetable} loading={timetableLoading} onOpenTimetable={() => navigate('/timetable')} />}
+          {tab === 'Timetable' && isTeacher && <StaffTimetable staff={staffRecord} assignments={assignments} publishedTimetable={publishedTimetable} loading={timetableLoading} onOpenTimetable={() => navigate('/timetable')} />}
           {tab === 'Classes & Subjects' && (
             <Card className="profile-table-card">
               <SectionHeader title="Classes & Subjects" action={<button className="button-primary button-small" type="button" disabled={mappingLoading} onClick={() => void openMapping()}>{mappingLoading ? 'Loading…' : '+ Add class & subject'}</button>} />

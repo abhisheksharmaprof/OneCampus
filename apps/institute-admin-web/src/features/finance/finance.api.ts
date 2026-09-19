@@ -91,7 +91,25 @@ export type FeeSummary = {
   monthlySeries: { month: string; collected: string }[]
 }
 
-export type InstituteBranding = { name: string; logoUrl: string | null; brandColor: string | null }
+export type InstituteBranding = {
+  name: string
+  logoUrl: string | null
+  brandColor: string | null
+  addressLine1?: string
+  addressLine2?: string
+  city?: string
+  state?: string
+  postalCode?: string
+  country?: string
+  gstNo?: string
+  panNo?: string
+  registrationNo?: string
+  primaryEmail?: string
+  primaryPhone?: string
+  websiteUrl?: string
+  contactName?: string
+  contactDesignation?: string
+}
 
 function query(params: Record<string, string | number | null | undefined>): string {
   const search = new URLSearchParams()
@@ -227,8 +245,60 @@ export function patchFinanceSettings(accessToken: string, body: Partial<FinanceS
  * services/api/modules/institutes/api/admin_serializers.py (logoUrl/brandColor fields) and the
  * existing usage in apps/institute-admin-web/src/features/institute/BrandingPage.tsx.
  */
-export function fetchInstituteBranding(accessToken: string, signal?: AbortSignal) {
-  return adminRequest<InstituteBranding>(accessToken, 'institute', { signal })
+export async function fetchInstituteBranding(accessToken: string, signal?: AbortSignal): Promise<InstituteBranding> {
+  type BrandingProfile = {
+    id: string
+    name: string
+    displayName?: string
+    logoUrl?: string | null
+    brandColor?: string | null
+    address_line_1?: string
+    address_line_2?: string
+    city?: string
+    state?: string
+    postalCode?: string
+    country?: string
+    gstNo?: string
+    panNo?: string
+    registrationNo?: string
+    primaryEmail?: string
+    primaryPhone?: string
+    websiteUrl?: string
+    contactName?: string
+    contactDesignation?: string
+  }
+  type LogoAsset = { url?: string | null }
+  const profile = await adminRequest<BrandingProfile>(accessToken, 'institute', { signal })
+  let uploadedLogoUrl: string | null = null
+  try {
+    const assets = await adminRequest<LogoAsset[]>(
+      accessToken,
+      `files?ownerType=INSTITUTE&ownerId=${encodeURIComponent(profile.id)}&assetType=LOGO`,
+      { signal },
+    )
+    uploadedLogoUrl = assets[0]?.url ?? null
+  } catch {
+    // A missing optional asset must not block invoice creation or printing.
+  }
+  return {
+    name: profile.displayName || profile.name,
+    logoUrl: uploadedLogoUrl || profile.logoUrl || null,
+    brandColor: profile.brandColor ?? null,
+    addressLine1: profile.address_line_1,
+    addressLine2: profile.address_line_2,
+    city: profile.city,
+    state: profile.state,
+    postalCode: profile.postalCode,
+    country: profile.country,
+    gstNo: profile.gstNo,
+    panNo: profile.panNo,
+    registrationNo: profile.registrationNo,
+    primaryEmail: profile.primaryEmail,
+    primaryPhone: profile.primaryPhone,
+    websiteUrl: profile.websiteUrl,
+    contactName: profile.contactName,
+    contactDesignation: profile.contactDesignation,
+  }
 }
 
 /**

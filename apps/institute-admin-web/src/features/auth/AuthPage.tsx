@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useState, type CSSProperties, type FormEvent } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { ArrowLeft, Check, GraduationCap } from 'lucide-react'
 import {
@@ -13,6 +13,7 @@ import {
   type OtpChallenge,
   type SessionData,
   getPublicInstituteConfig,
+  getInstituteSlugFromHostname,
   type PublicInstituteConfig,
 } from './auth.api'
 import { OnboardingWizard } from './OnboardingWizard'
@@ -90,15 +91,21 @@ export function AuthPage({ mode, onboardingStep, onNavigate, onAuthenticated }: 
   const [otpNotice, setOtpNotice] = useState('')
   const [resending, setResending] = useState(false)
   const [instituteBrand, setInstituteBrand] = useState<PublicInstituteConfig | null>(null)
+  const [instituteBrandError, setInstituteBrandError] = useState(false)
   const [resetNotice, setResetNotice] = useState('')
   const [passwordSetupSession, setPasswordSetupSession] = useState<SessionData | null>(null)
 
   useEffect(() => {
     if (mode !== 'login') return
-    const host = window.location.hostname.toLowerCase()
-    const parts = host.split('.')
-    if (parts.length < 3 || ['www', 'admin', 'api', 'institute', 'platform', 'localhost'].includes(parts[0])) return
-    void getPublicInstituteConfig(parts[0]).then(setInstituteBrand).catch(() => setInstituteBrand(null))
+    const slug = getInstituteSlugFromHostname()
+    if (!slug) return
+    void getPublicInstituteConfig(slug).then((config) => {
+      setInstituteBrand(config)
+      setInstituteBrandError(false)
+    }).catch(() => {
+      setInstituteBrand(null)
+      setInstituteBrandError(true)
+    })
   }, [mode])
 
   const update = (field: keyof typeof values, value: string) => {
@@ -282,8 +289,17 @@ export function AuthPage({ mode, onboardingStep, onNavigate, onAuthenticated }: 
 
   if (mode === 'onboarding') return <OnboardingWizard stepId={onboardingStep} onStepChange={(stepId) => onNavigate(`/onboarding/${stepId}`)} onAuthenticated={onAuthenticated} onExit={openLogin} />
 
+  const publicInstituteHost = getInstituteSlugFromHostname()
+  if (publicInstituteHost && instituteBrandError) return <PublicInstituteNotice name="Institute not found" message="This institute URL is not registered with CampusOne." />
+  if (instituteBrand && instituteBrand.status !== 'approved') {
+    const message = instituteBrand.status === 'declined'
+      ? 'This institute application needs changes before its workspace can be opened.'
+      : 'This institute has been registered and is waiting for platform approval.'
+    return <PublicInstituteNotice name={instituteBrand.name} logoUrl={instituteBrand.logoUrl} brandColor={instituteBrand.brandColor} message={message} />
+  }
+
   return (
-    <main className="auth-page">
+    <main className="auth-page" style={instituteBrand?.brandColor ? { '--auth-brand-color': instituteBrand.brandColor } as CSSProperties : undefined}>
       <section className="auth-aside" aria-label="CampusOne introduction">
         <div className="auth-brand">
           <span className="brand-mark" aria-hidden="true"><GraduationCap /></span>
@@ -429,4 +445,8 @@ export function AuthPage({ mode, onboardingStep, onNavigate, onAuthenticated }: 
       </section>
     </main>
   )
+}
+
+function PublicInstituteNotice({ name, message, logoUrl, brandColor }: { name: string; message: string; logoUrl?: string; brandColor?: string }) {
+  return <main className="auth-page" style={brandColor ? { '--auth-brand-color': brandColor } as CSSProperties : undefined}><section className="auth-aside" aria-label="Institute introduction"><div className="auth-brand"><span className="brand-mark" aria-hidden="true"><GraduationCap /></span><span>{name}</span></div></section><section className="auth-panel"><div className="auth-card public-institute-notice"><div className="auth-heading">{logoUrl ? <img className="auth-institute-logo" src={logoUrl} alt={`${name} logo`} /> : <span className="brand-mark" aria-hidden="true"><GraduationCap /></span>}<p className="auth-eyebrow">{name}</p><h1>We’ll be ready soon</h1><p>{message}</p></div></div></section></main>
 }

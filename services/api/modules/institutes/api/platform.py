@@ -1,4 +1,5 @@
 from django.db import transaction
+from django.conf import settings
 from django.shortcuts import get_object_or_404
 from secrets import token_hex
 
@@ -12,6 +13,9 @@ from rest_framework.views import APIView
 from modules.institutes.models import Branch, Institute
 from platform_core.models import AuditEvent
 from .admin_serializers import InstituteSerializer, short_branch_code
+
+RESERVED_SLUGS = {"admin", "api", "app", "auth", "help", "support", "www", "platform"}
+SLUG_PATTERN = r"^[a-z0-9](?:[a-z0-9-]{1,78}[a-z0-9])?$"
 
 
 def is_platform_admin(user):
@@ -66,7 +70,7 @@ class PlatformInstituteCreateSerializer(serializers.Serializer):
         value = slugify(value)
         if Institute.objects.filter(slug__iexact=value).exists():
             raise serializers.ValidationError("This URL name is already taken.")
-        if value in {"admin", "api", "app", "auth", "help", "support", "www", "platform"}:
+        if value in RESERVED_SLUGS:
             raise serializers.ValidationError("This URL name is reserved.")
         return value
 
@@ -141,4 +145,23 @@ class PublicInstituteConfigView(APIView):
 
     def get(self, request, slug):
         institute = get_object_or_404(Institute, slug__iexact=slug)
-        return Response({"success": True, "data": {"slug": institute.slug, "name": institute.display_name or institute.name, "logoUrl": institute.logo_url, "brandColor": institute.brand_color, "status": institute.onboarding_status, "publicUrl": f"https://{institute.slug}.arkailabs.com"}})
+        return Response({"success": True, "data": {"slug": institute.slug, "name": institute.display_name or institute.name, "logoUrl": institute.logo_url, "brandColor": institute.brand_color, "status": institute.onboarding_status, "publicUrl": f"https://{institute.slug}.{settings.PUBLIC_APP_DOMAIN}"}})
+
+
+class SlugAvailabilityView(APIView):
+    permission_classes = ()
+    authentication_classes = ()
+
+    def get(self, request):
+        raw_slug = str(request.query_params.get("slug", "")).strip().lower()
+        normalized_slug = slugify(raw_slug)
+        try:
+            serializers.RegexField(SLUG_PATTERN).run_validation(normalized_slug)
+        except serializers.ValidationError:
+            return Response({"success": True, "data": {"slug": normalized_slug, "available": False, "message": "Use 3–80 lowercase letters, numbers, or hyphens."}})
+        if len(normalized_slug) < 3:
+            return Response({"success": True, "data": {"slug": normalized_slug, "available": False, "message": "Use at least 3 characters."}})
+        if normalized_slug in RESERVED_SLUGS:
+            return Response({"success": True, "data": {"slug": normalized_slug, "available": False, "message": "This URL name is reserved."}})
+        taken = Institute.objects.filter(slug__iexact=normalized_slug).exists()
+        return Response({"success": True, "data": {"slug": normalized_slug, "available": not taken, "message": "This URL name is already taken." if taken else "This URL name is available."}})

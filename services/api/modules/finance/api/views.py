@@ -670,6 +670,58 @@ class FinanceRecordListCreateView(APIView):
         return Response({"success": True, "data": FinanceRecordSerializer(record).data}, status=status.HTTP_201_CREATED)
 
 
+class FinanceRecordDetailView(APIView):
+    permission_classes = (IsCurrentInstituteAdmin,)
+
+    def get_object(self, request, record_id):
+        return get_object_or_404(FinanceRecord, id=record_id, institute=request.institute)
+
+    def get(self, request, record_id):
+        record = self.get_object(request, record_id)
+        return Response({"success": True, "data": FinanceRecordSerializer(record).data})
+
+    def patch(self, request, record_id):
+        record = self.get_object(request, record_id)
+        serializer = FinanceRecordWriteSerializer(data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        values = serializer.validated_data
+        if "branch_id" in values:
+            record.branch = get_object_or_404(
+                Branch,
+                id=values.pop("branch_id"),
+                institute=request.institute,
+                is_active=True,
+            )
+        for field, value in values.items():
+            setattr(record, field, value)
+        record.save()
+        audit_mutation(
+            request=request,
+            verb="Updated",
+            target_label=f"finance record '{record.title}'",
+            target_type="finance_record",
+            target_id=record.id,
+            extra_meta={"kind": record.kind, "amount": str(record.amount)},
+        )
+        return Response({"success": True, "data": FinanceRecordSerializer(record).data})
+
+    def delete(self, request, record_id):
+        record = self.get_object(request, record_id)
+        target_id = record.id
+        target_label = record.title
+        target_kind = record.kind
+        record.delete()
+        audit_mutation(
+            request=request,
+            verb="Deleted",
+            target_label=f"finance record '{target_label}'",
+            target_type="finance_record",
+            target_id=target_id,
+            extra_meta={"kind": target_kind},
+        )
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
 class FinanceRecordSerializer(serializers.ModelSerializer):
     entryDate = serializers.DateField(source="entry_date")
     branchId = serializers.UUIDField(source="branch_id")

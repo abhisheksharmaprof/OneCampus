@@ -7,6 +7,7 @@ import { adminRequest, adminUpload } from '../admin/admin.api'
 interface InstituteProfile {
   id: string
   name: string
+  slug: string
   code: string
   isActive: boolean
   legalName?: string
@@ -449,6 +450,11 @@ export function InstituteProfilePage({ accessToken }: { accessToken: string }) {
                       <span>Assigned by the system platform</span>
                     </div>
                   </div>
+
+                  <label className="field-label">
+                    Institute Slug <span className="locked-field">🔒 Read-only</span>
+                    <input name="slug" value={profile.slug} readOnly aria-label="Institute slug" />
+                  </label>
                 </div>
               </Card>
             </div>
