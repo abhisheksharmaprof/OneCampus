@@ -89,7 +89,7 @@ export default defineRailway((ctx: any) => {
   const api = service("campusone-api", {
     source: github(repository, { branch: sourceBranch, rootDirectory: "services/api" }),
     start: "./scripts/start.sh",
-    healthcheck: "/api/v1/health/",
+    healthcheck: "/api/v1/health",
     healthcheckTimeout: 120,
     replicas: prod ? 1 : 1,
     env: {
