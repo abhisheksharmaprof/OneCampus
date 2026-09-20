@@ -2,6 +2,7 @@ import {
   defineRailway,
   github,
   group,
+  postgres,
   preserve,
   project,
   redis,
@@ -11,20 +12,16 @@ import {
 /*
  * CampusOne Railway IaC
  *
- * Before applying this file, replace the repository slug below with the GitHub
- * repository that Railway can access, for example "your-org/CampusOne".
- *
  * Database setup:
- * - Supabase/Postgres is intentionally external to Railway.
- * - Set DATABASE_URL on the API, worker, and beat services to the Supabase
- *   session-pooler connection string.
+ * - Railway Postgres is provisioned by this file.
+ * - API, worker, and beat services receive DATABASE_URL from Railway Postgres.
  * - The API image runs `python manage.py migrate --noinput` before Gunicorn,
- *   so an empty Supabase database is initialized automatically on deploy.
+ *   so an empty Railway database is initialized automatically on deploy.
  * - Keep school_platform_schema.sql updated with every database change.
  */
 
-const repository = "REPLACE_WITH_GITHUB_OWNER/REPLACE_WITH_REPO";
-const sourceBranch = "main";
+const repository = "abhisheksharmaprof/OneCampus";
+const sourceBranch = "feature/template-studio";
 
 const apiEnvironment = {
   DJANGO_ENV: "production",
@@ -35,7 +32,6 @@ const apiEnvironment = {
   PUBLIC_APP_DOMAIN: preserve(),
   CORS_ALLOWED_ORIGINS: preserve(),
   CSRF_TRUSTED_ORIGINS: preserve(),
-  DATABASE_URL: preserve(),
   DJANGO_USE_SQLITE: "false",
   DATABASE_SSL_REQUIRE: "true",
   DATABASE_CONNECT_TIMEOUT: "10",
@@ -43,6 +39,7 @@ const apiEnvironment = {
   JWT_ACCESS_MINUTES: "15",
   IDENTITY_LOGIN_RATE: "10/minute",
   IDENTITY_REFRESH_RATE: "30/minute",
+  PASSWORD_RESET_URL: preserve(),
   PASSWORD_RESET_RATE: "5/hour",
   INSTITUTE_ONBOARDING_RATE: "5/hour",
   EMAIL_BACKEND: "django.core.mail.backends.smtp.EmailBackend",
@@ -86,6 +83,7 @@ const apiEnvironment = {
 
 export default defineRailway((ctx: any) => {
   const prod = ctx.environment === "production";
+  const db = postgres("postgres");
   const cache = redis("redis");
 
   const api = service("campusone-api", {
@@ -96,6 +94,7 @@ export default defineRailway((ctx: any) => {
     replicas: prod ? 1 : 1,
     env: {
       ...apiEnvironment,
+      DATABASE_URL: db.env.DATABASE_URL,
       REDIS_URL: cache.env.REDIS_URL,
     },
   });
@@ -106,6 +105,7 @@ export default defineRailway((ctx: any) => {
     replicas: prod ? 1 : 1,
     env: {
       ...apiEnvironment,
+      DATABASE_URL: db.env.DATABASE_URL,
       REDIS_URL: cache.env.REDIS_URL,
     },
   });
@@ -116,6 +116,7 @@ export default defineRailway((ctx: any) => {
     replicas: prod ? 1 : 1,
     env: {
       ...apiEnvironment,
+      DATABASE_URL: db.env.DATABASE_URL,
       REDIS_URL: cache.env.REDIS_URL,
     },
   });
@@ -140,7 +141,7 @@ export default defineRailway((ctx: any) => {
     },
   });
 
-  const backend = group("Backend", [cache, api, worker, beat]);
+  const backend = group("Backend", [db, cache, api, worker, beat]);
   const frontends = group("Frontends", [instituteAdmin, platformAdmin]);
 
   return project("campusone", {

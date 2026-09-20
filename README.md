@@ -21,14 +21,15 @@ The architecture and product boundaries are described in [ARCHITECTURE.md](ARCHI
 - npm
 - Python 3.11+
 - [uv](https://docs.astral.sh/uv/) for the Django API
-- A Supabase Postgres database URL for `DATABASE_URL`
+- A Railway Postgres database URL for `DATABASE_URL`
 - Redis for background workers in production; local development may use eager Celery
 
 ## Getting started
 
-CampusOne uses Supabase/PostgreSQL as the application database in every
-developer and deployment environment. Do not switch the app to SQLite for local
-development.
+CampusOne uses PostgreSQL as the application database in every developer and
+deployment environment. For Railway deployments, use the Railway Postgres
+service provisioned by `.railway/railway.ts`. Do not switch the app to SQLite
+for local development.
 
 Install the JavaScript workspace dependencies from the repository root:
 
@@ -52,7 +53,7 @@ DJANGO_DEBUG=true
 DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1,testserver,api.snifply.com
 CORS_ALLOWED_ORIGINS=http://localhost:5173,http://localhost:5174,http://localhost:5175
 CSRF_TRUSTED_ORIGINS=http://localhost:5173,http://localhost:5174,http://localhost:5175
-DATABASE_URL=<supabase-postgres-session-pooler-or-direct-url>
+DATABASE_URL=<railway-postgres-url>
 DJANGO_USE_SQLITE=false
 DATABASE_SSL_REQUIRE=true
 DATABASE_CONNECT_TIMEOUT=10
@@ -60,11 +61,9 @@ REDIS_URL=redis://127.0.0.1:6379/0
 CELERY_TASK_ALWAYS_EAGER=true
 ```
 
-For Supabase, prefer the session pooler connection string when your machine or
-host cannot reach the direct database endpoint. If migration startup fails with
-`failed to resolve host 'db.<project-ref>.supabase.co'`, copy the current
-connection string from Supabase Dashboard -> Project Settings -> Database ->
-Connection string and retry with that URL.
+For local development, copy the Railway Postgres `DATABASE_URL` into
+`services/api/.env` or use another reachable PostgreSQL database. Keep
+`DJANGO_USE_SQLITE=false`.
 
 Apply migrations and run the API:
 
@@ -113,7 +112,7 @@ uv run python manage.py migrate
 uv run python manage.py makemigrations --check --dry-run
 ```
 
-Then edit `school_platform_schema.sql` so a fresh Supabase/Postgres database can
+Then edit `school_platform_schema.sql` so a fresh PostgreSQL database can
 be reviewed or recreated from the same schema contract. Do not add tables,
 columns, indexes, constraints, or seed permissions in code without updating that
 file.
@@ -124,10 +123,9 @@ Deploy the API and web apps as separate services.
 
 The repo includes a single Railway IaC manifest at `.railway/railway.ts` for the
 full Railway shape: API, worker, beat, Redis, Institute Admin web, and Platform
-Admin web. Before applying it, replace
-`REPLACE_WITH_GITHUB_OWNER/REPLACE_WITH_REPO` with the GitHub repository slug and
-set the preserved secrets/domains in Railway. The database remains Supabase
-Postgres; `DATABASE_URL` must be the Supabase connection string.
+Admin web. Railway Postgres and Redis are provisioned by the manifest, and
+`DATABASE_URL` is wired from the Railway Postgres service automatically. Set the
+preserved secrets and custom domains in Railway before promoting the deployment.
 
 ### API service
 
@@ -156,7 +154,7 @@ DJANGO_ALLOWED_HOSTS=<api-domain>
 PUBLIC_APP_DOMAIN=<public-root-domain>
 CORS_ALLOWED_ORIGINS=https://<institute-admin-domain>,https://<platform-admin-domain>
 CSRF_TRUSTED_ORIGINS=https://<institute-admin-domain>,https://<platform-admin-domain>
-DATABASE_URL=<supabase-postgres-url>
+DATABASE_URL=${{Postgres.DATABASE_URL}}
 DJANGO_USE_SQLITE=false
 DATABASE_SSL_REQUIRE=true
 REDIS_URL=<redis-url>

@@ -12,5 +12,8 @@
     "test:admin": "npm run test --workspace @campusone/institute-admin-web",
     "build:admin": "npm run build --workspace @campusone/institute-admin-web",
     "build:platform-admin": "npm run build --workspace @campusone/platform-admin-web"
+  },
+  "devDependencies": {
+    "railway": "^3.11.0"
   }
 }

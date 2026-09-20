@@ -10,7 +10,7 @@ Install:
 - [uv](https://docs.astral.sh/uv/)
 - Node.js 20+
 - npm
-- Supabase PostgreSQL connection details
+- Railway PostgreSQL connection details, or another reachable PostgreSQL database
 - Optional Redis connection details, or Docker for local Redis
 
 Run all commands from Git Bash, WSL, or another shell that supports the examples below.
@@ -26,9 +26,9 @@ cp .env.example .env
 
 Never commit `services/api/.env`. Replace the placeholder secret and service URLs in that file.
 
-### Supabase PostgreSQL and optional Redis
+### Railway PostgreSQL and optional Redis
 
-Set the following values in `services/api/.env` using the credentials provided by Supabase:
+Set the following values in `services/api/.env` using the credentials provided by Railway Postgres:
 
 ```env
 DJANGO_ENV=development
@@ -37,7 +37,7 @@ DJANGO_SECRET_KEY=<long-random-local-secret>
 DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1
 CORS_ALLOWED_ORIGINS=http://localhost:5173
 CSRF_TRUSTED_ORIGINS=http://localhost:5173
-DATABASE_URL=<supabase-postgres-session-pooler-or-direct-url>
+DATABASE_URL=<railway-postgres-url>
 DJANGO_USE_SQLITE=false
 DATABASE_SSL_REQUIRE=true
 REDIS_URL=redis://127.0.0.1:6379/0
@@ -46,7 +46,7 @@ CELERY_TASK_ALWAYS_EAGER=true
 
 Do not paste real credentials into documentation, source files, terminal screenshots, or commits.
 
-CampusOne is Supabase/Postgres-only. Do not use SQLite for local app runs. If the direct Supabase host fails with `failed to resolve host 'db.<project-ref>.supabase.co'`, use the current Supabase session pooler URL instead.
+CampusOne uses PostgreSQL for local app runs. Do not use SQLite for local app runs.
 
 ## 2. Install dependencies and prepare the database
 
