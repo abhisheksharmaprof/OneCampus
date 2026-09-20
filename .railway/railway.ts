@@ -123,7 +123,7 @@ export default defineRailway((ctx: any) => {
 
   const instituteAdmin = service("institute-admin-web", {
     source: github(repository, { branch: sourceBranch }),
-    build: "npm ci && npm run build:admin",
+    build: "npm run build:admin",
     start: "npx --yes serve -s apps/institute-admin-web/dist -l tcp://0.0.0.0:$PORT",
     env: {
       VITE_API_BASE_URL: preserve(),
@@ -133,7 +133,7 @@ export default defineRailway((ctx: any) => {
 
   const platformAdmin = service("platform-admin-web", {
     source: github(repository, { branch: sourceBranch }),
-    build: "npm ci && npm run build:platform-admin",
+    build: "npm run build:platform-admin",
     start: "npx --yes serve -s apps/platform-admin-web/dist -l tcp://0.0.0.0:$PORT",
     env: {
       VITE_API_BASE_URL: preserve(),
