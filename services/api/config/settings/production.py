@@ -10,6 +10,7 @@ SECURE_HSTS_SECONDS = 3600
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 SECURE_HSTS_PRELOAD = True
 SECURE_SSL_REDIRECT = True
+SECURE_REDIRECT_EXEMPT = [r"^api/v1/health/?$"]
 SECURE_CONTENT_TYPE_NOSNIFF = True
 
 if SECRET_KEY in {"local-development-only", "local-development-only-change-before-production"}:  # noqa: F405
