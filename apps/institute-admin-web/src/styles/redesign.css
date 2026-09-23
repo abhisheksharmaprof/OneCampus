@@ -223,7 +223,7 @@ input:not([type="checkbox"]):not([type="radio"]):focus, select:focus, textarea:f
 .stat-label { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.88rem; color: #475569; font-weight: 500; }
 .stat-value-group { display: flex; align-items: center; gap: 0.75rem; }
 .stat-value-group strong { font-size: 1.1rem; color: #0f172a; }
-.btn-link-sm { background: none; border: none; padding: 0; color: var(--color-primary); font-size: 0.8rem; font-weight: 600; cursor: pointer; }
+.btn-link-sm { background: none; border: none; padding: 0.5rem; min-height: 44px; display: inline-flex; align-items: center; color: var(--color-primary); font-size: 0.8rem; font-weight: 600; cursor: pointer; }
 .btn-link-sm:hover { text-decoration: underline; }
 .danger-text { color: var(--color-danger) !important; }
 
@@ -374,4 +374,69 @@ input:not([type="checkbox"]):not([type="radio"]):focus, select:focus, textarea:f
   .sidebar.is-mobile-open .sidebar-header .brand-name { display: inline; }
   .mobile-scrim { inset: 0; }
   .content-container { padding: 1.25rem 1rem 3rem; }
+}
+
+/* Cross-surface responsive hardening. These rules intentionally sit after the
+   visual redesign so operational, finance, setup, and profile screens share
+   the same safe layout behavior at the tablet and phone breakpoints. */
+@media (width <= 64rem) {
+  .topbar-context { display: flex; min-width: 0; }
+  .branch-control { width: min(12.5rem, 24vw); }
+  .year-control { width: min(7rem, 14vw); }
+  .global-search { min-width: 10rem; }
+  .content-container { padding-inline: 1.5rem; }
+  .page-heading, .admin-page-header { align-items: flex-start; flex-wrap: wrap; }
+  .page-actions, .admin-page-header__actions { width: 100%; justify-content: flex-start; }
+  .profile-form-layout { display: grid; grid-template-columns: 1fr; width: 100%; min-width: 0; box-sizing: border-box; }
+  .profile-section-nav-sticky { position: static; width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box; }
+  .section-nav-list { display: flex; flex-direction: row; overflow-x: auto; gap: .35rem; width: 100%; max-width: 100%; box-sizing: border-box; }
+  .section-nav-item { flex: 0 0 auto; border-left: 0; border-bottom: 3px solid transparent; border-radius: .4rem .4rem 0 0; }
+  .section-nav-item:hover, .section-nav-item.active { border-left-color: transparent; border-bottom-color: var(--color-primary); }
+  .setup-summary-grid { margin-inline: 0; }
+}
+
+@media (width <= 48rem) {
+  .topbar-context { display: none; }
+  .topbar { padding-inline: .75rem; }
+  .desktop-sidebar-toggle { display: none; }
+  .global-search { margin-left: auto; }
+  .content-container { padding-inline: 1rem; }
+  .page-heading, .admin-page-header { gap: .85rem; }
+  .page-actions, .admin-page-header__actions, .setup-hero-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); width: 100%; }
+  .page-actions > *, .admin-page-header__actions > *, .setup-hero-actions > * { width: 100%; }
+  .admin-modal__footer { align-items: stretch; flex-wrap: wrap; }
+  .admin-modal__footer > * { flex: 1 1 9rem; }
+  .profile-page-header, .profile-identity, .attendance-calendar-header, .staff-attendance-heading { align-items: stretch; flex-direction: column; }
+  .profile-actions, .attendance-calendar-actions, .attendance-month-actions { flex-wrap: wrap; }
+  .profile-actions > *, .attendance-calendar-actions > * { flex: 1 1 9rem; }
+  .profile-avatar { width: 5rem; height: 5rem; }
+  .profile-details, .profile-details-wide, .profile-summary-grid, .admin-form-grid { grid-template-columns: 1fr; }
+  .setup-summary-grid { grid-template-columns: 1fr; }
+  .setup-hero-actions { justify-content: stretch; }
+  .filter-bar-row, .table-toolbar { align-items: stretch; flex-direction: column; }
+  .chip-filter-group { flex-wrap: wrap; }
+  .side-drawer__header, .side-drawer__body, .side-drawer__footer { padding-inline: 1rem; }
+  .profile-sticky-footer { padding: .75rem 1rem; }
+}
+
+@media (width <= 40rem) {
+  .admin-tabs, .admin-tabs__panel { min-width: 0; }
+  .admin-page-skeleton__table { min-width: 0; width: 100%; }
+  .table-scroll { min-width: 0; max-width: 100%; overflow-x: auto !important; contain: paint; }
+  .page-actions, .admin-page-header__actions, .setup-hero-actions { grid-template-columns: 1fr; }
+  .content-container { padding-top: 1rem; }
+  .section-header { align-items: flex-start; flex-direction: column; }
+  .section-header > * { max-width: 100%; }
+  .attendance-kpis { grid-template-columns: 1fr; }
+  .attendance-calendar-week, .attendance-calendar-grid { min-width: 34rem; }
+  .attendance-calendar-card { overflow-x: auto; }
+  .admin-pagination { align-items: stretch; }
+  .admin-pagination label, .admin-pagination__buttons { justify-content: space-between; width: 100%; }
+  .admin-pagination { min-width: 0; overflow: hidden; }
+  .admin-pagination p, .admin-pagination label, .admin-pagination__buttons { min-width: 0; }
+  .admin-pagination label { flex-wrap: wrap; }
+  .admin-pagination select { max-width: 100%; }
+  .document-actions { flex-wrap: wrap; }
+  .kpi-grid { margin-right: 0; padding-right: 0; grid-template-columns: repeat(2, minmax(0, 1fr)); overflow-x: visible; scroll-snap-type: none; }
+  .kpi-card { min-width: 0; }
 }

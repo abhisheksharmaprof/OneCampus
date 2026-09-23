@@ -88,7 +88,16 @@ export async function printFinanceDocument(options: {
   template: DocumentTemplateRecord | null
   payment?: Payment
 }): Promise<boolean> {
-  return openPrintWindow(await buildFinanceDocumentHtml(options))
+  // Reserve the popup in the user gesture before QR generation/template work awaits.
+  // Opening only after the await is treated as an unsolicited popup by several browsers.
+  const popup = window.open('', '_blank', 'width=900,height=900')
+  if (!popup) return false
+  try {
+    return openPrintWindow(await buildFinanceDocumentHtml(options), popup)
+  } catch (error) {
+    popup.close()
+    throw error
+  }
 }
 
 export { financeFallbackLayout }

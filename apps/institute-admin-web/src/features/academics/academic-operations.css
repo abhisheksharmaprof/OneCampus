@@ -257,6 +257,39 @@
 .aop-error button { border: 0; background: transparent; color: inherit; font-weight: 750; text-decoration: underline; cursor: pointer; }
 .aop-row-buttons { display: flex; gap: .35rem; }
 
+.modal-backdrop {
+  position: fixed;
+  z-index: 100;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(15, 29, 55, .48);
+}
+.modal-card {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--aop-border);
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 20px 55px rgba(17, 39, 77, .24);
+}
+.modal-close {
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  min-height: 2.25rem !important;
+  padding: 0;
+  border: 1px solid var(--aop-border);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--aop-muted);
+  cursor: pointer;
+}
+.modal-close:hover { background: #f4f7fc; color: var(--aop-ink); }
+
 .aop-editor { width: min(680px, calc(100vw - 2rem)); max-height: calc(100vh - 2rem); overflow-y: auto; }
 .aop-editor > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
 .aop-editor > header h2 { margin: 0 0 .3rem; }
@@ -320,6 +353,13 @@
   .aop-notice { left: 14px; right: 14px; top: 68px; }
   .aop-editor-grid { grid-template-columns: 1fr; }
   .aop-editor-grid label.wide { grid-column: 1; }
+}
+
+@media (max-width: 48rem) {
+  .modal-backdrop { align-items: end; padding: 0; }
+  .modal-card { max-height: calc(100dvh - 1rem); border-radius: 14px 14px 0 0; }
+  .aop-editor > footer { justify-content: stretch; }
+  .aop-editor > footer > button { flex: 1; }
 }
 
 @media (prefers-reduced-motion: reduce) {

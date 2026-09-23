@@ -155,8 +155,8 @@ ${previewCss}
 }
 
 /** Popup + print — same pattern as the finance renderer it replaces. */
-export function openPrintWindow(html: string): boolean {
-  const popup = window.open('', '_blank', 'width=900,height=900')
+export function openPrintWindow(html: string, existingPopup?: Window | null): boolean {
+  const popup = existingPopup ?? window.open('', '_blank', 'width=900,height=900')
   if (!popup) return false
   popup.opener = null
   popup.document.write(html.replace('</body>', "<script>window.addEventListener('load',()=>setTimeout(()=>window.print(),250))</script></body>"))

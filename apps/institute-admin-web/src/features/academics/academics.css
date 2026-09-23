@@ -185,9 +185,13 @@
 .section-reference-card small { font-size: .74rem; }
 .section-reference-card > button { font-size: .76rem; }
 .grade-empty { padding: 1rem 0 .2rem; font-size: .8rem; }
+.years-reference { min-width: 0; max-width: 100%; overflow-x: hidden; }
+.years-reference .classes-reference-actions { max-width: 100%; box-sizing: border-box; }
+.years-reference .classes-kpis { max-width: 100%; box-sizing: border-box; }
+
 @media (max-width: 760px) {
-  .classes-reference-actions { justify-content: stretch; }
-  .classes-reference-actions button { flex: 1; }
+  .classes-reference-actions { justify-content: stretch; width: 100%; box-sizing: border-box; }
+  .classes-reference-actions button { flex: 1 1 0; min-width: 0; }
   .grade-reference-card > header { align-items: stretch; }
   .grade-summary { min-width: 0; }
   .grade-actions { justify-content: space-between; }

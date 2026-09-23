@@ -38,6 +38,15 @@
   overflow: hidden;
 }
 
+.onboarding-header button {
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0 1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
 @media (width <= 56rem) {
   .auth-page,
   .auth-panel {
@@ -63,5 +72,14 @@
   .auth-switch {
     flex-wrap: wrap;
     text-align: center;
+  }
+
+  .auth-link-button,
+  .auth-switch button,
+  .auth-back {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
   }
 }

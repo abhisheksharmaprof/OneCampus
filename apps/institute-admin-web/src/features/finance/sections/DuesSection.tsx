@@ -78,11 +78,11 @@ export default function DuesSection({ accessToken, branchId }: FinanceSectionPro
   return (
     <>
       <div className="fin-toolbar">
-        <select value={classFilter} onChange={(event) => { setClassFilter(event.target.value); setPage(1) }}>
+        <select aria-label="Filter class" value={classFilter} onChange={(event) => { setClassFilter(event.target.value); setPage(1) }}>
           <option value="">All classes</option>
           {(grades.data?.items ?? []).map((grade: GradeOption) => <option key={grade.id} value={grade.id}>{grade.name}</option>)}
         </select>
-        <select value={minDaysOverdue} onChange={(event) => { setMinDaysOverdue(event.target.value); setPage(1) }}>
+        <select aria-label="Filter days overdue" value={minDaysOverdue} onChange={(event) => { setMinDaysOverdue(event.target.value); setPage(1) }}>
           {OVERDUE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
         </select>
         <span style={{ flex: 1 }} />

@@ -60,13 +60,13 @@ export default function PaymentsSection({ accessToken, branchId }: FinanceSectio
   return (
     <>
       <div className="fin-toolbar">
-        <input value={search} placeholder="Search student or receipt no" onChange={(event) => { setSearch(event.target.value); setPage(1) }} />
-        <select value={method} onChange={(event) => { setMethod(event.target.value); setPage(1) }}>
+        <input aria-label="Search student or receipt number" value={search} placeholder="Search student or receipt no" onChange={(event) => { setSearch(event.target.value); setPage(1) }} />
+        <select aria-label="Filter payment method" value={method} onChange={(event) => { setMethod(event.target.value); setPage(1) }}>
           <option value="">All methods</option>
           {METHODS.map((value) => <option key={value} value={value}>{value}</option>)}
         </select>
-        <input type="date" value={dateFrom} onChange={(event) => { setDateFrom(event.target.value); setPage(1) }} />
-        <input type="date" value={dateTo} onChange={(event) => { setDateTo(event.target.value); setPage(1) }} />
+        <input aria-label="Date from" type="date" value={dateFrom} onChange={(event) => { setDateFrom(event.target.value); setPage(1) }} />
+        <input aria-label="Date to" type="date" value={dateTo} onChange={(event) => { setDateTo(event.target.value); setPage(1) }} />
         <span style={{ flex: 1 }} />
         <button type="button" className="fin-btn fin-btn--primary" onClick={() => setPickerOpen(true)}>Record payment</button>
       </div>

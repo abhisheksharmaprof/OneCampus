@@ -214,11 +214,22 @@ class Command(BaseCommand):
             peer, _ = Institute.objects.get_or_create(
                 code=peer_defaults["code"], defaults=peer_defaults
             )
-            Branch.objects.get_or_create(
-                institute=peer,
-                code="MAIN",
-                defaults={"name": "Main Campus", "is_head_office": True},
-            )
+            # Realistic demo data may already give this peer a differently
+            # coded head office (for example SEC62 or BANER). Reusing it keeps
+            # this command idempotent and avoids violating the one-head-office
+            # constraint when the two seed commands are run in either order.
+            if not peer.branches.filter(is_head_office=True).exists():
+                main_branch = peer.branches.filter(code="MAIN").first()
+                if main_branch:
+                    main_branch.is_head_office = True
+                    main_branch.save(update_fields=("is_head_office", "updated_at"))
+                else:
+                    Branch.objects.create(
+                        institute=peer,
+                        code="MAIN",
+                        name="Main Campus",
+                        is_head_office=True,
+                    )
             InstituteAssociation.link(institute, peer)
         year, _ = AcademicYear.objects.get_or_create(
             institute=institute,

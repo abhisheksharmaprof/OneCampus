@@ -44,14 +44,7 @@ export default function InvoiceEditor({ accessToken, onClose }: InvoiceEditorPro
   const plans = plansLoad.data?.items ?? []
 
   useEffect(() => {
-    if (templateId !== null) return
-    const preferred = templates.find((template) => template.isDefault) ?? templates[0]
-    if (preferred) setTemplateId(preferred.id)
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- only run the default-selection logic when the template list itself changes.
-  }, [templates])
-
-  useEffect(() => {
-    if (studentQuery.trim().length < 2) { setStudentOptions([]); return }
+    if (studentQuery.trim().length < 2) return
     const controller = new AbortController()
     const timer = setTimeout(() => {
       searchStudents(accessToken, studentQuery.trim(), controller.signal)
@@ -66,7 +59,9 @@ export default function InvoiceEditor({ accessToken, onClose }: InvoiceEditorPro
     [items],
   )
   const total = Math.max(subtotal - Number(discount || 0) + Number(tax || 0), 0)
-  const template = templates.find((candidate) => candidate.id === templateId) ?? null
+  const preferredTemplate = templates.find((candidate) => candidate.isDefault) ?? templates[0] ?? null
+  const activeTemplateId = templateId ?? preferredTemplate?.id ?? null
+  const template = templates.find((candidate) => candidate.id === activeTemplateId) ?? preferredTemplate
 
   const previewHtml = useMemo(() => {
     if (!branding.data) return ''
@@ -78,11 +73,11 @@ export default function InvoiceEditor({ accessToken, onClose }: InvoiceEditorPro
       lineItems: items.filter((item) => item.description.trim()),
       subtotal: subtotal.toFixed(2), discountAmount: Number(discount || 0).toFixed(2),
       taxAmount: Number(tax || 0).toFixed(2), total: total.toFixed(2),
-      notes, templateId, totalPaid: '0.00',
+      notes, templateId: activeTemplateId, totalPaid: '0.00',
     }
     const data = invoiceToDocumentData(draft, branding.data)
     return renderDocumentHtml({ layout: template?.layout ?? financeFallbackLayout('FEE_INVOICE', branding.data.brandColor), data, mode: 'preview' })
-  }, [branding.data, student, items, subtotal, discount, tax, total, issueDate, dueDate, notes, template, templateId])
+  }, [branding.data, student, items, subtotal, discount, tax, total, issueDate, dueDate, notes, template, activeTemplateId])
 
   // Debounced so a fast typist doesn't trigger a full iframe document.write() on every keystroke.
   useEffect(() => {
@@ -120,7 +115,7 @@ export default function InvoiceEditor({ accessToken, onClose }: InvoiceEditorPro
       const created = await createInvoice(accessToken, {
         studentId: student.id, issueDate, dueDate, lineItems,
         discountAmount: Number(discount || 0).toFixed(2), taxAmount: Number(tax || 0).toFixed(2),
-        notes, templateId, status,
+        notes, templateId: activeTemplateId, status,
       })
       if (printAfter && branding.data) {
         const printed = await printFinanceDocument({ invoice: created, branding: branding.data, template })
@@ -168,15 +163,16 @@ export default function InvoiceEditor({ accessToken, onClose }: InvoiceEditorPro
     <div className="fin-editor">
       <div className="fin-card">
         <h3>New invoice</h3>
+        <p className="fin-editor__intro">Create a student bill, review the exact A4 layout, then save as draft or issue and print.</p>
         {error && <p className="fin-field-error" role="alert">{error}</p>}
-        <div className="fin-form">
+        <div className="fin-editor__section fin-form">
           <label className="is-wide">Student
             {student ? (
               <span>{studentLabel(student)} ({student.admissionNumber}) <button type="button" className="fin-btn" onClick={() => setStudent(null)}>Change</button></span>
             ) : (
               <>
                 <input value={studentQuery} onChange={(event) => setStudentQuery(event.target.value)} placeholder="Search by name or admission number" />
-                {studentOptions.map((option) => (
+                {studentQuery.trim().length >= 2 && studentOptions.map((option) => (
                   <button key={option.id} type="button" className="fin-btn" onClick={() => { setStudent(option); setStudentOptions([]) }}>
                     {studentLabel(option)} · {option.admissionNumber}
                   </button>
@@ -193,30 +189,33 @@ export default function InvoiceEditor({ accessToken, onClose }: InvoiceEditorPro
             </select>
           </label>
           <label>Template
-            <select value={templateId ?? ''} onChange={(event) => setTemplateId(event.target.value || null)}>
+            <select value={activeTemplateId ?? ''} onChange={(event) => setTemplateId(event.target.value || null)}>
               {templates.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.name}</option>)}
             </select>
           </label>
         </div>
+        <div className="fin-editor__section">
         <h4>Line items</h4>
+        <p className="fin-hint">Use a fee plan to fill standard charges, or add individual items below.</p>
         <div className="fin-rows">
           {items.map((item, index) => (
             <div className="fin-row" key={index}>
-              <input value={item.description} placeholder="Description" onChange={(event) => updateItem(index, { description: event.target.value })} />
-              <input value={item.period} placeholder="Period" onChange={(event) => updateItem(index, { period: event.target.value })} />
-              <input type="number" min={1} value={item.qty} onChange={(event) => updateItem(index, { qty: Math.max(Number(event.target.value) || 1, 1) })} />
-              <input type="number" min={0} step="0.01" value={item.amount} onChange={(event) => updateItem(index, { amount: event.target.value })} />
+              <input aria-label={`Line ${index + 1} description`} value={item.description} placeholder="Description" onChange={(event) => updateItem(index, { description: event.target.value })} />
+              <input aria-label={`Line ${index + 1} period`} value={item.period} placeholder="Period" onChange={(event) => updateItem(index, { period: event.target.value })} />
+              <input aria-label={`Line ${index + 1} quantity`} type="number" min={1} value={item.qty} onChange={(event) => updateItem(index, { qty: Math.max(Number(event.target.value) || 1, 1) })} />
+              <input aria-label={`Line ${index + 1} rate`} type="number" min={0} step="0.01" value={item.amount} onChange={(event) => updateItem(index, { amount: event.target.value })} />
               <button type="button" className="fin-btn fin-btn--danger" aria-label="Remove row" onClick={() => setItems((current) => current.filter((_, position) => position !== index))}>×</button>
             </div>
           ))}
         </div>
         <button type="button" className="fin-btn" onClick={() => setItems((current) => [...current, emptyItem()])}>+ Add row</button>
-        <div className="fin-form">
+        </div>
+        <div className="fin-editor__section fin-form">
           <label>Discount (₹)<input type="number" min={0} step="0.01" value={discount} onChange={(event) => setDiscount(event.target.value)} /></label>
           <label>Tax (₹)<input type="number" min={0} step="0.01" value={tax} onChange={(event) => setTax(event.target.value)} /></label>
           <label className="is-wide">Notes<textarea rows={2} value={notes} onChange={(event) => setNotes(event.target.value)} /></label>
         </div>
-        <p><b>Subtotal:</b> {money(subtotal)} · <b>Total:</b> {money(total)}</p>
+        <div className="fin-editor__summary"><span>Subtotal {money(subtotal)} · Discount {money(discount)} · Tax {money(tax)}</span><strong>Total {money(total)}</strong></div>
         <div className="fin-modal__actions">
           <button type="button" className="fin-btn" disabled={saving} onClick={() => onClose(false)}>Close</button>
           <button type="button" className="fin-btn" disabled={saving} onClick={() => saveAnd('DRAFT', false, false)}>Save draft</button>

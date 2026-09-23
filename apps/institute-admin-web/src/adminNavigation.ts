@@ -197,6 +197,8 @@ const actionAliases: Record<string, string> = {
   'Collections': 'Payments',
   'Reports': 'Finance Reports',
   'Enquiries Inbox': 'Enquiries',
+  'Branding & Profile': 'Branding',
+  'Help & support': 'Help & Support',
 }
 
 export function getAdminRouteByLabel(label: string) { return routesByLabel.get(actionAliases[label.trim()] ?? label.trim()) }

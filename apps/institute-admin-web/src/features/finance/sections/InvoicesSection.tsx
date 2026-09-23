@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { Ban, CreditCard, FilePlus2, Printer, ReceiptIndianRupee, Search, WandSparkles } from 'lucide-react'
 import {
   bulkGenerateInvoices, fetchInstituteBranding, listFeePlans, listGrades, listInvoices,
   patchInvoice, recordPayment,
@@ -71,26 +72,38 @@ export default function InvoicesSection({ accessToken, branchId }: Props) {
   }
 
   const items = invoices.data?.items ?? []
+  const billedInView = items.reduce((sum, invoice) => sum + Number(invoice.total || 0), 0)
+  const paidInView = items.reduce((sum, invoice) => sum + Number(invoice.totalPaid || 0), 0)
+  const outstandingInView = Math.max(billedInView - paidInView, 0)
+  const openInvoiceCount = items.filter((invoice) => invoice.status === 'ISSUED' || invoice.status === 'PARTIALLY_PAID').length
   return (
     <>
-      <div className="fin-toolbar">
-        <input value={search} placeholder="Search student, admission no or invoice no" onChange={(event) => { setSearch(event.target.value); setPage(1) }} />
-        <select value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); setPage(1) }}>
+      <div className="fin-kpis fin-kpis--invoice" aria-label="Invoice register summary">
+        <div className="fin-kpi"><span className="fin-kpi__icon"><FilePlus2 size={17} aria-hidden="true" /></span><span>Billed in view</span><b>{money(billedInView)}</b><small>{items.length} invoice{items.length === 1 ? '' : 's'} loaded</small></div>
+        <div className="fin-kpi"><span className="fin-kpi__icon fin-kpi__icon--success"><CreditCard size={17} aria-hidden="true" /></span><span>Collected in view</span><b>{money(paidInView)}</b><small>Recorded payments</small></div>
+        <div className="fin-kpi"><span className="fin-kpi__icon fin-kpi__icon--warning"><ReceiptIndianRupee size={17} aria-hidden="true" /></span><span>Outstanding in view</span><b>{money(outstandingInView)}</b><small>Needs collection</small></div>
+        <div className="fin-kpi"><span className="fin-kpi__icon fin-kpi__icon--warning"><WandSparkles size={17} aria-hidden="true" /></span><span>Open invoices</span><b>{openInvoiceCount}</b><small>Issued or partially paid</small></div>
+      </div>
+      <div className="fin-toolbar fin-toolbar--panel fin-invoice-toolbar">
+        <label className="fin-search"><Search size={16} aria-hidden="true" /><input aria-label="Search invoices" value={search} placeholder="Search student, admission no or invoice no" onChange={(event) => { setSearch(event.target.value); setPage(1) }} /></label>
+        <select aria-label="Filter invoices by status" value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); setPage(1) }}>
           <option value="">All statuses</option>
           {['DRAFT', 'ISSUED', 'PARTIALLY_PAID', 'PAID', 'CANCELLED'].map((value) => <option key={value} value={value}>{value.replace('_', ' ')}</option>)}
         </select>
-        <select value={classFilter} onChange={(event) => { setClassFilter(event.target.value); setPage(1) }}>
+        <select aria-label="Filter invoices by class" value={classFilter} onChange={(event) => { setClassFilter(event.target.value); setPage(1) }}>
           <option value="">All classes</option>
           {(grades.data?.items ?? []).map((grade: GradeOption) => <option key={grade.id} value={grade.id}>{grade.name}</option>)}
         </select>
-        <span style={{ flex: 1 }} />
-        <button type="button" className="fin-btn" onClick={() => setBulkOpen(true)}>Bulk generate</button>
-        <button type="button" className="fin-btn fin-btn--primary" onClick={() => setMode('editor')}>New invoice</button>
+        <span className="fin-toolbar__spacer" />
+        <button type="button" className="fin-btn" onClick={() => setBulkOpen(true)}><WandSparkles size={15} aria-hidden="true" /> Bulk generate</button>
+        <button type="button" className="fin-btn fin-btn--primary" onClick={() => setMode('editor')}><FilePlus2 size={15} aria-hidden="true" /> New invoice</button>
       </div>
       {busyMessage && <p className="fin-field-error" role="alert">{busyMessage}</p>}
       <StatePanel loading={invoices.loading} error={invoices.error} onRetry={invoices.reload}
         empty={!items.length} emptyMessage="No invoices yet — create your first invoice.">
-        <div className="fin-card">
+        <div className="fin-card fin-card--table">
+          <div className="fin-card__header"><div><h3>Invoice register</h3><p>Branch-scoped billing records. Select an invoice to collect, print, or cancel.</p></div><span className="fin-hint">Page {invoices.data?.page ?? 1} of {invoices.data?.totalPages ?? 1}</span></div>
+          <div className="fin-table-wrap">
           <table className="fin-table">
             <thead><tr>
               <th>Invoice</th><th>Student</th><th>Class</th><th className="is-right">Total</th>
@@ -99,8 +112,8 @@ export default function InvoicesSection({ accessToken, branchId }: Props) {
             <tbody>
               {items.map((invoice) => (
                 <tr key={invoice.id}>
-                  <td>{invoice.invoiceNumber}</td>
-                  <td>{invoice.studentName}<br /><small>{invoice.admissionNumber}</small></td>
+                  <td><strong>{invoice.invoiceNumber}</strong><small>{invoice.issueDate}</small></td>
+                  <td><strong>{invoice.studentName}</strong><small>{invoice.admissionNumber}</small></td>
                   <td>{invoice.className || '—'}</td>
                   <td className="is-right">{money(invoice.total)}</td>
                   <td className="is-right">{money(invoice.totalPaid)}</td>
@@ -109,22 +122,24 @@ export default function InvoicesSection({ accessToken, branchId }: Props) {
                   <td>
                     {invoice.status !== 'CANCELLED' && (
                       <>
-                        <button type="button" className="fin-btn" disabled={printingId === invoice.id} onClick={() => void printInvoice(invoice)}>{printingId === invoice.id ? 'Preparing…' : 'Print invoice'}</button>{' '}
+                        <button type="button" className="fin-icon-btn" title="Print invoice" aria-label={`Print invoice ${invoice.invoiceNumber}`} disabled={printingId === invoice.id} onClick={() => void printInvoice(invoice)}><Printer size={15} aria-hidden="true" /></button>{' '}
                       </>
                     )}
                     {(invoice.status === 'ISSUED' || invoice.status === 'PARTIALLY_PAID') && (
                       <>
-                        <button type="button" className="fin-btn" onClick={() => setPayFor(invoice)}>Record payment</button>{' '}
+                        <button type="button" className="fin-btn fin-btn--compact" onClick={() => setPayFor(invoice)}><CreditCard size={14} aria-hidden="true" /> Record payment</button>{' '}
                       </>
                     )}
                     {invoice.status !== 'CANCELLED' && invoice.status !== 'PAID' && (
                       <button
                         type="button"
-                        className="fin-btn fin-btn--danger"
+                        className="fin-icon-btn fin-icon-btn--danger"
+                        title="Cancel invoice"
+                        aria-label={`Cancel invoice ${invoice.invoiceNumber}`}
                         disabled={cancellingId === invoice.id}
                         onClick={() => cancelInvoice(invoice)}
                       >
-                        {cancellingId === invoice.id ? 'Cancelling…' : 'Cancel'}
+                        <Ban size={15} aria-hidden="true" />
                       </button>
                     )}
                   </td>
@@ -132,6 +147,7 @@ export default function InvoicesSection({ accessToken, branchId }: Props) {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
         <Pagination page={invoices.data?.page ?? 1} totalPages={invoices.data?.totalPages ?? 1} onPage={setPage} />
       </StatePanel>

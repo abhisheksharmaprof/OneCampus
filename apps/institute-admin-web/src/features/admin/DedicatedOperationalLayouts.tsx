@@ -32,7 +32,7 @@ const layout: Record<string, CSSProperties> = {
   split: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-3)', flexWrap: 'wrap' },
   toolbar: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-3)', flexWrap: 'wrap', padding: 'var(--space-3) var(--space-4)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-card)', background: 'var(--color-surface)' },
   table: { width: '100%', borderCollapse: 'collapse', fontSize: 'var(--font-size-body)' },
-  settingsRow: { display: 'grid', gridTemplateColumns: 'minmax(15rem, 1fr) auto', gap: 'var(--space-5)', alignItems: 'center', padding: 'var(--space-4) 0', borderBottom: '1px solid var(--color-border)' },
+  settingsRow: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: 'var(--space-5)', alignItems: 'center', padding: 'var(--space-4) 0', borderBottom: '1px solid var(--color-border)' },
 }
 
 const status = (label: string, tone: 'success' | 'warning' | 'neutral' | 'danger' = 'neutral') => <span className={`status-badge tone-${tone}`}>{label}</span>
