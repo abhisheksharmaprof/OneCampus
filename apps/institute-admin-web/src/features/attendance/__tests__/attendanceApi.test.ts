@@ -49,6 +49,26 @@ describe('attendanceApi', () => {
     expect(fetchMock.mock.calls[0][0]).toContain('search=Aarav')
   })
 
+  it('surfaces network failures instead of showing seeded attendance data or claiming writes succeeded', async () => {
+    vi.spyOn(globalThis, 'fetch').mockRejectedValue(new TypeError('Failed to fetch'))
+
+    await expect(getDailyRoster('token', { date: '2026-07-21' })).rejects.toThrow('Failed to fetch')
+    await expect(getOverviewRegister('token', { month: '2026-07' })).rejects.toThrow('Failed to fetch')
+    await expect(getLeaveApplications('token')).rejects.toThrow('Failed to fetch')
+    await expect(getLowAttendanceAlerts('token')).rejects.toThrow('Failed to fetch')
+    await expect(getAttendanceSettings('token')).rejects.toThrow('Failed to fetch')
+    await expect(getLeaveTypes('token')).rejects.toThrow('Failed to fetch')
+    await expect(getLeaveBalances('token')).rejects.toThrow('Failed to fetch')
+    await expect(bulkMarkAttendance('token', {
+      date: '2026-07-21',
+      records: [{ studentId: 'st-101', status: 'PRESENT' }],
+    })).rejects.toThrow('Failed to fetch')
+    await expect(approveLeaveApplication('token', 'la-1')).rejects.toThrow('Failed to fetch')
+    await expect(rejectLeaveApplication('token', 'la-1', 'Reason')).rejects.toThrow('Failed to fetch')
+    await expect(updateAttendanceSettings('token', { lowAttendanceThreshold: 80 })).rejects.toThrow('Failed to fetch')
+    await expect(updateLeaveQuota('token', { leaveTypeId: 'lt-1', targetId: 'st-101', targetType: 'student', allocatedDays: 10 })).rejects.toThrow('Failed to fetch')
+  })
+
   it('bulk marks attendance via POST request', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(

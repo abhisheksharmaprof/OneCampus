@@ -1,7 +1,14 @@
 import pytest
 
 from modules.identity.models import User
-from modules.institutes.models import Branch, Institute, InstituteAssociation, InstituteMembership
+from modules.institutes.models import (
+    Branch,
+    Institute,
+    InstituteAssociation,
+    InstituteMembership,
+    InstituteSubscription,
+    SubscriptionPlan,
+)
 
 
 def authenticate_admin(api_client):
@@ -81,6 +88,56 @@ def test_admin_cannot_write_system_owned_institute_fields(api_client):
 
 
 @pytest.mark.django_db
+def test_admin_reads_only_current_institute_subscription(api_client):
+    _, institute, _ = authenticate_admin(api_client)
+    other = Institute.objects.create(name="Other Institute", code="OTHER")
+    plan = SubscriptionPlan.objects.create(
+        name="Northstar Plan",
+        price_per_student="12.50",
+        flat_fee="250.00",
+        max_branches=4,
+        max_students=800,
+        features_json=["Attendance", "Finance"],
+    )
+    InstituteSubscription.objects.create(
+        institute=other,
+        plan=plan,
+        trial_ends_at="2027-01-01T00:00:00Z",
+    )
+
+    response = api_client.get("/api/v1/admin/institute/subscription")
+    assert response.status_code == 200
+    assert response.json()["data"]["subscription"] is None
+
+    current = InstituteSubscription.objects.create(
+        institute=institute,
+        plan=plan,
+        status=InstituteSubscription.Status.ACTIVE,
+        trial_ends_at="2027-01-01T00:00:00Z",
+    )
+    response = api_client.get("/api/v1/admin/institute/subscription")
+
+    assert response.status_code == 200
+    subscription = response.json()["data"]["subscription"]
+    assert subscription["id"] == str(current.id)
+    assert subscription["plan"] == {
+        "id": str(plan.id),
+        "name": "Northstar Plan",
+        "pricePerStudent": "12.50",
+        "flatFee": "250.00",
+        "maxBranches": 4,
+        "maxStudents": 800,
+        "features": ["Attendance", "Finance"],
+    }
+
+
+@pytest.mark.django_db
+def test_subscription_endpoint_requires_institute_admin(api_client):
+    response = api_client.get("/api/v1/admin/institute/subscription")
+    assert response.status_code in (401, 403)
+
+
+@pytest.mark.django_db
 def test_admin_lists_only_current_institute_branches(api_client):
     user, institute, head_office = authenticate_admin(api_client)
     second = Branch.objects.create(institute=institute, name="North Campus", code="NORTH")
@@ -112,8 +169,7 @@ def test_admin_creates_branch_with_server_generated_code(api_client):
     assert response.status_code == 201
     created = response.json()["data"]
     assert created["name"] == "East Campus"
-    assert created["code"].startswith("EAST-CAMPUS-")
-    assert len(created["code"]) <= 32
+    assert created["code"] == "EAST"
     branch = Branch.objects.get(id=created["id"])
     assert branch.institute_id == institute.id
     assert branch.is_head_office is False

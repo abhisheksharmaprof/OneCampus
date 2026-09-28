@@ -25,6 +25,13 @@ class DocumentTemplate(TimeStampedModel):
     category = models.CharField(max_length=20, choices=Category.choices)
     layout = models.JSONField(default=dict, blank=True)
     is_default = models.BooleanField(default=False)
+    published_version = models.ForeignKey(
+        "documents.DocumentTemplateVersion",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
     )
@@ -39,3 +46,27 @@ class DocumentTemplate(TimeStampedModel):
             )
         ]
         indexes = [models.Index(fields=("institute", "category"))]
+
+
+class DocumentTemplateVersion(TimeStampedModel):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    template = models.ForeignKey(
+        DocumentTemplate, on_delete=models.CASCADE, related_name="versions"
+    )
+    institute = models.ForeignKey(
+        "institutes.Institute", on_delete=models.CASCADE, related_name="document_template_versions"
+    )
+    version = models.PositiveIntegerField()
+    name = models.CharField(max_length=120)
+    layout = models.JSONField()
+    published_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name="+"
+    )
+
+    class Meta:
+        ordering = ("-version",)
+        constraints = [
+            models.UniqueConstraint(
+                fields=("template", "version"), name="uq_document_template_version"
+            )
+        ]

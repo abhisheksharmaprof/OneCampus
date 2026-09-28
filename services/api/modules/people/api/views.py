@@ -118,6 +118,8 @@ class StudentListCreateView(APIView):
                 )
             )
         )
+        if request.institute_membership.branch_id:
+            students = students.filter(branch_id=request.institute_membership.branch_id)
         branch_id = request.query_params.get("branchId")
         if branch_id:
             branch = get_object_or_404(Branch, id=branch_id, institute=request.institute)
@@ -302,11 +304,10 @@ class StudentDetailView(APIView):
     permission_classes = (IsCurrentInstituteAdmin,)
 
     def _get_student(self, request, student_id):
-        return get_object_or_404(
-            Student.objects.select_related("branch"),
-            id=student_id,
-            institute=request.institute,
-        )
+        students = Student.objects.select_related("branch").filter(institute=request.institute)
+        if request.institute_membership.branch_id:
+            students = students.filter(branch_id=request.institute_membership.branch_id)
+        return get_object_or_404(students, id=student_id)
 
     @extend_schema(responses={status.HTTP_200_OK: StudentSerializer})
     def get(self, request, student_id):

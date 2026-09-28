@@ -8,6 +8,7 @@ export interface DocumentTemplateRecord {
   layout: LayoutV2
   isDefault: boolean
   createdAt: string
+  publishedVersion?: { id: string; version: number; name: string; layout: LayoutV2 } | null
 }
 
 function query(params: Record<string, string | number | undefined>): string {
@@ -50,6 +51,41 @@ export function patchDocumentTemplate(
 ) {
   return adminRequest<DocumentTemplateRecord>(accessToken, `documents/templates/${templateId}`, {
     method: 'PATCH', body: JSON.stringify(body),
+  })
+}
+
+export function publishDocumentTemplate(accessToken: string, templateId: string) {
+  return adminRequest<DocumentTemplateRecord>(accessToken, `documents/templates/${templateId}/publish`, { method: 'POST' })
+}
+
+export interface IdCardStudent {
+  studentId: string
+  name?: string
+  admissionNumber?: string
+  branchName?: string
+  issues: string[]
+  missingPhoto: boolean
+  tokens?: Record<string, string>
+  images?: Record<string, string | null>
+}
+
+export interface IdCardPreflight {
+  fingerprint: string
+  ready: boolean
+  templateVersionId: string
+  templateName: string
+  version: number
+  layout: LayoutV2 | null
+  students: IdCardStudent[]
+}
+
+export function preflightIdCards(accessToken: string, body: {
+  templateVersionId: string
+  studentIds: string[]
+  acceptMissingPhotos: boolean
+}) {
+  return adminRequest<IdCardPreflight>(accessToken, 'documents/id-cards/preflight', {
+    method: 'POST', body: JSON.stringify(body),
   })
 }
 

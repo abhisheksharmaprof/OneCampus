@@ -137,7 +137,7 @@ export function renderDocumentHtml({ layout, data, mode, sampleMode = true }: Re
   })
 
   const previewCss = mode === 'preview'
-    ? 'body{background:#F3F5F8;padding:12px}.doc-sheet{box-shadow:0 2px 14px rgba(22,33,46,.18);margin:0 auto 12px}'
+    ? 'body{background:#F3F5F8;padding:12px}.doc-sheet{box-shadow:0 2px 14px rgba(22,33,46,.18);margin:0 auto 12px}@media print{body{background:#FFFFFF;padding:0}.doc-sheet{box-shadow:none;margin:0;page-break-after:always}.doc-sheet:last-child{page-break-after:auto}}'
     : 'body{margin:0}.doc-sheet{page-break-after:always}.doc-sheet:last-child{page-break-after:auto}'
 
   return `<!doctype html><html><head><meta charset="utf-8" /><title>Document</title><style>

@@ -39,3 +39,4 @@
 .template-row b, .template-row small { display: block; }
 .template-row small { margin-top: .2rem; color: #5f7190; font-size: .68rem; }
 @media (max-width: 800px) { .branding-grid { grid-template-columns: 1fr; } .branding-heading { flex-direction: column; } .branding-heading-actions { width: 100%; } .branding-heading-actions button { flex: 1; } }
+.branding-save-notice { margin: 0 0 16px; padding: 10px 12px; border: 1px solid #CFE8DA; border-radius: 8px; background: #E7F6EE; color: #137A4B; font-size: 13px; }

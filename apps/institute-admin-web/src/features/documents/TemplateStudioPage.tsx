@@ -3,6 +3,7 @@ import { AdminApiError } from '../admin/admin.api'
 import { StatePanel, useAbortableLoad } from '../finance/sections/shared'
 import {
   createDocumentTemplate, deleteDocumentTemplate, listDocumentTemplates, patchDocumentTemplate,
+  publishDocumentTemplate,
   type DocumentTemplateRecord,
 } from './documents.api'
 import { CATEGORY_CONFIG } from './engine/datasets'
@@ -81,9 +82,11 @@ export default function TemplateStudioPage({ accessToken }: { accessToken: strin
           {items.map((template) => (
             <div key={template.id} className={`stu-gallery-card${template.isDefault ? ' is-default' : ''}`}>
               <h3 style={{ margin: '0 0 4px', fontSize: 14 }}>{template.name}{template.isDefault ? ' ★' : ''}</h3>
-              <p style={{ margin: '0 0 10px', fontSize: 11, color: '#5B6675' }}>{template.layout.page.sizeId} · {template.layout.pages.length} page{template.layout.pages.length > 1 ? 's' : ''}</p>
+              <p style={{ margin: '0 0 10px', fontSize: 11, color: '#5B6675' }}>{template.layout.page.sizeId} · {template.layout.pages.length} page{template.layout.pages.length > 1 ? 's' : ''}{category === 'ID_CARD' ? ` · ${template.publishedVersion ? `Published v${template.publishedVersion.version}` : 'Draft only'}` : ''}</p>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 <button type="button" className="stu-btn" onClick={() => setEditing(template)}>Open in editor</button>
+                {category === 'ID_CARD' && <button type="button" className="stu-btn" disabled={busy}
+                  onClick={() => run(publishDocumentTemplate(accessToken, template.id))}>Publish for student cards</button>}
                 {!template.isDefault && (
                   <>
                     <button type="button" className="stu-btn" disabled={busy}

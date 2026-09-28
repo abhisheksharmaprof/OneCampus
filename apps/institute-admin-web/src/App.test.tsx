@@ -231,6 +231,15 @@ describe('Institute Admin dashboard', () => {
     expect(allAdminRoutes).toContainEqual(expect.objectContaining({ label: 'Transport', path: '/addons/transport' }))
   })
 
+  it('resolves legacy academic structure and staff leave routes to their working destinations', () => {
+    expect(getAdminRouteByPath('/institute/academic-structure')).toEqual(
+      expect.objectContaining({ id: 'AHS1', path: '/academics/structure', label: 'Academic Structure' }),
+    )
+    expect(getAdminRouteByPath('/staff/leave-approvals')).toEqual(
+      expect.objectContaining({ id: 'AT7', path: '/attendance/staff-leave', label: 'Staff Leave' }),
+    )
+  })
+
   it('renders truthful coming-soon pages for planned add-on modules', async () => {
     window.history.pushState({}, '', '/addons/transport')
     render(<App />)

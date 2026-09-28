@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Ban, CreditCard, FilePlus2, Printer, ReceiptIndianRupee, Search, WandSparkles } from 'lucide-react'
+import { Ban, CreditCard, Eye, FilePlus2, ReceiptIndianRupee, Search, WandSparkles } from 'lucide-react'
 import {
   bulkGenerateInvoices, fetchInstituteBranding, listFeePlans, listGrades, listInvoices,
   patchInvoice, recordPayment,
@@ -7,7 +7,7 @@ import {
 } from '../finance.api'
 import { AdminApiError } from '../../admin/admin.api'
 import { listDocumentTemplates, type DocumentTemplateRecord } from '../../documents/documents.api'
-import { printFinanceDocument } from '../../documents/engine/printDocument'
+import FinanceDocumentPreview from '../FinanceDocumentPreview'
 import InvoiceEditor from './InvoiceEditor'
 import {
   inDays, money, Pagination, StatePanel, StatusBadge, today, useAbortableLoad, useModalKeyHandling,
@@ -29,6 +29,7 @@ export default function InvoicesSection({ accessToken, branchId }: Props) {
   const [payFor, setPayFor] = useState<Invoice | null>(null)
   const [cancellingId, setCancellingId] = useState<string | null>(null)
   const [printingId, setPrintingId] = useState<string | null>(null)
+  const [previewInvoice, setPreviewInvoice] = useState<Invoice | null>(null)
 
   const invoices = useAbortableLoad(
     (signal) => listInvoices(accessToken, { page, branchId, status: statusFilter, classId: classFilter, search }, signal),
@@ -50,8 +51,7 @@ export default function InvoicesSection({ accessToken, branchId }: Props) {
     setBusyMessage(null)
     setPrintingId(invoice.id)
     try {
-      const printed = await printFinanceDocument({ invoice, branding: branding.data, template: templateFor(invoice) })
-      if (!printed) setBusyMessage('The print popup was blocked by the browser.')
+      setPreviewInvoice(invoice)
     } finally {
       setPrintingId(null)
     }
@@ -122,7 +122,7 @@ export default function InvoicesSection({ accessToken, branchId }: Props) {
                   <td>
                     {invoice.status !== 'CANCELLED' && (
                       <>
-                        <button type="button" className="fin-icon-btn" title="Print invoice" aria-label={`Print invoice ${invoice.invoiceNumber}`} disabled={printingId === invoice.id} onClick={() => void printInvoice(invoice)}><Printer size={15} aria-hidden="true" /></button>{' '}
+                        <button type="button" className="fin-icon-btn" title="Preview invoice" aria-label={`Preview invoice ${invoice.invoiceNumber}`} disabled={printingId === invoice.id} onClick={() => void printInvoice(invoice)}><Eye size={15} aria-hidden="true" /></button>{' '}
                       </>
                     )}
                     {(invoice.status === 'ISSUED' || invoice.status === 'PARTIALLY_PAID') && (
@@ -163,6 +163,14 @@ export default function InvoicesSection({ accessToken, branchId }: Props) {
           accessToken={accessToken}
           invoice={payFor}
           onClose={(recorded) => { setPayFor(null); if (recorded) invoices.reload() }}
+        />
+      )}
+      {previewInvoice && branding.data && (
+        <FinanceDocumentPreview
+          invoice={previewInvoice}
+          branding={branding.data}
+          template={templateFor(previewInvoice)}
+          onClose={() => setPreviewInvoice(null)}
         />
       )}
     </>

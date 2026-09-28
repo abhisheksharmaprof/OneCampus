@@ -3,8 +3,8 @@ import {
   fetchInstituteBranding, getInvoice, listInvoices, listPayments, searchStudents,
   type Invoice, type Payment, type PaymentMethod, type StudentOption,
 } from '../finance.api'
-import { listDocumentTemplates } from '../../documents/documents.api'
-import { printFinanceDocument } from '../../documents/engine/printDocument'
+import { listDocumentTemplates, type DocumentTemplateRecord } from '../../documents/documents.api'
+import FinanceDocumentPreview from '../FinanceDocumentPreview'
 import { RecordPaymentModal } from './InvoicesSection'
 import { money, Pagination, StatePanel, useAbortableLoad, useModalKeyHandling, type FinanceSectionProps } from './shared'
 
@@ -24,6 +24,7 @@ export default function PaymentsSection({ accessToken, branchId }: FinanceSectio
   const [payFor, setPayFor] = useState<Invoice | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [printingIds, setPrintingIds] = useState<Set<string>>(new Set())
+  const [receiptPreview, setReceiptPreview] = useState<{ invoice: Invoice; payment: Payment; template: DocumentTemplateRecord | null } | null>(null)
 
   const payments = useAbortableLoad(
     (signal) => listPayments(accessToken, { page, branchId, method, search, dateFrom, dateTo }, signal),
@@ -41,10 +42,7 @@ export default function PaymentsSection({ accessToken, branchId }: FinanceSectio
       const invoice = await getInvoice(accessToken, payment.invoiceId)
       const receiptTemplate = templates.data?.items.find((candidate) => candidate.isDefault)
         ?? templates.data?.items[0] ?? null
-      const printed = await printFinanceDocument({
-        invoice, branding: branding.data, template: receiptTemplate, payment,
-      })
-      if (!printed) setNotice('The print popup was blocked by the browser.')
+      setReceiptPreview({ invoice, payment, template: receiptTemplate })
     } catch {
       setNotice('Could not load the invoice for this receipt.')
     } finally {
@@ -87,7 +85,7 @@ export default function PaymentsSection({ accessToken, branchId }: FinanceSectio
                   <td>{payment.paidAt.slice(0, 10)}</td>
                   <td>
                     <button type="button" className="fin-btn" disabled={printingIds.has(payment.id)} onClick={() => void printReceipt(payment)}>
-                      {printingIds.has(payment.id) ? 'Preparing…' : 'Print receipt'}
+                      {printingIds.has(payment.id) ? 'Preparing…' : 'Preview receipt'}
                     </button>
                   </td>
                 </tr>
@@ -109,6 +107,15 @@ export default function PaymentsSection({ accessToken, branchId }: FinanceSectio
           accessToken={accessToken}
           invoice={payFor}
           onClose={(recorded) => { setPayFor(null); if (recorded) payments.reload() }}
+        />
+      )}
+      {receiptPreview && branding.data && (
+        <FinanceDocumentPreview
+          invoice={receiptPreview.invoice}
+          branding={branding.data}
+          payment={receiptPreview.payment}
+          template={receiptPreview.template}
+          onClose={() => setReceiptPreview(null)}
         />
       )}
     </>

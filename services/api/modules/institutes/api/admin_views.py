@@ -10,7 +10,7 @@ from rest_framework.views import APIView
 from modules.access_control.exceptions import AccessDenied
 from modules.access_control.policies import require_any_permission, require_permission
 from modules.access_control.selectors import effective_permission_keys
-from modules.institutes.models import Branch, Institute, InstituteAssociation, InstituteMembership
+from modules.institutes.models import Branch, Institute, InstituteAssociation, InstituteMembership, InstituteSubscription
 from platform_core.api.audit import audit_mutation
 from platform_core.api.pagination import paginate_admin_queryset
 
@@ -74,6 +74,42 @@ class CurrentInstituteView(APIView):
             extra_meta={"changedFields": list(serializer.validated_data.keys())},
         )
         return Response({"success": True, "data": InstituteSerializer(request.institute).data})
+
+
+class CurrentInstituteSubscriptionView(APIView):
+    permission_classes = (IsCurrentInstituteAdmin,)
+
+    def get(self, request):
+        subscription = (
+            InstituteSubscription.objects.filter(institute=request.institute)
+            .select_related("plan")
+            .order_by("-created_at")
+            .first()
+        )
+        if subscription is None:
+            return Response({"success": True, "data": {"subscription": None}})
+
+        plan = subscription.plan
+        return Response({
+            "success": True,
+            "data": {
+                "subscription": {
+                    "id": str(subscription.id),
+                    "status": subscription.status,
+                    "trialEndsAt": subscription.trial_ends_at,
+                    "createdAt": subscription.created_at,
+                    "plan": {
+                        "id": str(plan.id),
+                        "name": plan.name,
+                        "pricePerStudent": str(plan.price_per_student),
+                        "flatFee": str(plan.flat_fee),
+                        "maxBranches": plan.max_branches,
+                        "maxStudents": plan.max_students,
+                        "features": plan.features_json,
+                    },
+                }
+            },
+        })
 
 
 class BranchListCreateView(APIView):

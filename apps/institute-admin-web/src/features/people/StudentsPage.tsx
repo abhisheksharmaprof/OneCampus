@@ -5,6 +5,7 @@ import { DataTable, Modal, type DataTableColumn, type TableSort } from '../../co
 import { Card, SectionHeader } from '../../components/ui/primitives'
 import { adminRequest, AdminApiError, type PageData } from '../admin/admin.api'
 import { StudentBulkImport } from './StudentBulkImport'
+import { IdCardBatchDialog } from './IdCardBatchDialog'
 
 /* ─────────────────────────── types ─────────────────────────── */
 type Branch = { id: string; name: string; isHeadOffice?: boolean }
@@ -338,6 +339,11 @@ export function StudentsPage({ accessToken, branches = [], selectedBranch, selec
   const [sort, setSort] = useState<TableSort>({ columnId: 'student', direction: 'asc' })
   const [revision, setRevision] = useState(0)
   const [selectedStudentIds, setSelectedStudentIds] = useState<Set<string>>(new Set())
+  const [showIdCards, setShowIdCards] = useState(false)
+  const selectedOrder = Array.from(selectedStudentIds)
+  const updateSelectedStudents = (next: Set<string>) => setSelectedStudentIds(next)
+
+  useEffect(() => { setSelectedStudentIds(new Set()); setShowIdCards(false) }, [selectedBranch])
 
   /* form ui state */
   const [showForm, setShowForm] = useState(false)
@@ -979,6 +985,10 @@ export function StudentsPage({ accessToken, branches = [], selectedBranch, selec
       />
 
       <StudentBulkImport open={showBulkImport} onClose={() => setShowBulkImport(false)} accessToken={accessToken} branches={branches} selectedBranch={selectedBranch} classes={academicClasses} sections={academicSections} onComplete={() => { setPage(1); setRevision((value) => value + 1) }} />
+      <IdCardBatchDialog open={showIdCards} onClose={() => setShowIdCards(false)} accessToken={accessToken}
+        studentIds={selectedOrder} onRemove={(id) => setSelectedStudentIds((current) => {
+          const next = new Set(current); next.delete(id); return next
+        })} />
 
       <section className="student-summary-grid" aria-label="Student directory summary">
         <Card className="student-summary-card"><span>Total students</span><strong>{queryLoaded ? data.count : '—'}</strong><small>In the selected branch scope</small></Card>
@@ -996,8 +1006,8 @@ export function StudentsPage({ accessToken, branches = [], selectedBranch, selec
           rows={queryLoaded ? data.items : []}
           getRowId={(s) => s.id}
           selectedRowIds={selectedStudentIds}
-          onSelectionChange={setSelectedStudentIds}
-          bulkActions={<button type="button" className="button-secondary danger-text" onClick={() => void deleteSelectedStudents()}><Trash2 size={14} /> Delete selected</button>}
+          onSelectionChange={updateSelectedStudents}
+          bulkActions={<><button type="button" className="button-secondary" onClick={() => setShowIdCards(true)}>Generate ID cards</button> <button type="button" className="button-secondary danger-text" onClick={() => void deleteSelectedStudents()}><Trash2 size={14} /> Delete selected</button></>}
           rowLabel={(s) => `${s.firstName} ${s.lastName}`.trim()}
           totalRows={queryLoaded ? data.count : 0}
           page={page}

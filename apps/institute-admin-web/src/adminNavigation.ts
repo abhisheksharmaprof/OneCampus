@@ -134,14 +134,14 @@ export const allAdminRoutes = [...adminRoutes, ...auxiliaryRoutes, ...globalRout
 
 const legacyPaths = new Map<string, AdminRoute>([
   ['/institute/branches', adminRoutes.find((item) => item.id === 'BR1')!],
-  ['/institute/academic-structure', { ...adminRoutes.find((item) => item.id === 'AY1')!, label: 'Academic Years', breadcrumb: 'Institute Setup / Academic Years' }],
+  ['/institute/academic-structure', adminRoutes.find((item) => item.id === 'AHS1')!],
   ['/institute/profile', adminRoutes.find((item) => item.id === 'SE1')!],
   ['/people/staff', adminRoutes.find((item) => item.id === 'ST1')!],
   ['/people/students', adminRoutes.find((item) => item.id === 'SD1')!],
   ['/people/parents', route('SD2', 'Parents', '/people/parents', 'Students', 'parents')],
   ['/admissions/funnel', adminRoutes.find((item) => item.id === 'AD1')!],
   ['/attendance/leave-approvals', adminRoutes.find((item) => item.id === 'AT6')!],
-  ['/staff/leave-approvals', adminRoutes.find((item) => item.id === 'AT6')!],
+  ['/staff/leave-approvals', adminRoutes.find((item) => item.id === 'AT7')!],
   ['/gamification/points', adminRoutes.find((item) => item.id === 'RG1')!],
   ['/gamification/batches', adminRoutes.find((item) => item.id === 'RG2')!],
   ['/gamification/leaderboards', adminRoutes.find((item) => item.id === 'RG4')!],

@@ -104,21 +104,9 @@ describe('Empirical Stress & Edge-Case Test Suite — Attendance & Leave Managem
       expect(fetchMock.mock.calls[0][0]).toContain('threshold=150')
     })
 
-    it('handles offline fallback threshold filtering across 0%, 75%, 100%, negative, >100%', async () => {
+    it('surfaces unavailable alert data instead of applying thresholds to seeded samples', async () => {
       vi.spyOn(globalThis, 'fetch').mockRejectedValue(new TypeError('Failed to fetch'))
-
-      // Offline mock data has mockAttendanceAlertStudents with percentages like 62.5%
-      const alerts0 = await getLowAttendanceAlerts(token, { threshold: 0 })
-      expect(alerts0.every((a) => a.attendancePercentage < 0)).toBe(true)
-
-      const alerts75 = await getLowAttendanceAlerts(token, { threshold: 75 })
-      expect(alerts75.every((a) => a.attendancePercentage < 75)).toBe(true)
-
-      const alertsNegative = await getLowAttendanceAlerts(token, { threshold: -50 })
-      expect(alertsNegative).toHaveLength(0)
-
-      const alerts150 = await getLowAttendanceAlerts(token, { threshold: 150 })
-      expect(alerts150.length).toBeGreaterThan(0)
+      await expect(getLowAttendanceAlerts(token, { threshold: 0 })).rejects.toThrow('Failed to fetch')
     })
   })
 
@@ -157,16 +145,9 @@ describe('Empirical Stress & Edge-Case Test Suite — Attendance & Leave Managem
       expect(bodySent.rejectionReason).toBe('Insufficient notice period')
     })
 
-    it('rejects leave application in offline mode with valid reason and handles 404 for non-existent ID', async () => {
+    it('surfaces network failures for leave rejection instead of updating an in-memory sample', async () => {
       vi.spyOn(globalThis, 'fetch').mockRejectedValue(new TypeError('Failed to fetch'))
-
-      // Valid existing mock leave application (la-1 exists in mockData)
-      const res = await rejectLeaveApplication(token, 'la-1', 'Medical certificate missing')
-      expect(res.status).toBe('rejected')
-      expect(res.rejectionReason).toBe('Medical certificate missing')
-
-      // Non-existent ID in offline mode should throw AdminApiError 404
-      await expect(rejectLeaveApplication(token, 'non-existent-id', 'Valid reason')).rejects.toThrow('Leave application not found')
+      await expect(rejectLeaveApplication(token, 'la-1', 'Medical certificate missing')).rejects.toThrow('Failed to fetch')
     })
   })
 
@@ -260,7 +241,7 @@ describe('Empirical Stress & Edge-Case Test Suite — Attendance & Leave Managem
       expect(res.updatedCount).toBe(2)
     })
 
-    it('handles offline fallback mode for 100 student bulk attendance payload', async () => {
+    it('does not claim a 100 student attendance write succeeded when the API is unavailable', async () => {
       vi.spyOn(globalThis, 'fetch').mockRejectedValue(new TypeError('Failed to fetch'))
 
       const hundredRecords = Array.from({ length: 100 }, (_, i) => ({
@@ -273,9 +254,7 @@ describe('Empirical Stress & Edge-Case Test Suite — Attendance & Leave Managem
         records: hundredRecords,
       }
 
-      const res = await bulkMarkAttendance(token, payload)
-      expect(res.success).toBe(true)
-      expect(res.updatedCount).toBe(100)
+      await expect(bulkMarkAttendance(token, payload)).rejects.toThrow('Failed to fetch')
     })
   })
 
@@ -328,16 +307,9 @@ describe('Empirical Stress & Edge-Case Test Suite — Attendance & Leave Managem
       expect(url).toContain('search=Aarav') // Trimmed search
     })
 
-    it('handles offline roster filtering with white-spaces and special characters in search', async () => {
+    it('surfaces roster network errors instead of filtering seeded local students', async () => {
       vi.spyOn(globalThis, 'fetch').mockRejectedValue(new TypeError('Failed to fetch'))
-
-      // Search with leading/trailing spaces
-      const roster1 = await getDailyRoster(token, { date: '2026-07-21', search: '   aarav   ' })
-      expect(roster1.every((item) => item.firstName.toLowerCase().includes('aarav'))).toBe(true)
-
-      // Search with no matches
-      const roster2 = await getDailyRoster(token, { date: '2026-07-21', search: 'NONEXISTENT_STUDENT_XYZ' })
-      expect(roster2).toHaveLength(0)
+      await expect(getDailyRoster(token, { date: '2026-07-21', search: '   aarav   ' })).rejects.toThrow('Failed to fetch')
     })
 
     it('handles processStudents helper logic with edge inputs', () => {

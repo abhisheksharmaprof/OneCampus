@@ -403,10 +403,10 @@ export function InstituteSetupPage({
         <div className="page-actions"><button className="button-secondary" type="button" onClick={() => setComparisonOpen(true)}><GitCompare size={16} /> Compare</button><button className="button-secondary" type="button" onClick={() => setAssociationModal('create')}><Building2 size={16} /> Add Institute</button><button className="button-primary" type="button" onClick={() => { setEditing(undefined); setDrawerOpen(true) }}><Plus size={16} /> Add Branch</button></div>
       </div>
       <div className="branch-kpi-grid" aria-label="Branch summary">
-        <BranchKpi label="Total Branches" value={data.count} hint={`▲ Across ${new Set(data.items.map((item) => item.city).filter(Boolean)).size || 1} cities`} tone="blue" icon={<Network size={20} />} />
+        <BranchKpi label="Total Branches" value={data.count} hint={`${new Set(data.items.map((item) => item.city).filter(Boolean)).size} cities identified`} tone="blue" icon={<Network size={20} />} />
         <BranchKpi label="Total Students" value={data.items.reduce((total, item) => total + item.studentCount, 0)} hint={`▲ ${data.items.reduce((total, item) => total + item.studentCount, 0)} active`} tone="green" icon={<GraduationCap size={20} />} />
         <BranchKpi label="Total Staff" value={data.items.reduce((total, item) => total + item.staffCount, 0)} hint={`▲ ${data.items.reduce((total, item) => total + item.staffCount, 0)} active`} tone="gold" icon={<Users size={20} />} />
-        <BranchKpi label="Affiliations" value="CBSE • ICSE" hint="" tone="purple" icon={<Building2 size={20} />} />
+        <BranchKpi label="Head Offices" value={data.items.filter((item) => item.isHeadOffice).length} hint="Designated across these campuses" tone="purple" icon={<Building2 size={20} />} />
       </div>
 
       {error ? <div role="alert" className="inline-error">{error}</div> : null}
@@ -449,7 +449,7 @@ export function InstituteSetupPage({
       >
         <form id="institute-association-form" className="admin-form-grid" onSubmit={handleAssociationSubmit}>
           {associationModal === 'create' ? <>
-            <label className="field-label">Institute name <span className="req">*</span><input name="name" required minLength={2} placeholder="e.g. Horizon Public School" /></label>
+            <label className="field-label field-full-width">Institute name <span className="req">*</span><input name="name" required minLength={2} placeholder="e.g. Horizon Public School" /></label>
             <label className="field-label">City<input name="city" placeholder="e.g. Jaipur" /></label>
             <label className="field-label">Administrator email<input name="email" type="email" placeholder="admin@example.edu" /></label>
           </> : <label className="field-label">Registered institute ID <span className="req">*</span><input name="instituteId" required placeholder="Paste the institute ID" /></label>}
@@ -470,9 +470,10 @@ function BranchKpi({ label, value, hint, tone, icon }: { label: string; value: s
 
 function BranchReferenceCard({ branch, color, onView, onEdit }: { branch: Branch; color: string; onView: () => void; onEdit: () => void }) {
   const abbreviation = branch.code || branch.name.split(/\s+/).map((part) => part[0]).join('').slice(0, 3).toUpperCase()
+  const location = [branch.city, branch.state].filter(Boolean).join(', ')
   return <article className="branch-reference-card" style={{ '--branch-color': color } as CSSProperties}>
-    <header><div className="branch-card-name"><b>{abbreviation}</b><div><strong>{branch.name}</strong><small>{branch.city || 'Campus'} · Est. 2026</small></div></div><em>{branch.isHeadOffice ? 'CBSE' : 'ICSE'}</em></header>
-    <div className="branch-card-body"><div className="branch-counts"><div><strong>{branch.studentCount}</strong><span>Students</span></div><div><strong>{branch.staffCount}</strong><span>Staff</span></div></div><dl><div><dt>Branch Head</dt><dd>{branch.branch_admin_name || 'Unassigned'}</dd></div><div><dt>Avg Attendance</dt><dd><mark>87%</mark></dd></div><div><dt>Fee Collected (MTD)</dt><dd>₹0</dd></div><div><dt>Status</dt><dd><mark>{branch.isActive ? 'Active' : 'Inactive'}</mark></dd></div></dl><footer><button className="button-secondary btn-sm" type="button" onClick={onView}><Eye size={15} /> Details</button><button className="button-secondary btn-sm" type="button" onClick={onEdit}><Edit2 size={15} /> Edit</button><button className="button-primary btn-sm" type="button" onClick={onView}><Network size={15} /> Switch</button></footer></div>
+    <header><div className="branch-card-name"><b>{abbreviation}</b><div><strong>{branch.name}</strong><small>{location || 'Location not set'}</small></div></div><em>{branch.isHeadOffice ? 'Head office' : 'Branch'}</em></header>
+    <div className="branch-card-body"><div className="branch-counts"><div><strong>{branch.studentCount}</strong><span>Students</span></div><div><strong>{branch.staffCount}</strong><span>Staff</span></div></div><dl><div><dt>Branch Head</dt><dd>{branch.branch_admin_name || 'Unassigned'}</dd></div><div><dt>Status</dt><dd><mark>{branch.isActive ? 'Active' : 'Inactive'}</mark></dd></div></dl><footer><button className="button-secondary btn-sm" type="button" onClick={onView}><Eye size={15} /> Details</button><button className="button-secondary btn-sm" type="button" onClick={onEdit}><Edit2 size={15} /> Edit</button><button className="button-primary btn-sm" type="button" onClick={onView}><Network size={15} /> Switch</button></footer></div>
   </article>
 }
 

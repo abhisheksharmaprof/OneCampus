@@ -297,7 +297,7 @@ function RoutedApp() {
       {(route?.id === 'BR1' || route?.id === 'BR2') && <InstituteSetupPage accessToken={session.accessToken} branchId={route.id === 'BR2' ? searchParams.get('branchDetail') ?? undefined : undefined} onOpenBranch={(branchId) => navigateWithBranch(`/branches/detail?branchDetail=${branchId}`)} onBranchesChanged={() => setDashboardRevision((value) => value + 1)} />}
       {route?.view === 'institute-profile' && <InstituteProfilePage accessToken={session.accessToken} />}
       {route?.view === 'branding' && <BrandingPage accessToken={session.accessToken} />}
-      {route?.id === 'SE3' && <SubscriptionPage />}
+      {route?.id === 'SE3' && <SubscriptionPage accessToken={session.accessToken} />}
       {route?.view === 'staff' && <StaffPage accessToken={session.accessToken} branches={visibleBranches} selectedBranch={selectedBranch} />}
       {route?.view === 'parents' && <ParentsPage accessToken={session.accessToken} selectedBranch={selectedBranch} />}
       {route?.view === 'students' && <StudentsPage accessToken={session.accessToken} branches={visibleBranches} selectedBranch={selectedBranch} selectedStudentId={searchParams.get('student')} onSelectStudent={(studentId) => updateQuery('student', studentId)} />}

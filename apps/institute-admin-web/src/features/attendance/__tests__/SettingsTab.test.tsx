@@ -56,18 +56,18 @@ describe('SettingsTab', () => {
     vi.restoreAllMocks()
   })
 
-  it('renders only manual capture mode in attendance settings', async () => {
+  it('renders capture modes and period tracking from saved institute settings', async () => {
     installFetchMock()
     render(<SettingsTab accessToken="test-token" />)
 
     // Capture modes
     const captureBox = await screen.findByTestId('capture-modes-toggle')
     expect(within(captureBox).getByLabelText('Manual Tap')).toBeChecked()
-    expect(within(captureBox).queryByLabelText('QR Scan')).not.toBeInTheDocument()
-    expect(within(captureBox).queryByLabelText('RFID Card')).not.toBeInTheDocument()
-    expect(within(captureBox).queryByLabelText('Biometric Scanner')).not.toBeInTheDocument()
-    expect(within(captureBox).queryByLabelText('Face Recognition')).not.toBeInTheDocument()
-    expect(screen.queryByLabelText('Enable period / subject-wise attendance tracking')).not.toBeInTheDocument()
+    expect(within(captureBox).getByLabelText('QR Scan')).toBeChecked()
+    expect(within(captureBox).getByLabelText('RFID Card')).not.toBeChecked()
+    expect(within(captureBox).getByLabelText('Biometric Scanner')).not.toBeChecked()
+    expect(within(captureBox).getByLabelText('Face Recognition')).not.toBeChecked()
+    expect(screen.getByLabelText('Enable period / subject-wise attendance tracking')).toBeChecked()
 
     // Threshold input
     expect(screen.getByLabelText('Low-attendance threshold')).toHaveValue(75)

@@ -18,6 +18,7 @@ interface StudioEditorProps {
 
 export function StudioEditor({ accessToken, template, onBack }: StudioEditorProps) {
   const [state, dispatch] = useReducer(editorReducer, initialEditorState)
+  const [mobilePanel, setMobilePanel] = useState<'components' | 'properties' | null>(null)
   const [saving, setSaving] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
   const [savedOnce, setSavedOnce] = useState(false)
@@ -96,6 +97,8 @@ export function StudioEditor({ accessToken, template, onBack }: StudioEditorProp
         <button type="button" className="stu-btn" onClick={() => dispatch({ type: 'setZoom', zoom: state.zoom - 0.1 })}>−</button>
         <span style={{ fontSize: 12, minWidth: 38, textAlign: 'center' }}>{Math.round(state.zoom * 100)}%</span>
         <button type="button" className="stu-btn" onClick={() => dispatch({ type: 'setZoom', zoom: state.zoom + 0.1 })}>+</button>
+        <button type="button" className="stu-btn stu-mobile-panel-toggle" aria-pressed={mobilePanel === 'components'} onClick={() => setMobilePanel((panel) => panel === 'components' ? null : 'components')}>Components</button>
+        <button type="button" className="stu-btn stu-mobile-panel-toggle" aria-pressed={mobilePanel === 'properties'} onClick={() => setMobilePanel((panel) => panel === 'properties' ? null : 'properties')}>Properties</button>
         <span className="spacer" />
         {notice && <span role="alert" style={{ fontSize: 12, color: notice === 'Saved.' ? '#137A4B' : '#C0392B' }}>{notice}</span>}
         <button type="button" className="stu-btn" onClick={() => void previewPrint()}>Preview print</button>
@@ -104,7 +107,7 @@ export function StudioEditor({ accessToken, template, onBack }: StudioEditorProp
         </button>
         <button type="button" className="stu-btn" onClick={leave}>Back</button>
       </div>
-      <div className="stu-workspace">
+      <div className="stu-workspace" data-mobile-panel={mobilePanel ?? 'canvas'}>
         <ComponentRail category={template.category} state={state} dispatch={dispatch} />
         <CanvasStage state={state} dispatch={dispatch} data={data} />
         <PropertiesPanel category={template.category} state={state} dispatch={dispatch} data={data} />

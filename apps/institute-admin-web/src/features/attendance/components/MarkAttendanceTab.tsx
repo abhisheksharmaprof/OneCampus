@@ -94,8 +94,8 @@ export function MarkAttendanceTab({
     const controller = new AbortController()
     void getAttendanceSettings(accessToken, undefined, controller.signal)
       .then((value) => {
-        setSettings({ ...value, enabledCaptureModes: ['manual'], periodWiseEnabled: false })
-        setCaptureMode('manual')
+        setSettings(value)
+        setCaptureMode(value.enabledCaptureModes?.[0] ?? 'manual')
       })
       .catch(() => undefined)
     return () => controller.abort()

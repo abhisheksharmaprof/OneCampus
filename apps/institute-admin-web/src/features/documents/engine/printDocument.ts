@@ -65,20 +65,41 @@ function hasRenderableElements(layout: LayoutV2 | null | undefined): layout is L
   return Boolean(layout?.pages?.some((page) => page.elements.length > 0))
 }
 
+const PRESET_BRAND_COLORS = new Set([DEFAULT_BRAND, '#16A085'])
+
+function withInstituteBrandColor(value: unknown, brandColor: string | null): unknown {
+  if (typeof value === 'string') return PRESET_BRAND_COLORS.has(value.toUpperCase()) ? safeBrandColor(brandColor) : value
+  if (Array.isArray(value)) return value.map((item) => withInstituteBrandColor(item, brandColor))
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, withInstituteBrandColor(item, brandColor)]))
+  }
+  return value
+}
+
+export function financeDocumentLayout(
+  template: DocumentTemplateRecord | null,
+  brandColor: string | null,
+  category: 'FEE_INVOICE' | 'FEE_RECEIPT',
+): LayoutV2 {
+  const layout = hasRenderableElements(template?.layout)
+    ? template.layout
+    : financeFallbackLayout(category, brandColor)
+  return withInstituteBrandColor(layout, brandColor) as LayoutV2
+}
+
 export async function buildFinanceDocumentHtml(options: {
   invoice: Invoice
   branding: InstituteBranding
   template: DocumentTemplateRecord | null
   payment?: Payment
+  mode?: 'print' | 'preview'
 }): Promise<string> {
-  const { invoice, branding, template, payment } = options
+  const { invoice, branding, template, payment, mode = 'print' } = options
   const category = payment ? 'FEE_RECEIPT' : 'FEE_INVOICE'
-  const layout = hasRenderableElements(template?.layout)
-    ? template.layout
-    : financeFallbackLayout(category, branding.brandColor)
+  const layout = financeDocumentLayout(template, branding.brandColor, category)
   const data = invoiceToDocumentData(invoice, branding, payment)
   data.qrDataUrls = await prepareQrDataUrls(layout, data)
-  return renderDocumentHtml({ layout, data, mode: 'print' })
+  return renderDocumentHtml({ layout, data, mode })
 }
 
 /** Print a real invoice/receipt through a document template. Returns false if the popup was blocked. */

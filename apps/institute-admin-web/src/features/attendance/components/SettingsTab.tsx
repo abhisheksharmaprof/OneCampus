@@ -6,6 +6,10 @@ import type { AttendanceSettings, LeaveType } from '../types'
 
 const CAPTURE_MODES = [
   { id: 'manual', label: 'Manual Tap' },
+  { id: 'qr', label: 'QR Scan' },
+  { id: 'rfid', label: 'RFID Card' },
+  { id: 'biometric', label: 'Biometric Scanner' },
+  { id: 'face', label: 'Face Recognition' },
 ]
 
 export interface SettingsTabProps {
@@ -35,7 +39,7 @@ export function SettingsTab({ accessToken }: SettingsTabProps) {
       getLeaveTypes(accessToken, undefined, controller.signal),
     ])
       .then(([config, types]) => {
-        setSettings({ ...config, enabledCaptureModes: ['manual'], periodWiseEnabled: false })
+        setSettings(config)
         setLeaveTypes(types)
       })
       .catch((cause: unknown) => {
@@ -59,12 +63,8 @@ export function SettingsTab({ accessToken }: SettingsTabProps) {
     setMessage('')
     setError('')
     try {
-      const updated = await updateAttendanceSettings(accessToken, {
-        ...settings,
-        enabledCaptureModes: ['manual'],
-        periodWiseEnabled: false,
-      })
-      setSettings({ ...updated, enabledCaptureModes: ['manual'], periodWiseEnabled: false })
+      const updated = await updateAttendanceSettings(accessToken, settings)
+      setSettings(updated)
       setMessage('Attendance settings saved successfully.')
     } catch (cause: unknown) {
       setError(cause instanceof Error ? cause.message : 'Settings could not be saved.')
@@ -98,6 +98,17 @@ export function SettingsTab({ accessToken }: SettingsTabProps) {
 
   const change = (patch: Partial<AttendanceSettings>) =>
     setSettings((current) => (current ? { ...current, ...patch } : current))
+
+  const toggleCaptureMode = (modeId: string, enabled: boolean) => {
+    const modes = settings?.enabledCaptureModes ?? ['manual']
+    const next = enabled ? [...new Set([...modes, modeId])] : modes.filter((mode) => mode !== modeId)
+    if (next.length === 0) {
+      setError('Keep at least one attendance capture mode enabled.')
+      return
+    }
+    setError('')
+    change({ enabledCaptureModes: next })
+  }
 
   if (loading) return <PageSkeleton name="attendance-settings" label="Loading attendance settings" variant="form" />
 
@@ -146,12 +157,21 @@ export function SettingsTab({ accessToken }: SettingsTabProps) {
                   <input
                     type="checkbox"
                     checked={(settings.enabledCaptureModes ?? []).includes(mode.id)}
-                    disabled
+                    onChange={(event) => toggleCaptureMode(mode.id, event.target.checked)}
                   />
                   {mode.label}
                 </label>
               ))}
             </div>
+            <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+              <input
+                type="checkbox"
+                aria-label="Enable period / subject-wise attendance tracking"
+                checked={settings.periodWiseEnabled ?? false}
+                onChange={(event) => change({ periodWiseEnabled: event.target.checked })}
+              />
+              Enable period / subject-wise attendance tracking
+            </label>
           </div>
 
           {/* Low-Attendance Threshold & Recipient Rules */}

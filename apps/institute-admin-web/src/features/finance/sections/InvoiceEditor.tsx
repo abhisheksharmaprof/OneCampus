@@ -7,7 +7,8 @@ import { AdminApiError } from '../../admin/admin.api'
 import { listDocumentTemplates } from '../../documents/documents.api'
 import { invoiceToDocumentData } from '../../documents/engine/datasets'
 import { renderDocumentHtml } from '../../documents/engine/docRender'
-import { financeFallbackLayout, printFinanceDocument } from '../../documents/engine/printDocument'
+import { financeDocumentLayout } from '../../documents/engine/printDocument'
+import FinanceDocumentPreview from '../FinanceDocumentPreview'
 import { inDays, money, StatePanel, today, useAbortableLoad } from './shared'
 
 type InvoiceEditorProps = {
@@ -35,6 +36,7 @@ export default function InvoiceEditor({ accessToken, onClose }: InvoiceEditorPro
   const [templateId, setTemplateId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [savedPreview, setSavedPreview] = useState<Invoice | null>(null)
   const previewRef = useRef<HTMLIFrameElement>(null)
 
   const branding = useAbortableLoad((signal) => fetchInstituteBranding(accessToken, signal), [accessToken])
@@ -76,7 +78,7 @@ export default function InvoiceEditor({ accessToken, onClose }: InvoiceEditorPro
       notes, templateId: activeTemplateId, totalPaid: '0.00',
     }
     const data = invoiceToDocumentData(draft, branding.data)
-    return renderDocumentHtml({ layout: template?.layout ?? financeFallbackLayout('FEE_INVOICE', branding.data.brandColor), data, mode: 'preview' })
+    return renderDocumentHtml({ layout: financeDocumentLayout(template, branding.data.brandColor, 'FEE_INVOICE'), data, mode: 'preview' })
   }, [branding.data, student, items, subtotal, discount, tax, total, issueDate, dueDate, notes, template, activeTemplateId])
 
   // Debounced so a fast typist doesn't trigger a full iframe document.write() on every keystroke.
@@ -117,10 +119,7 @@ export default function InvoiceEditor({ accessToken, onClose }: InvoiceEditorPro
         discountAmount: Number(discount || 0).toFixed(2), taxAmount: Number(tax || 0).toFixed(2),
         notes, templateId: activeTemplateId, status,
       })
-      if (printAfter && branding.data) {
-        const printed = await printFinanceDocument({ invoice: created, branding: branding.data, template })
-        if (!printed) setError('The invoice was saved, but the print popup was blocked by the browser.')
-      }
+      if (printAfter) setSavedPreview(created)
       return created
     } catch (cause) {
       setError(cause instanceof AdminApiError
@@ -141,7 +140,7 @@ export default function InvoiceEditor({ accessToken, onClose }: InvoiceEditorPro
     void save(status, printAfter).then((created) => {
       if (!created) return
       if (reset) { setStudent(null); setStudentQuery(''); setItems([emptyItem()]); setNotes('') }
-      else onClose(true)
+      else if (!printAfter) onClose(true)
     })
   }
 
@@ -224,6 +223,14 @@ export default function InvoiceEditor({ accessToken, onClose }: InvoiceEditorPro
         </div>
       </div>
       <div className="fin-editor__preview"><iframe ref={previewRef} title="Invoice preview" /></div>
+      {savedPreview && branding.data && (
+        <FinanceDocumentPreview
+          invoice={savedPreview}
+          branding={branding.data}
+          template={template}
+          onClose={() => { setSavedPreview(null); onClose(true) }}
+        />
+      )}
     </div>
   )
 }
