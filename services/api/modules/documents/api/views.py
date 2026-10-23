@@ -226,9 +226,9 @@ class DocumentTemplatePublishView(APIView):
                 id=template_id,
                 institute=request.institute,
             )
-            if template.category not in {DocumentTemplate.Category.ID_CARD, DocumentTemplate.Category.MARKSHEET}:
+            if template.category != DocumentTemplate.Category.ID_CARD:
                 raise serializers.ValidationError(
-                    {"category": ["Only ID cards and marksheets can be published yet."]}
+                    {"category": ["Only ID cards can be published yet."]}
                 )
             validate_layout(template.layout, category=template.category)
             issues = layout_issues(template.layout)

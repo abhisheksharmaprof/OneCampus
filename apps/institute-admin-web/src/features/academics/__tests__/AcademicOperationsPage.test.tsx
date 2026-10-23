@@ -31,7 +31,7 @@ describe('AcademicOperationsPage', () => {
 
   it.each<[AcademicOperationsPageId, string, string]>([
     ['ACL1', 'Lesson Plans', 'Linear Equations'], ['ACH1', 'Homework', 'Chapter 5 Exercises'],
-    ['ACE1', 'Exams', 'Unit Test 1'],
+    ['ACE1', 'Exams', 'Unit Test 1'], ['ACM1', 'Marks & Grades', 'Aarav Sharma'],
     ['ACC1', 'Curriculum', 'Mathematics'],
   ])('loads real API content for %s', async (page, title, content) => {
     render(<AcademicOperationsPage page={page} accessToken="token" selectedBranch="all" />)

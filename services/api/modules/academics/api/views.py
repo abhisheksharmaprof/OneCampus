@@ -111,7 +111,6 @@ class AcademicOperationDetailView(APIView):
 
     def patch(self, request, operation_id):
         record = self.get_object(request, operation_id)
-        self.require_legacy_editable(record)
         serializer = AcademicOperationWriteSerializer(instance=record, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
@@ -125,19 +124,8 @@ class AcademicOperationDetailView(APIView):
         _save(record)
         return _success(AcademicOperationSerializer(record).data)
 
-    @staticmethod
-    def require_legacy_editable(record):
-        from ..models import ResultChange, ResultExam
-        if ResultExam.objects.filter(legacy_operation=record).exists() or ResultChange.objects.filter(
-            exam__institute=record.institute,
-            action="LEGACY_MIGRATED", detail__legacyId=str(record.id)
-        ).exists():
-            raise ValidationError("This record has been reconciled. Edit it in Marks & Grades.")
-
     def delete(self, request, operation_id):
-        record = self.get_object(request, operation_id)
-        self.require_legacy_editable(record)
-        return _delete(record)
+        return _delete(self.get_object(request, operation_id))
 
 
 def _institute(request):
