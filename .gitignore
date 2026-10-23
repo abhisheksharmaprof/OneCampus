@@ -65,3 +65,7 @@ Thumbs.db
 
 # graft's local graph cache — regenerable, not committed (run `graft build`).
 graft/
+
+# Generated from the checked-in Marksheet Studio v5 source and pinned npm dependencies.
+apps/institute-admin-web/public/marksheet-studio/
+apps/institute-admin-web/src/features/academics/results/studio/tailwind.generated.css

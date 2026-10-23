@@ -122,10 +122,7 @@ describe('Institute Admin dashboard', () => {
 
     expect(screen.getByText(/viewing: main campus/i)).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: /branch comparison/i })).not.toBeInTheDocument()
-    expect(fetch).toHaveBeenLastCalledWith(
-      expect.stringContaining('branchId=branch-1'),
-      expect.any(Object),
-    )
+    expect(vi.mocked(fetch).mock.calls.some(([url]) => String(url).includes('branchId=branch-1'))).toBe(true)
     expect(window.location.search).toBe('?branch=branch-1')
   })
 
@@ -146,7 +143,7 @@ describe('Institute Admin dashboard', () => {
     await user.click(reviewButtons[0])
 
     expect(window.location.pathname).toBe('/attendance')
-    expect(window.location.search).toBe('?view=low-attendance')
+    expect(window.location.search).toBe('?view=low-attendance&branch=branch-1')
   })
 
   it('navigates to the API-backed student page instead of a fixture screen', async () => {
@@ -258,8 +255,8 @@ describe('Institute Admin dashboard', () => {
     expect(screen.getByText('60% conversion')).toBeInTheDocument()
   })
 
-  it('loads Branding & Profile from the institute API', async () => {
-    window.history.pushState({}, '', '/institute/profile')
+  it('loads Institute Details from the institute API', async () => {
+    window.history.pushState({}, '', '/settings/institute-details')
     vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => Promise.resolve({
       ok: true,
       json: async () => String(input).endsWith('/institute')
@@ -268,12 +265,12 @@ describe('Institute Admin dashboard', () => {
     })))
     render(<App />)
 
-    expect(await screen.findByRole('heading', { name: 'Branding & Profile' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Institute Details' })).toBeInTheDocument()
     expect(await screen.findByDisplayValue('Northstar Academy')).toBeInTheDocument()
-    expect(screen.getByDisplayValue('NSA')).toBeDisabled()
+    expect(screen.getByLabelText('Permanent institute code')).toHaveTextContent('NSA')
   })
 
-  it('restores the API-backed academic calendar route', async () => {
+  it('restores the API-backed holidays and calendar route', async () => {
     window.history.pushState({}, '', '/academics/calendar')
     vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => Promise.resolve({
       ok: true,
@@ -284,27 +281,31 @@ describe('Institute Admin dashboard', () => {
 
     render(<App />)
 
-    expect(await screen.findByRole('heading', { name: 'Academic Calendar' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Holidays & Calendar' })).toBeInTheDocument()
     expect(await screen.findByText('Parent-Teacher Meeting')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /add event/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /add holiday/i })).toBeInTheDocument()
   })
 
-  it('loads a date-scoped attendance register from live APIs', async () => {
+  it('loads the selected month attendance overview from live APIs', async () => {
     window.history.pushState({}, '', '/attendance?date=2026-07-21')
     vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => Promise.resolve({
       ok: true,
       json: async () => String(input).includes('attendance/overview')
-        ? { success: true, data: { items: [{ id: 'attendance-1', studentId: 'student-1', studentName: 'Diya Patel', date: '2026-07-21', status: 'PRESENT' }] } }
-        : String(input).includes('/students')
-          ? { success: true, data: { items: [{ id: 'student-1', firstName: 'Diya', lastName: 'Patel', admissionNumber: 'NSA-0001' }] } }
-          : dashboardResponse,
+        ? { success: true, data: { records: [{ id: 'attendance-1', studentId: 'student-1', date: '2026-07-21', status: 'PRESENT' }], calendarDates: ['2026-07-21'], calendar: [{ date: '2026-07-21', state: 'marked', percentage: 100 }] } }
+        : String(input).includes('attendance/reminders')
+          ? { success: true, data: { missingSections: [] } }
+          : String(input).includes('attendance/daily-roster')
+            ? { success: true, data: [] }
+        : dashboardResponse,
     })))
 
     render(<App />)
 
-    expect(await screen.findByRole('heading', { name: 'Attendance Overview' })).toBeInTheDocument()
-    expect(await screen.findByText('Diya Patel')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Attendance command centre' })).toBeInTheDocument()
+    expect(await screen.findByText('Interactive Monthly Attendance Register')).toBeInTheDocument()
     expect(screen.getByLabelText('Attendance date')).toHaveValue('2026-07-21')
+    expect(screen.getByTestId('calendar-cell-2026-07-21')).toBeInTheDocument()
+    expect(fetch).toHaveBeenCalledWith(expect.stringContaining('attendance/overview?month=2026-07'), expect.any(Object))
   })
 
   it('renders the finance suite shell with its sub-sidebar', async () => {
@@ -360,11 +361,13 @@ describe('Institute Admin dashboard', () => {
 
     render(<App />)
 
-    expect(await screen.findByText('Timetable Builder')).toBeInTheDocument()
+    const timetableWorkspace = within(await screen.findByRole('main', { name: 'Timetable' }))
+    await timetableWorkspace.findByText('Teachers', { exact: true })
     expect(fetch).toHaveBeenCalledWith(expect.stringContaining('/api/v1/admin/academics/subjects?page=1&pageSize=100'), expect.any(Object))
     expect(fetch).toHaveBeenCalledWith(expect.stringContaining('/api/v1/admin/academics/sections?page=1&pageSize=100&branchId=branch-1'), expect.any(Object))
-    expect(screen.getByRole('button', { name: 'View Timetable' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Generate Timetable' })).toBeInTheDocument()
+    for (const tab of ['Setup', 'Teachers', 'Structure', 'Assignments', 'Timetable']) {
+      expect(timetableWorkspace.getByText(tab, { exact: true })).toBeInTheDocument()
+    }
   })
 
   it('restores the parent-linking screen with live parent records', async () => {

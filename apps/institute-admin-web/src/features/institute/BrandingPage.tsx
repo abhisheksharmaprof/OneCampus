@@ -51,11 +51,17 @@ export function BrandingPage({ accessToken }: { accessToken: string }) {
   useEffect(() => {
     const controller = new AbortController()
     const loadBranding = async () => {
+      let loadedProfile: InstituteProfile
       try {
-        const loadedProfile = await adminRequest<InstituteProfile>(accessToken, 'institute', { signal: controller.signal })
+        loadedProfile = await adminRequest<InstituteProfile>(accessToken, 'institute', { signal: controller.signal })
         setProfile(loadedProfile)
         setInstituteName(loadedProfile.displayName || loadedProfile.name || '')
         if (loadedProfile.brandColor) setPrimary(loadedProfile.brandColor)
+      } catch (cause) {
+        if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : 'Institute branding could not be loaded.')
+        return
+      }
+      try {
         const assets = await adminRequest<LogoAsset[]>(accessToken, `files?ownerType=INSTITUTE&ownerId=${encodeURIComponent(loadedProfile.id)}&assetType=LOGO`, { signal: controller.signal })
         const asset = assets[0]
         if (asset) {
@@ -63,7 +69,7 @@ export function BrandingPage({ accessToken }: { accessToken: string }) {
           if (asset.url) setLogoUrl(asset.url)
         }
       } catch (cause) {
-        if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : 'Institute branding could not be loaded.')
+        if (!controller.signal.aborted) setLogoError(cause instanceof Error ? cause.message : 'Institute logo could not be loaded.')
       } finally {
         if (!controller.signal.aborted) setLoading(false)
       }
@@ -112,7 +118,6 @@ export function BrandingPage({ accessToken }: { accessToken: string }) {
       if (asset.url) setLogoUrl(asset.url)
     } catch (cause) {
       setLogo(null)
-      setLogoUrl('')
       setLogoError(cause instanceof Error ? cause.message : 'Logo could not be uploaded.')
     } finally {
       setSavingLogo(false)
@@ -139,10 +144,10 @@ export function BrandingPage({ accessToken }: { accessToken: string }) {
     }
   }
 
-  return <main className="entity-page branding-page">
+  return <main className="entity-page institute-setup-page branding-page">
     <header className="branding-heading">
       <div><p className="breadcrumb">Home / Institute Setup / Branding</p><h1>Branding</h1><p>Manage the assets and colors used across institute documents.</p></div>
-      <div className="branding-heading-actions"><button className="button-secondary" title="Preview document branding" type="button" onClick={() => setPreviewOpen(true)}><Eye size={15} /> Preview</button><button className="button-primary" title="Save branding changes" type="button" disabled={loading || saving || !profile} onClick={() => void saveBranding()}><Check size={15} /> {saving ? 'Saving…' : 'Save All'}</button></div>
+      <div className="branding-heading-actions"><button className="button-secondary" title="Preview document branding" type="button" onClick={() => setPreviewOpen(true)}><Eye size={15} /> Preview</button><button className="button-primary" title="Save brand settings" type="button" disabled={loading || saving || !profile} onClick={() => void saveBranding()}><Check size={15} /> {saving ? 'Saving…' : 'Save brand settings'}</button></div>
     </header>
     {error && <p className="form-error" role="alert">{error}</p>}
     {notice && <p className="branding-save-notice" role="status">{notice}</p>}
@@ -153,6 +158,7 @@ export function BrandingPage({ accessToken }: { accessToken: string }) {
         <strong className="branding-institute-name">{instituteName}</strong>
         <p>Logo appears on receipts, report cards, certificates, and the parent portal.</p>
         <FileUploadField kind="image" label={savingLogo ? 'Uploading…' : 'Upload logo'} value={logo} disabled={savingLogo || loading} onChange={saveLogo} />
+        <p className="branding-logo-help">Logo uploads and removals take effect immediately. Save brand settings to apply name and color changes.</p>
         {logoUrl ? <button className="branding-remove-link" type="button" onClick={() => void removeLogo()} disabled={savingLogo}>Remove logo</button> : null}
         {logoError && <p className="form-error" role="alert">{logoError}</p>}
         <label>School Full Name (for documents)<input value={instituteName} onChange={(event) => setInstituteName(event.target.value)} disabled={loading} /></label>
@@ -163,7 +169,7 @@ export function BrandingPage({ accessToken }: { accessToken: string }) {
         <section className="branding-card"><h2>Document Templates</h2><p>Load and edit the saved invoice and receipt templates in Template Studio.</p><button className="button-secondary" type="button" onClick={() => navigate('/template-studio')}><ExternalLink size={14} /> Open Template Studio</button></section>
       </div>
     </div>
-    <Modal open={previewOpen} title="Document branding preview" description="Preview of the institute identity currently saved for invoices and receipts." onClose={() => setPreviewOpen(false)} footer={<button className="button-primary" type="button" onClick={() => setPreviewOpen(false)}>Close preview</button>}><div className="document-preview" style={{ borderTopColor: primary }}><div className="document-brand-row">{logoUrl ? <img src={logoUrl} alt="Institute logo" /> : <span>{instituteName.slice(0, 2).toUpperCase()}</span>}<strong style={{ background: primary }}>{instituteName}</strong></div><small>Official institute document</small><hr style={{ borderColor: primary }} />{[profile?.address_line_1, profile?.address_line_2, [profile?.city, profile?.state, profile?.postalCode].filter(Boolean).join(' '), profile?.country].filter(Boolean).map((line) => <span key={line}>{line}</span>)}<hr style={{ borderColor: primary }} /><b style={{ color: primary }}>FEE RECEIPT</b></div></Modal>
+    <Modal open={previewOpen} title="Document branding preview" description="Preview of the name and color currently in the editor. Logo uploads and removals take effect immediately." onClose={() => setPreviewOpen(false)} footer={<button className="button-primary" type="button" onClick={() => setPreviewOpen(false)}>Close preview</button>}><div className="document-preview" style={{ borderTopColor: primary }}><div className="document-brand-row">{logoUrl ? <img src={logoUrl} alt="Institute logo" /> : <span>{instituteName.slice(0, 2).toUpperCase()}</span>}<strong style={{ background: primary }}>{instituteName}</strong></div><small>Official institute document</small><hr style={{ borderColor: primary }} />{[profile?.address_line_1, profile?.address_line_2, [profile?.city, profile?.state, profile?.postalCode].filter(Boolean).join(' '), profile?.country].filter(Boolean).map((line) => <span key={line}>{line}</span>)}<hr style={{ borderColor: primary }} /><b style={{ color: primary }}>FEE RECEIPT</b></div></Modal>
   </main>
 }
 

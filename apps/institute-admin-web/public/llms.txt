@@ -1,0 +1,50 @@
+# CampusOne
+
+> **Definition:** CampusOne is a multi-tenant school ERP for institute operations, covering academics, attendance, finance, timetables, and people management.
+
+**Canonical product URL:** https://campusone.example/ (placeholder; replace with deployed canonical host).
+
+**Quick answer — what is CampusOne?** A web-based ERP for academic operations, people, attendance, finance, and timetables.
+
+**Quick answer — where is the API?** Versioned REST endpoints live under `/api/v1/`; the OpenAPI contract is `/api/schema/`.
+
+| Need | Start here |
+| --- | --- |
+| Product overview | `/llms.txt` |
+| Detailed endpoint/entity notes | `/llms-full.txt` |
+| API contract | `/api/schema/` |
+| Interactive API reference | `/api/docs/` |
+
+CampusOne provides institute administrators and branch administrators with a web application and a versioned REST API. Institute data is tenant-scoped; branch administrators are restricted to their assigned branch. This public documentation does not expose or authorize access to student records.
+
+## Product areas
+
+| Module | Purpose | Core records |
+| --- | --- | --- |
+| People | Student, staff, parent, and admissions operations | Student, Staff, Parent, Enquiry |
+| Academics | Academic structure and teaching operations | AcademicYear, Term, Class, Section, Subject, Enrollment |
+| Attendance | Daily attendance, leave, alerts, and reports | Attendance, LeaveApplication |
+| Finance | Fees, invoices, payments, and finance operations | FeePlan, Invoice, Payment, FinanceRecord |
+| Timetable | Schedule publication and staff views | Timetable, Staff assignment |
+| Institute operations | Branches, roles, audit, documents, files | Institute, Branch, Role, DocumentTemplate, FileAsset |
+
+## Web application routes
+
+The institute-admin-web SPA uses client-side routes; most administrative pages require authentication. Main routes include `/login`, `/onboarding/*`, `/dashboard`, `/branches`, `/academics`, `/academics/structure`, `/attendance`, `/staff`, `/students`, `/parents`, `/admissions`, `/finance`, `/timetable`, `/roles`, `/audit-log`, `/settings/*`, `/template-studio`, and `/verify` (public document verification). Some UI modules use generic screen-record endpoints; a UI route does not imply a distinct API resource.
+
+## API discovery
+
+- `GET /api/v1/llms.txt` — this capability summary in Markdown.
+- `GET /api/schema/` — OpenAPI schema.
+- `/api/docs/` — Swagger UI.
+- API resources are under `/api/v1/`; see [llms-full.txt](./llms-full.txt) for endpoint families, authentication, data model, and integration details.
+
+## Data and AI-agent guidance
+
+Core entities include Institute, Branch, User/Membership/Role, Student, Staff, Parent, Attendance, LeaveApplication, AcademicYear, AcademicTerm, Class/Section, Subject, Enrollment, FeePlan, Invoice, Payment, CalendarEvent, Timetable, DocumentTemplate, and FileAsset. Exact fields and lifecycle rules are defined by the API schema and implementation.
+
+AI agents must not infer or disclose tenant data. Use only an authorized institute account and minimum necessary permissions; honor branch scope and API responses. Do not bypass authentication, guess identifiers, or treat this public documentation as authorization. Avoid transmitting personal or financial data to external services without explicit authorization. Prefer the OpenAPI schema for exact request/response contracts; this document is descriptive and may lag implementation.
+
+## Detailed documentation
+
+- [Comprehensive API, entities, permissions, and integration notes](./llms-full.txt)

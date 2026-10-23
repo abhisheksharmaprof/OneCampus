@@ -1,0 +1,127 @@
+# CampusOne — LLM capability and API reference
+
+> Descriptive documentation for the CampusOne Institute Admin web application and Django REST API. The live OpenAPI document at `/api/schema/` is authoritative for exact serializers, enum values, required fields, and response shapes.
+
+## Canonical URLs and quick answers
+
+- Product canonical URL: `https://campusone.example/` (placeholder; configure to match deployed host).
+- Concise guide: `/llms.txt`; detailed guide: `/llms-full.txt`; discovery copy: `/.well-known/llms.txt`.
+- API contract: `/api/schema/`; Swagger UI: `/api/docs/`; API summary: `/api/v1/llms.txt`.
+
+| Question | Answer |
+| --- | --- |
+| What is CampusOne? | A multi-tenant school ERP for academic, attendance, finance, timetable, and people operations. |
+| Does this documentation authorize data access? | No. Server-side authentication, tenant scope, and permissions remain mandatory. |
+| Which contract defines exact fields? | The live OpenAPI schema at `/api/schema/`. |
+
+## System overview
+
+CampusOne is a multi-tenant school ERP. The institute-admin-web SPA serves institute and branch administration. The API is versioned under `/api/v1/` and is organized around identity, institute onboarding, institute administration, academics, documents, and generic operational screens. Resources are scoped to the authenticated institute. Branch-level scope applies where relevant.
+
+## Web routes
+
+The SPA uses React Router and guarded client-side routes. Public/unauthenticated flows include `/login`, `/onboarding/*`, and `/verify` (document verification). Authenticated routes include `/dashboard`, `/branches`, `/branches/detail`, `/academics`, `/academics/structure`, `/academics/teaching-learning`, `/academics/assessment-results`, `/academics/calendar`, `/setup/rooms-facilities`, `/setup/holidays-calendar`, `/roles`, `/roles/assignments`, `/roles/builder`, `/staff`, `/staff/profile`, `/students`, `/students/profile`, `/parents`, `/parents/profile`, `/admissions`, `/admissions/enquiries`, `/attendance` and its mark/leave/reports/settings pages, `/finance` and its invoices/payments/dues/fee-structure/settings/expenses/payroll/budget/reports paths, `/timetable`, `/timetable/generate`, `/template-studio`, `/audit-log`, `/settings/*`, and other module paths exposed in the application navigation. UI routes are not a promise that a separate REST endpoint exists; use the API schema.
+
+## API endpoints and route families
+
+All paths below are relative to `/api/v1` unless stated otherwise. HTTP methods and exact payloads are defined in `/api/schema/`.
+
+### Discovery and health
+
+- `GET /health`, `GET /ready` — service health/readiness.
+- `GET /llms.txt` — concise product/API discovery document.
+- `GET /api/schema/` — OpenAPI schema (outside the versioned prefix).
+- `/api/docs/` — Swagger UI (outside the versioned prefix).
+
+### Identity — `/identity/`
+
+- `POST /identity/sessions` — create a session.
+- `POST /identity/sessions/otp`, `POST /identity/sessions/otp/resend` — OTP verification/resend.
+- `POST /identity/sessions/password-setup` — password setup.
+- `POST /identity/sessions/refresh` — refresh credentials.
+- `GET /identity/sessions/current` — current authenticated session.
+- `POST /identity/password-reset/request`, `POST /identity/password-reset/confirm` — password reset flow.
+
+### Institute onboarding — `/institute-onboarding/`
+
+- `POST /institute-onboarding/applications` — submit institute application.
+- `POST /institute-onboarding/registrations` — onboarding registration.
+- `GET /institute-onboarding/public/{slug}` — public institute configuration.
+- `GET /institute-onboarding/slug-availability` — check slug availability.
+
+### Institute administration — `/admin/`
+
+These endpoints are generally authenticated and institute-scoped; exact role/permission checks are endpoint-specific.
+
+- Platform governance: `GET /admin/platform/registrations`, `POST /admin/platform/registrations/{institute_id}/approve`, `POST /admin/platform/registrations/{institute_id}/reject`, `GET /admin/platform/institutes`.
+- Institute dashboard and audit: `/admin/dashboard`, `/admin/audit-log`, `/admin/audit-log/export`.
+- People: `/admin/students`, `/admin/students/{student_id}`, `/admin/students/bulk-delete`, `/admin/staff`, `/admin/staff/{staff_id}`, `/admin/parents`, `/admin/parents/{parent_id}/students`, `/admin/enquiries`.
+- Branch and institute: `/admin/institute`, `/admin/institute/subscription`, `/admin/branches`, `/admin/branches/{branch_id}`, `/admin/peer-institutes`, `/admin/peer-institutes/create`, `/admin/peer-institutes/link`, `/admin/institute-associations`.
+- Attendance: `/admin/attendance/overview`, `/admin/attendance/daily-roster`, `/admin/attendance/bulk`, `/admin/attendance/staff`, `/admin/attendance/reminders`, `/admin/attendance/leaves`, `/admin/attendance/leaves/{application_id}/approve`, `/admin/attendance/leaves/{application_id}/reject`, `/admin/attendance/leaves/{application_id}/history`, `/admin/attendance/notifications/{notification_id}/{action}`, `/admin/attendance/alerts`, `/admin/attendance/alerts/{student_id}/notify`, `/admin/attendance/reports`, `/admin/attendance/settings`, `/admin/attendance/leave-types`, `/admin/attendance/leave-types/{type_id}`, `/admin/attendance/leave-balances`, `/admin/attendance/leave-quotas`.
+- Fees/finance: `/admin/fees/invoices`, `/admin/fees/invoices/bulk-generate`, `/admin/fees/invoices/{invoice_id}`, `/admin/fees/payments`, `/admin/fees/plans`, `/admin/fees/plans/{plan_id}`, `/admin/fees/summary`, `/admin/fees/dues`, `/admin/fees/dues/export`, `/admin/finance/records`, `/admin/finance/records/{record_id}`, `/admin/finance/settings`.
+- Calendar: `/admin/calendar/events`.
+
+### Access control — `/admin/`
+
+- `/admin/roles`, `/admin/roles/{role_id}`, `/admin/roles/{role_id}/clone`.
+- `/admin/role-assignments`, `/admin/role-assignments/{assignment_id}/revoke`.
+
+Role and assignment operations enforce permissions; never assume a role name grants a specific permission. Effective access may include institute role, explicit permissions, and assigned branch.
+
+### Academics — `/admin/academics/`
+
+- Operations: `/operations`, `/operations/{operation_id}`.
+- Rooms: `/rooms`, `/rooms/{room_id}`.
+- Academic years: `/academic-years`, `/academic-years/{year_id}`, `/academic-years/{year_id}/set-current`.
+- Terms: `/academic-terms`, `/academic-terms/{term_id}`.
+- Classes/subjects/curriculum: `/classes`, `/classes/{grade_id}`, `/subjects`, `/subjects/{subject_id}`, `/class-subjects`, `/class-subjects/{curriculum_id}`.
+- Sections and teaching assignment: `/sections`, `/sections/{section_id}`, `/section-subject-teachers`, `/section-subject-teachers/{assignment_id}`.
+- Enrollment: `/enrollments`, `/enrollments/{enrollment_id}`.
+
+### Generic admin console — `/admin/`
+
+- `/screens`, `/screens/{screen_id}`, `/screens/{screen_id}/records`, `/screens/{screen_id}/records/{record_id}` — catalog and records for configurable operational screens.
+- Timetable lifecycle: `/timetable/publish`, `/timetable/unpublish`, `/timetable/published`, `/staff/{staff_id}/timetable`.
+
+### Documents and files
+
+- `/admin/documents/templates`, `/admin/documents/templates/{template_id}`, `/admin/documents/templates/{template_id}/publish`, `/admin/documents/id-cards/preflight`.
+- `/admin/file-uploads`, `/admin/file-uploads/{upload_id}/complete` — upload initiation and completion. Follow returned upload instructions; do not assume storage credentials or URLs are permanent.
+
+## Authentication and permissions
+
+The identity API provides session creation, OTP, refresh, and current-session operations. Authenticated REST calls use the API's configured authentication mechanism (the web client uses a bearer access token); the token is sensitive and must never be logged or shared. Refresh credentials only through the documented session refresh flow. Public endpoints explicitly identified above (health/readiness, public institute configuration, onboarding/slug lookup, and discovery/schema documentation) do not grant access to protected records.
+
+Authorization is enforced server-side. Institute administrators may access institute-wide data subject to permissions; branch administrators are restricted to their branch on scoped operations. Platform governance endpoints are distinct from institute administration. Use least privilege, preserve tenant and branch identifiers exactly as returned, and treat 401/403 as authoritative. Do not attempt cross-tenant access or infer missing data. Personal, attendance, and financial data require particular care.
+
+## Entities and conceptual relationships
+
+Field-level schemas are available from `/api/schema/`; these descriptions are intentionally conceptual:
+
+- **Institute** owns branches, membership, configuration, subscription, and tenant-scoped operational records.
+- **Branch** belongs to an institute; people, classes, attendance, and finance records may be branch-scoped.
+- **User, InstituteMembership, Role, RoleAssignment** define identity, institute context, role, permissions, and branch access.
+- **Student** belongs to an institute and may be assigned to a branch, class/section, and one or more enrollment records. **Staff** belongs to an institute and may have branch and teaching assignments. **Parent** may link to student(s).
+- **Attendance** records a person's attendance for a date/session and scope. **LeaveApplication**, leave types, balances, and quotas represent leave requests and decisions.
+- **AcademicYear** contains **AcademicTerm** records. **Class/Grade**, **Section**, **Subject**, **ClassSubject**, **SubjectTeacherAssignment**, and **StudentEnrollment** describe academic organization.
+- **FeePlan** describes charge configuration. **Invoice** is a student/institute financial obligation; **Payment** records a payment against a financial obligation. Finance records, dues, and summaries support operational reporting. Exact ledger semantics must be confirmed from schema and implementation.
+- **CalendarEvent** represents scheduled institute events. **Timetable** lifecycle endpoints expose publish/unpublish and published views.
+- **DocumentTemplate** supports generated documents; **FileAsset/upload** handles associated files.
+- **Admissions enquiry**, audit events, and configurable screen records support workflow and traceability.
+
+## Data flow and integrations
+
+1. A user authenticates through the identity session flow and receives session credentials.
+2. The client sends authorized requests to `/api/v1/admin/...`; server-side tenant/role/branch checks apply.
+3. Changes to people, academics, attendance, and finance are persisted through their relevant resource endpoints. Dashboard, summary, and report endpoints provide derived views.
+4. File upload is a two-stage initiate/complete flow. Document templates may be managed and published; timetable has explicit publish/unpublish lifecycle calls.
+5. Integrations should use the documented REST API and OpenAPI schema. Do not scrape the administrative UI, depend on undocumented internal endpoints, or assume webhooks exist unless the deployed schema explicitly documents them.
+
+## Agent operating rules
+
+- Read `/api/schema/` before constructing writes; follow required fields, methods, and response envelopes exactly.
+- Use read requests first and request the smallest necessary dataset. Respect pagination and filters.
+- Obtain explicit user authorization before mutations, approvals, deletions, messaging, or financial actions. Confirm consequential actions before submitting.
+- Keep secrets and personal data out of prompts, logs, and third-party tools unless authorized and necessary. Never expose tokens, passwords, OTPs, student records, attendance, or invoices in public output.
+- Do not bypass permission errors, tenant boundaries, retention policies, or audit controls.
+- This file can drift as the API changes; the live OpenAPI schema and server authorization logic take precedence.

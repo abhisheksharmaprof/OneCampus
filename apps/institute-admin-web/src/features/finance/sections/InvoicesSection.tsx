@@ -103,7 +103,7 @@ export default function InvoicesSection({ accessToken, branchId }: Props) {
         empty={!items.length} emptyMessage="No invoices yet — create your first invoice.">
         <div className="fin-card fin-card--table">
           <div className="fin-card__header"><div><h3>Invoice register</h3><p>Branch-scoped billing records. Select an invoice to collect, print, or cancel.</p></div><span className="fin-hint">Page {invoices.data?.page ?? 1} of {invoices.data?.totalPages ?? 1}</span></div>
-          <div className="fin-table-wrap">
+          <div className="fin-table-wrap" role="region" aria-label="Scrollable invoice register" tabIndex={0}>
           <table className="fin-table">
             <thead><tr>
               <th>Invoice</th><th>Student</th><th>Class</th><th className="is-right">Total</th>
@@ -119,7 +119,7 @@ export default function InvoicesSection({ accessToken, branchId }: Props) {
                   <td className="is-right">{money(invoice.totalPaid)}</td>
                   <td><StatusBadge status={invoice.status} /></td>
                   <td>{invoice.dueDate}</td>
-                  <td>
+                  <td className="fin-table__actions">
                     {invoice.status !== 'CANCELLED' && (
                       <>
                         <button type="button" className="fin-icon-btn" title="Preview invoice" aria-label={`Preview invoice ${invoice.invoiceNumber}`} disabled={printingId === invoice.id} onClick={() => void printInvoice(invoice)}><Eye size={15} aria-hidden="true" /></button>{' '}

@@ -35,10 +35,10 @@ export function FileUploadField({ kind, label = 'Choose file', value, onChange, 
     event.target.value = ''
   }
   return <div className="file-upload-field">
-    <label htmlFor={inputId} className="button-secondary button-small" aria-disabled={disabled}>
+    <label className="button-secondary button-small" aria-disabled={disabled}>
       <Upload size={14} /> {value ? 'Replace file' : label}
+      <input id={inputId} className="file-upload-input" type="file" accept={FILE_UPLOAD_LIMITS[kind].accept} disabled={disabled} onChange={handleChange} />
     </label>
-    <input id={inputId} type="file" accept={FILE_UPLOAD_LIMITS[kind].accept} hidden disabled={disabled} onChange={handleChange} />
     <span className="file-upload-help">{value ? value.name : FILE_UPLOAD_LIMITS[kind].label}</span>
     {value && <button type="button" className="icon-button" aria-label="Remove selected file" onClick={() => { setError(''); onChange(null) }}><X size={14} /></button>}
     {error && <p className="form-error" role="alert">{error}</p>}

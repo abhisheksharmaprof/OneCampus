@@ -94,6 +94,7 @@ export default function DuesSection({ accessToken, branchId }: FinanceSectionPro
       <StatePanel loading={dues.loading} error={dues.error} onRetry={dues.reload}
         empty={!items.length} emptyMessage="No outstanding dues — everyone is paid up.">
         <div className="fin-card">
+          <div className="fin-table-wrap" role="region" aria-label="Scrollable outstanding dues table" tabIndex={0}>
           <table className="fin-table">
             <thead><tr>
               <th>Student</th><th>Admission no</th><th className="is-right">Billed</th>
@@ -112,6 +113,7 @@ export default function DuesSection({ accessToken, branchId }: FinanceSectionPro
               ))}
             </tbody>
           </table>
+          </div>
         </div>
         <Pagination page={dues.data?.page ?? 1} totalPages={dues.data?.totalPages ?? 1} onPage={setPage} />
       </StatePanel>

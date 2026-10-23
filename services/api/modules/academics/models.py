@@ -1,5 +1,11 @@
 import uuid
 
+# Register the result models alongside the existing academic model registry.
+from .result_models import (  # noqa: F401
+    ResultBatch, ResultCandidate, ResultChange, ResultComponent, ResultDocument,
+    ResultExam, ResultExamSubject, ResultImport, ResultMark, ResultReport, default_result_rules,
+)
+
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models

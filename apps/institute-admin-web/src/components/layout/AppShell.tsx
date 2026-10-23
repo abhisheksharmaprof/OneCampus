@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type PropsWithChildren } from 'react'
+import { useEffect, useMemo, useRef, useState, type PropsWithChildren } from 'react'
 import {
   BarChart3,
   Bell,
@@ -14,6 +14,7 @@ import {
   Gamepad2,
   GraduationCap,
   LayoutDashboard,
+  LockKeyhole,
   Menu,
   Network,
   PanelLeftClose,
@@ -51,6 +52,13 @@ const navigationIcons: Record<NavigationIcon, typeof LayoutDashboard> = {
   addons: Package,
 }
 
+const globalSearchLinks = [
+  { label: 'Students', destination: 'Students', description: 'Search the student directory' },
+  { label: 'Staff', destination: 'Staff', description: 'Search the staff directory' },
+  { label: 'Roles', destination: 'Role Builder', description: 'Manage institute access roles' },
+  { label: 'Circulars', destination: 'Circulars', description: 'Review announcements' },
+]
+
 export function AppShell({ children, branch, branches, activePage, academicYear, onAcademicYearChange, onBranchChange, onNavigate, onSignOut, isBranchAdmin = false, canViewAllBranches = false, canViewAudit = false }: PropsWithChildren<{
   branch: BranchContext
   branches: BranchOption[]
@@ -71,6 +79,8 @@ export function AppShell({ children, branch, branches, activePage, academicYear,
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [signingOut, setSigningOut] = useState(false)
+  const profileMenuRef = useRef<HTMLDivElement>(null)
+  const globalSearchRef = useRef<HTMLLabelElement>(null)
   const navigationItems = useMemo(
     () => canViewAllBranches && canViewAudit
       ? adminNavigation
@@ -95,6 +105,17 @@ export function AppShell({ children, branch, branches, activePage, academicYear,
     }
     window.addEventListener('keydown', handleShortcut)
     return () => window.removeEventListener('keydown', handleShortcut)
+  }, [])
+
+  useEffect(() => {
+    const closePopovers = (event: PointerEvent) => {
+      const target = event.target
+      if (!(target instanceof Node)) return
+      if (!profileMenuRef.current?.contains(target)) setProfileOpen(false)
+      if (!globalSearchRef.current?.contains(target)) setSearchOpen(false)
+    }
+    document.addEventListener('pointerdown', closePopovers)
+    return () => document.removeEventListener('pointerdown', closePopovers)
   }, [])
 
   const navigateTo = (label: string) => {
@@ -151,14 +172,15 @@ export function AppShell({ children, branch, branches, activePage, academicYear,
           </label>
         </div>
 
-        <label className="global-search">
+        <label className="global-search" ref={globalSearchRef}>
           <Search aria-hidden="true" />
           <span className="sr-only">Global search</span>
-          <input id="app-global-search" type="search" value={searchQuery} placeholder="Search students, staff, roles…" aria-label="Global search" onFocus={() => setSearchOpen(true)} onChange={(event) => { setSearchQuery(event.target.value); setSearchOpen(true) }} />
+          <input id="app-global-search" type="search" value={searchQuery} placeholder="Search students, staff, roles…" aria-label="Global search" aria-expanded={searchOpen} aria-controls="global-search-results" aria-haspopup="dialog" onFocus={() => setSearchOpen(true)} onChange={(event) => { setSearchQuery(event.target.value); setSearchOpen(true) }} />
           <kbd>/</kbd>
-          {searchOpen && <div className="global-search-results" role="dialog" aria-label="Global search results">
-            <p className="search-results-title">{searchQuery ? 'Suggested results' : 'Recent'}</p>
-            {[['Students', 'Students', 'Search the student directory'], ['Staff', 'Staff', 'Search the staff directory'], ['Roles', 'Role Builder', 'Manage institute access roles'], ['Circulars', 'Circulars', 'Review announcements']].map(([type, destination, description]) => <button type="button" key={type} onMouseDown={(event) => event.preventDefault()} onClick={() => { navigateTo(destination); setSearchOpen(false); setSearchQuery('') }}><span className="search-result-icon">{type.slice(0, 1)}</span><span><strong>{type}</strong><small>{description}</small></span></button>)}
+          {searchOpen && <div id="global-search-results" className="global-search-results" role="dialog" aria-label="Global search results">
+            <p className="search-results-title">{searchQuery ? 'Quick links' : 'Recent destinations'}</p>
+            {globalSearchLinks.filter((item) => !searchQuery || `${item.label} ${item.destination} ${item.description}`.toLowerCase().includes(searchQuery.trim().toLowerCase())).map((item) => <button type="button" key={item.label} onMouseDown={(event) => event.preventDefault()} onClick={() => { navigateTo(item.destination); setSearchOpen(false); setSearchQuery('') }}><span className="search-result-icon" aria-hidden="true">{item.label.slice(0, 1)}</span><span><strong>{item.label}</strong><small>{item.description}</small></span></button>)}
+            {searchQuery && !globalSearchLinks.some((item) => `${item.label} ${item.destination} ${item.description}`.toLowerCase().includes(searchQuery.trim().toLowerCase())) && <p className="search-results-empty">No quick links match. Try another search.</p>}
           </div>}
         </label>
 
@@ -171,7 +193,7 @@ export function AppShell({ children, branch, branches, activePage, academicYear,
             <Bell aria-hidden="true" />
             <span className="notification-dot" />
           </IconButton>
-          <div className="profile-menu">
+          <div className="profile-menu" ref={profileMenuRef}>
             <button type="button" className="profile-trigger" aria-label="Open profile menu" aria-expanded={profileOpen} onClick={() => setProfileOpen((value) => !value)}>
               <span>AM</span>
               <ChevronDown aria-hidden="true" />
@@ -211,17 +233,22 @@ export function AppShell({ children, branch, branches, activePage, academicYear,
                 <button
                   type="button"
                   className={`nav-item ${active ? 'is-active' : ''}`}
-                  title={collapsed ? item.label : undefined}
+                  title={item.comingSoon ? `${item.label} — Coming soon` : collapsed ? item.label : undefined}
                   aria-current={active ? 'page' : undefined}
-                  aria-expanded={item.children ? expanded : undefined}
+                  aria-expanded={item.children && !item.comingSoon ? expanded : undefined}
+                  aria-disabled={item.comingSoon || undefined}
+                  data-coming-soon={item.comingSoon || undefined}
                   onClick={() => {
+                    if (item.comingSoon) return
                     if (item.children) setExpandedGroup(expanded ? null : item.label)
                     else if (item.route) navigateTo(item.route.label)
                   }}
                 >
                   <Icon aria-hidden="true" />
                   <span className="nav-label">{item.label}</span>
-                  {item.children && <ChevronRight className={`nav-chevron ${expanded ? 'is-expanded' : ''}`} aria-hidden="true" />}
+                  {item.comingSoon
+                    ? <LockKeyhole className="nav-lock" aria-hidden="true" />
+                    : item.children && <ChevronRight className={`nav-chevron ${expanded ? 'is-expanded' : ''}`} aria-hidden="true" />}
                 </button>
                 {item.children && expanded && !collapsed && (
                   <div className="nav-children">

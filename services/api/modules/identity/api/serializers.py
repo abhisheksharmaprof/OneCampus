@@ -119,3 +119,47 @@ class SessionLogoutSerializer(serializers.Serializer):
 class SessionLogoutSuccessSerializer(serializers.Serializer):
     success = serializers.BooleanField()
     data = serializers.DictField()
+
+
+class AccountProfileSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    email = serializers.EmailField()
+    firstName = serializers.CharField(source="first_name", allow_blank=True)
+    lastName = serializers.CharField(source="last_name", allow_blank=True)
+    displayName = serializers.CharField()
+    phone = serializers.CharField(allow_blank=True)
+    twoFactorEnabled = serializers.BooleanField(source="otp_required")
+    userType = serializers.CharField(source="user_type", allow_blank=True)
+    activeRole = serializers.CharField()
+    roles = serializers.ListField(child=serializers.CharField())
+    instituteId = serializers.UUIDField(allow_null=True)
+    branchIds = serializers.ListField(child=serializers.UUIDField())
+    permissions = serializers.ListField(child=serializers.CharField(), required=False)
+
+
+class AccountUpdateSerializer(serializers.Serializer):
+    firstName = serializers.CharField(required=False, allow_blank=True, max_length=150)
+    lastName = serializers.CharField(required=False, allow_blank=True, max_length=150)
+    phone = serializers.CharField(required=False, allow_blank=True, max_length=20)
+    currentPassword = serializers.CharField(required=False, allow_blank=True, write_only=True)
+    newPassword = serializers.CharField(required=False, allow_blank=True, write_only=True)
+    confirmPassword = serializers.CharField(required=False, allow_blank=True, write_only=True)
+    twoFactorEnabled = serializers.BooleanField(required=False)
+
+    def validate(self, attrs):
+        user = self.context.get("user")
+        new_password = attrs.get("newPassword")
+        current_password = attrs.get("currentPassword")
+        confirm_password = attrs.get("confirmPassword")
+
+        if new_password:
+            if not current_password:
+                raise serializers.ValidationError({"currentPassword": ["Current password is required to set a new password."]})
+            if not user or not user.check_password(current_password):
+                raise serializers.ValidationError({"currentPassword": ["Current password is incorrect."]})
+            if new_password != confirm_password:
+                raise serializers.ValidationError({"confirmPassword": ["Passwords do not match."]})
+            validate_password(new_password, user=user)
+
+        return attrs
+

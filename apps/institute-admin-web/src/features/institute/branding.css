@@ -18,7 +18,9 @@
 .branding-card > label { display: grid; gap: .35rem; margin-top: 1rem; color: #385173; font-size: .76rem; }
 .branding-card .file-upload-field > label { display: inline-flex; width: auto; min-height: 2.4rem; margin: 0; align-items: center; }
 .branding-card input { width: 100%; min-height: 2.4rem; padding: .45rem .65rem; border: 1px solid #d8e0eb; border-radius: .4rem; background: #fff; color: #142b4a; }
-.branding-card .file-upload-field { margin-top: 1rem; }
+.branding-card .file-upload-field { display: flex; align-items: center; flex-wrap: wrap; gap: .45rem .65rem; margin-top: 1rem; }
+.branding-card .file-upload-field .file-upload-help { flex: 1 1 8rem; min-width: 0; line-height: 1.4; overflow-wrap: anywhere; }
+.branding-card .file-upload-field .form-error { flex-basis: 100%; margin: 0; }
 .branding-remove-link { display: block; margin-top: .45rem; padding: 0; border: 0; background: transparent; color: #b42318; font-size: .75rem; cursor: pointer; }
 .branding-remove-link:hover { text-decoration: underline; }
 .branding-remove-link:disabled { opacity: .55; cursor: wait; }
@@ -40,3 +42,4 @@
 .template-row small { margin-top: .2rem; color: #5f7190; font-size: .68rem; }
 @media (max-width: 800px) { .branding-grid { grid-template-columns: 1fr; } .branding-heading { flex-direction: column; } .branding-heading-actions { width: 100%; } .branding-heading-actions button { flex: 1; } }
 .branding-save-notice { margin: 0 0 16px; padding: 10px 12px; border: 1px solid #CFE8DA; border-radius: 8px; background: #E7F6EE; color: #137A4B; font-size: 13px; }
+.branding-logo-help { margin-top: .4rem; font-size: .68rem !important; line-height: 1.45; }

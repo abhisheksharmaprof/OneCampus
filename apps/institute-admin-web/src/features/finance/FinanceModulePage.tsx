@@ -165,7 +165,7 @@ function FinanceLedger({ accessToken, selectedBranch, branches, module }: {
         <button className="fin-btn fin-btn--primary" type="button" onClick={() => openForm('new')}><Plus size={16} aria-hidden /> Add {moduleConfig.singular}</button>
       </div>
 
-      <section className="fin-kpis" aria-label={`${moduleConfig.title} summary`}>
+      <section className="fin-kpis fin-kpis--ledger" aria-label={`${moduleConfig.title} summary`}>
         <div className="fin-kpi"><span className="fin-kpi__icon"><WalletCards size={18} /></span><span>{moduleConfig.totalLabel}</span><b>{money(total)}</b><small>{visible.length} ledger entries</small></div>
         <div className="fin-kpi"><span className="fin-kpi__icon fin-kpi__icon--success"><CheckCircle2 size={18} /></span><span>Approved or paid</span><b>{approved.length}</b><small>Ready for reporting</small></div>
         <div className="fin-kpi"><span className="fin-kpi__icon fin-kpi__icon--warning"><CalendarDays size={18} /></span><span>Pending review</span><b>{pending}</b><small>Needs attention</small></div>
@@ -174,7 +174,7 @@ function FinanceLedger({ accessToken, selectedBranch, branches, module }: {
       {error && <p className="fin-field-error" role="alert">{error}</p>}
       <div className="fin-card fin-card--table">
         <div className="fin-card__header"><div><h3>{moduleConfig.title} ledger</h3><p>Branch-scoped operational records</p></div></div>
-        <div className="fin-table-wrap">
+        <div className="fin-table-wrap" role="region" aria-label={`Scrollable ${moduleConfig.title.toLowerCase()} ledger`} tabIndex={0}>
           <table className="fin-table">
             <thead><tr><th>Record</th><th>Category</th><th className="is-right">Amount</th><th>Date</th><th>Status</th><th className="fin-table__actions">Actions</th></tr></thead>
             <tbody>{visible.map((record) => (
@@ -250,8 +250,8 @@ function FinanceReports({ accessToken, selectedBranch }: { accessToken: string; 
           <div className="fin-kpi"><span className="fin-kpi__icon"><BarChart3 size={18} /></span><span>Net cash view</span><b>{money(collected - spend)}</b><small>Payments minus recorded expenses</small></div>
         </section>
 
-        {tab === 'Collections' && <ReportCard title="Monthly collections" subtitle="Actual payments recorded by month"><div className="fin-chart fin-chart--report">{(summary.data?.monthlySeries ?? []).map((point) => <div className="fin-chart__point" key={point.month}><div className="fin-chart__value">{money(point.collected)}</div><div className="bar" style={{ height: `${Math.max(3, Number(point.collected || 0) / maxMonth * 100)}%` }} /><span>{new Date(`${point.month}-01`).toLocaleDateString('en-IN', { month: 'short' })}</span></div>)}</div></ReportCard>}
-        {tab === 'Receivables' && <ReportCard title="Receivables ageing" subtitle="Highest outstanding student balances"><div className="fin-table-wrap"><table className="fin-table"><thead><tr><th>Student</th><th>Admission no</th><th className="is-right">Outstanding</th><th className="is-right">Days overdue</th></tr></thead><tbody>{dueItems.slice(0, 12).map((due) => <tr key={due.studentId}><td><strong>{due.studentName}</strong></td><td>{due.admissionNumber}</td><td className="is-right"><strong>{money(due.outstanding)}</strong></td><td className="is-right">{due.daysOverdue}</td></tr>)}</tbody></table></div></ReportCard>}
+        {tab === 'Collections' && <ReportCard title="Monthly collections" subtitle="Actual payments recorded by month"><div className="fin-chart fin-chart--report">{(summary.data?.monthlySeries ?? []).map((point) => <div className="fin-chart__point" key={point.month} tabIndex={0} aria-label={`${point.month}: ${money(point.collected)}`} title={`${point.month}: ${money(point.collected)}`}><div className="fin-chart__value">{money(point.collected)}</div><div className="bar" style={{ height: `${Number(point.collected || 0) > 0 ? Math.max(3, Number(point.collected || 0) / maxMonth * 100) : 0}%` }} /><span>{new Date(`${point.month}-01`).toLocaleDateString('en-IN', { month: 'short' })}</span></div>)}</div></ReportCard>}
+        {tab === 'Receivables' && <ReportCard title="Receivables ageing" subtitle="Highest outstanding student balances"><div className="fin-table-wrap" role="region" aria-label="Scrollable receivables ageing table" tabIndex={0}><table className="fin-table"><thead><tr><th>Student</th><th>Admission no</th><th className="is-right">Outstanding</th><th className="is-right">Days overdue</th></tr></thead><tbody>{dueItems.slice(0, 12).map((due) => <tr key={due.studentId}><td><strong>{due.studentName}</strong></td><td>{due.admissionNumber}</td><td className="is-right"><strong>{money(due.outstanding)}</strong></td><td className="is-right">{due.daysOverdue}</td></tr>)}</tbody></table></div></ReportCard>}
         {tab === 'Tax summary' && <ReportCard title="Tax summary" subtitle="Tax recorded across invoices in the current view"><div className="fin-report-total"><span>Taxable invoices</span><strong>{invoiceItems.filter((invoice) => Number(invoice.taxAmount) > 0).length}</strong><span>Tax recorded</span><strong>{money(tax)}</strong></div></ReportCard>}
         {tab === 'Income & expense' && <ReportCard title="Income & expense" subtitle="Operational cash comparison for the loaded period"><div className="fin-comparison"><div><span>Payment income</span><strong>{money(collected)}</strong></div><div><span>Recorded expenses</span><strong>{money(spend)}</strong></div><div className={collected - spend >= 0 ? 'is-positive' : 'is-negative'}><span>Net position</span><strong>{money(collected - spend)}</strong></div></div></ReportCard>}
       </StatePanel>

@@ -1,4 +1,4 @@
-from django.urls import path
+from django.urls import include, path
 
 from .views import (
     AcademicOperationDetailView,
@@ -27,6 +27,7 @@ from .views import (
 app_name = "academics"
 
 urlpatterns = [
+    path("results/", include("modules.academics.results.urls")),
     path("operations", AcademicOperationListCreateView.as_view(), name="operation-list"),
     path("operations/<uuid:operation_id>", AcademicOperationDetailView.as_view(), name="operation-detail"),
     path("rooms", RoomListCreateView.as_view(), name="room-list"),

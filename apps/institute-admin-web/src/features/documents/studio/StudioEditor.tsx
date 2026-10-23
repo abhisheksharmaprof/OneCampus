@@ -85,27 +85,34 @@ export function StudioEditor({ accessToken, template, onBack }: StudioEditorProp
   return (
     <div className="stu-root">
       <div className="stu-topbar">
-        <strong>{template.name}</strong>
+        <button type="button" className="stu-btn stu-back-btn" onClick={leave}>← Back</button>
+        <div className="stu-editor-title"><strong title={template.name}>{template.name}</strong>
         <span style={{ background: '#E8EEF5', color: '#173A5E', borderRadius: 99, padding: '2px 8px', fontSize: 10, fontWeight: 700 }}>
           {template.category.replace('_', ' ')}
         </span>
-        <button type="button" className="stu-btn" onClick={() => dispatch({ type: 'undo' })} disabled={state.historyIndex <= 0}>↶ Undo</button>
+        </div>
+        <div className="stu-editor-tools">
+        <button type="button" className="stu-btn" aria-label="Undo last change" onClick={() => dispatch({ type: 'undo' })} disabled={state.historyIndex <= 0}>↶ Undo</button>
         <button type="button" className="stu-btn" onClick={() => dispatch({ type: 'redo' })} disabled={state.historyIndex >= state.history.length - 1}>↷ Redo</button>
-        <label style={{ fontSize: 12 }}>
+        <label className="stu-sample-toggle">
           <input type="checkbox" checked={state.sampleMode} onChange={(event) => dispatch({ type: 'setSampleMode', on: event.target.checked })} /> Sample data
         </label>
-        <button type="button" className="stu-btn" onClick={() => dispatch({ type: 'setZoom', zoom: state.zoom - 0.1 })}>−</button>
+        <div className="stu-zoom-control" aria-label="Canvas zoom controls">
+        <button type="button" className="stu-btn" aria-label="Zoom out" onClick={() => dispatch({ type: 'setZoom', zoom: state.zoom - 0.1 })}>−</button>
         <span style={{ fontSize: 12, minWidth: 38, textAlign: 'center' }}>{Math.round(state.zoom * 100)}%</span>
-        <button type="button" className="stu-btn" onClick={() => dispatch({ type: 'setZoom', zoom: state.zoom + 0.1 })}>+</button>
+        <button type="button" className="stu-btn" aria-label="Zoom in" onClick={() => dispatch({ type: 'setZoom', zoom: state.zoom + 0.1 })}>+</button>
+        </div>
         <button type="button" className="stu-btn stu-mobile-panel-toggle" aria-pressed={mobilePanel === 'components'} onClick={() => setMobilePanel((panel) => panel === 'components' ? null : 'components')}>Components</button>
         <button type="button" className="stu-btn stu-mobile-panel-toggle" aria-pressed={mobilePanel === 'properties'} onClick={() => setMobilePanel((panel) => panel === 'properties' ? null : 'properties')}>Properties</button>
+        </div>
         <span className="spacer" />
-        {notice && <span role="alert" style={{ fontSize: 12, color: notice === 'Saved.' ? '#137A4B' : '#C0392B' }}>{notice}</span>}
+        <span className={`stu-save-state ${state.dirty ? 'is-dirty' : ''}`} role={notice && notice !== 'Saved.' ? 'alert' : 'status'}>{notice ?? (state.dirty ? 'Unsaved changes' : 'All changes saved')}</span>
+        <div className="stu-editor-actions">
         <button type="button" className="stu-btn" onClick={() => void previewPrint()}>Preview print</button>
         <button type="button" className="stu-btn stu-btn--primary" disabled={saving || !state.dirty} onClick={() => void save()}>
           {saving ? 'Saving…' : 'Save template'}
         </button>
-        <button type="button" className="stu-btn" onClick={leave}>Back</button>
+        </div>
       </div>
       <div className="stu-workspace" data-mobile-panel={mobilePanel ?? 'canvas'}>
         <ComponentRail category={template.category} state={state} dispatch={dispatch} />

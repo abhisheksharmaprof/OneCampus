@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import {
   Award, BarChart3, BookOpen, CalendarDays, Check, CheckCircle2, Clock3, Download,
   Edit3, FileText, FlaskConical, GraduationCap, NotebookPen, Plus, Search, Trash2, Users,
@@ -11,6 +11,7 @@ import {
 import type { AcademicClass, ClassSubject } from './academics.types'
 import { BoneScreen } from '../../components/admin-ui'
 import './academic-operations.css'
+const MarksGradesPage = lazy(() => import('./results/MarksGradesPage').then(module => ({ default: module.MarksGradesPage })))
 
 export type AcademicOperationsPageId = 'ACL1' | 'ACH1' | 'ACE1' | 'ACM1' | 'ACC1' | 'AHT1' | 'AAR1'
 type Metric = { label: string; value: string | number; hint: string; icon: ReactNode; tone?: 'blue' | 'green' | 'amber' | 'violet' | 'red' }
@@ -115,7 +116,52 @@ function Exams({ records, loading, open, edit, patch, remove }: OperationViewPro
   return <><PageHeader title="Exams" description="Manage exam schedules, question bank, online exams, and hall tickets." action={<button className="button-primary" type="button" onClick={() => open(tab === 'Question Bank' ? 'QUESTION' : 'EXAM')}><Plus /> {tab === 'Question Bank' ? 'Add Question' : 'New Exam'}</button>} /><Tabs tabs={tabs} active={tab} onChange={setTab} label="Exam views" /><MetricGrid items={[{ label: 'Total Exams', value: exams.length, hint: 'Persisted schedules', icon: <Award /> }, { label: 'Questions', value: questions.length, hint: 'Question bank', icon: <FileText />, tone: 'green' }, { label: 'Upcoming', value: exams.filter((item) => item.status === 'SCHEDULED').length, hint: 'Scheduled', icon: <CalendarDays />, tone: 'amber' }, { label: 'Completed', value: exams.filter((item) => item.status === 'COMPLETED').length, hint: 'Results ready', icon: <CheckCircle2 />, tone: 'violet' }]} />{tab === 'Analytics' ? <Analytics records={exams} /> : tab === 'Hall Tickets' ? <HallTicketList exams={exams} /> : <section className="aop-card aop-list-card">{loading ? <LoadingState /> : shown.length === 0 ? <EmptyState noun={tab === 'Question Bank' ? 'questions' : 'exams'} onCreate={() => open(tab === 'Question Bank' ? 'QUESTION' : 'EXAM')} /> : <div className="aop-record-list">{shown.map((item) => <article className="aop-record aop-exam" key={item.id}><i className="aop-date-chip"><CalendarDays /></i><div><h2>{item.title} <Status>{labelStatus(item.status)}</Status></h2><p>{value(item, 'subject')} · {value(item, 'className')} · {value(item, 'date')}</p><small>{value(item, 'description')}</small></div><RecordActions record={item} onEdit={() => edit(item)} onPatch={(status) => patch(item, status)} onDelete={() => remove(item)} /></article>)}</div>}</section>}</>
 }
 
-function HallTicketList({ exams }: { exams: AcademicOperation[] }) { return <section className="aop-card"><h2>Hall Ticket Exams</h2>{exams.length === 0 ? <EmptyState noun="scheduled exams" /> : <div className="aop-ticket-grid">{exams.map((exam) => <article className="aop-ticket" key={exam.id}><b>CampusOne School</b><small>Hall Ticket Configuration</small><i><Award /></i><h2>{exam.title}</h2><p>{value(exam, 'className')}</p><span>{value(exam, 'date')}</span><Status>{labelStatus(exam.status)}</Status></article>)}</div>}</section> }
+function HallTicketList({ exams }: { exams: AcademicOperation[] }) {
+  return (
+    <section className="aop-card">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+        <div>
+          <h2>Hall Ticket Exams</h2>
+          <p style={{ margin: '0.25rem 0 0', color: '#64748b', fontSize: '0.875rem' }}>
+            Generate, schedule, and print exam hall tickets and admit cards for candidates.
+          </p>
+        </div>
+        <button
+          className="button-primary"
+          type="button"
+          onClick={() => { window.location.href = '/academics/assessment-results' }}
+        >
+          <Award /> Open Hall Ticket Generator
+        </button>
+      </div>
+      {exams.length === 0 ? (
+        <EmptyState noun="scheduled exams" />
+      ) : (
+        <div className="aop-ticket-grid">
+          {exams.map((exam) => (
+            <article className="aop-ticket" key={exam.id}>
+              <b>CampusOne School</b>
+              <small>Hall Ticket Configuration</small>
+              <i><Award /></i>
+              <h2>{exam.title}</h2>
+              <p>{value(exam, 'className')}</p>
+              <span>{value(exam, 'date')}</span>
+              <Status>{labelStatus(exam.status)}</Status>
+              <button
+                className="button-secondary"
+                type="button"
+                style={{ marginTop: '0.75rem', width: '100%', fontSize: '0.8125rem' }}
+                onClick={() => { window.location.href = '/academics/assessment-results' }}
+              >
+                Generate Tickets →
+              </button>
+            </article>
+          ))}
+        </div>
+      )}
+    </section>
+  )
+}
 
 function MarksGrades({ records, loading, open, edit, patch, remove, exportData }: OperationViewProps) {
   const tabs = ['Entry', 'Class Dashboard', 'Report Cards', 'Grade Analysis'] as const; const [tab, setTab] = useState<(typeof tabs)[number]>('Entry'); const marks = records.filter((item) => item.kind === 'MARK')
@@ -143,7 +189,7 @@ function AssessmentResults({ props }: { props: OperationViewProps }) {
 
 type OperationViewProps = { records: AcademicOperation[]; loading: boolean; open: (kind: AcademicOperationKind) => void; edit: (record: AcademicOperation) => void; patch: (record: AcademicOperation, status: string) => void; remove: (record: AcademicOperation) => void; exportData: () => void }
 
-export function AcademicOperationsPage({ page, accessToken, selectedBranch }: { page: AcademicOperationsPageId; accessToken: string; selectedBranch: string }) {
+function LegacyAcademicOperationsPage({ page, accessToken, selectedBranch }: { page: AcademicOperationsPageId; accessToken: string; selectedBranch: string }) {
   const kindsByPage: Record<AcademicOperationsPageId, AcademicOperationKind[]> = { ACL1: ['LESSON_PLAN'], ACH1: ['HOMEWORK'], ACE1: ['EXAM', 'QUESTION'], ACM1: ['MARK'], ACC1: [], AHT1: ['LESSON_PLAN', 'HOMEWORK'], AAR1: ['EXAM', 'QUESTION', 'MARK'] }
   const store = useOperations(accessToken, kindsByPage[page], selectedBranch); const [editorKind, setEditorKind] = useState<EditorKind>(null); const [editing, setEditing] = useState<AcademicOperation>(); const [saving, setSaving] = useState(false); const [notice, setNotice] = useState('')
   const notify = (message: string) => { setNotice(message); window.setTimeout(() => setNotice(''), 2600) }
@@ -153,4 +199,11 @@ export function AcademicOperationsPage({ page, accessToken, selectedBranch }: { 
   const remove = (record: AcademicOperation) => { if (!window.confirm(`Delete ${record.title}?`)) return; void deleteAcademicOperation(accessToken, record.id).then(() => { store.reload(); notify(`${record.title} deleted.`) }).catch((cause: unknown) => notify(cause instanceof Error ? cause.message : 'Record could not be deleted.')) }
   const props: OperationViewProps = { records: store.records, loading: store.loading, open, edit, patch: patchStatus, remove, exportData: () => { downloadRecords(`academic-${page.toLowerCase()}.json`, store.records); notify('Academic data exported.') } }
   return <main className="aop-page">{notice && <div className="aop-notice" role="status"><CheckCircle2 /> {notice}</div>}{store.error && <div className="aop-error" role="alert">{store.error}<button type="button" onClick={store.reload}>Retry</button></div>}{page === 'ACL1' && <LessonPlans {...props} />}{page === 'ACH1' && <Homework {...props} />}{page === 'ACE1' && <Exams {...props} />}{page === 'ACM1' && <MarksGrades {...props} />}{page === 'ACC1' && <Curriculum accessToken={accessToken} exportNotice={notify} />}{page === 'AHT1' && <TeachingLearning props={props} />}{page === 'AAR1' && <AssessmentResults props={props} />}<RecordEditor kind={editorKind} record={editing} branchId={store.branchId} busy={saving} onClose={() => { setEditorKind(null); setEditing(undefined) }} onSave={save} /></main>
+}
+
+export function AcademicOperationsPage(props: { page: AcademicOperationsPageId; accessToken: string; selectedBranch: string }) {
+  if (['ACM1', 'AAR1'].includes(props.page)) {
+    return <Suspense fallback={<p role="status">Loading Marks & Grades…</p>}><MarksGradesPage accessToken={props.accessToken} selectedBranch={props.selectedBranch} examTools={<LegacyAcademicOperationsPage {...props} page="ACE1" />} /></Suspense>
+  }
+  return <LegacyAcademicOperationsPage {...props} />
 }

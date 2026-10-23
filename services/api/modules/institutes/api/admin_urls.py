@@ -34,7 +34,7 @@ from modules.finance.api.settings_views import FinanceSettingsView
 from modules.people.api.parents import ParentListCreateView, ParentStudentLinkView
 from modules.people.api.staff import StaffDetailView, StaffListCreateView
 from modules.people.api.views import StudentBulkDeleteView, StudentDetailView, StudentListCreateView
-from modules.school_calendar.api.views import CalendarEventListCreateView
+from modules.school_calendar.api.views import CalendarEventListCreateView, HolidaySyncView
 from .audit import AuditEventExportView, AuditEventListView
 
 from .admin_views import (
@@ -109,6 +109,7 @@ urlpatterns = [
     path("finance/records/<uuid:record_id>", FinanceRecordDetailView.as_view(), name="admin-finance-record-detail"),
     path("finance/settings", FinanceSettingsView.as_view(), name="admin-finance-settings"),
     path("calendar/events", CalendarEventListCreateView.as_view(), name="admin-calendar-events"),
+    path("calendar/sync-holidays", HolidaySyncView.as_view(), name="admin-calendar-sync-holidays"),
     path("institute", CurrentInstituteView.as_view(), name="admin-current-institute"),
     path("institute/subscription", CurrentInstituteSubscriptionView.as_view(), name="admin-current-institute-subscription"),
     path("branches", BranchListCreateView.as_view(), name="admin-branch-list-create"),

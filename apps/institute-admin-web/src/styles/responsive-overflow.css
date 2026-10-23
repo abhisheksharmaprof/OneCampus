@@ -1,0 +1,71 @@
+/* Keep responsive content within the viewport; wide data stays locally scrollable. */
+.app-shell,
+.main-content,
+.content-container,
+.dashboard-page,
+.dashboard-page > *,
+.card,
+.admin-data-table,
+.entity-table-card,
+.academics-page,
+.admin-tabs,
+.admin-tabs__panel,
+.subjects-reference {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.admin-table-scroll,
+.entity-table,
+.subject-table-wrap {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.entity-table { margin-inline: 0; }
+
+@media (max-width: 850px) {
+  .table-scroll {
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: auto !important;
+    contain: paint;
+  }
+
+  .entity-table-row {
+    min-width: 42rem;
+  }
+
+  .topbar { min-width: 0; }
+  .topbar-context { min-width: 0; }
+  .branch-control { width: min(9rem, 16vw); }
+  .year-control { width: min(5rem, 9vw); }
+  .global-search { flex: 0 0 2rem; width: 2rem; min-width: 0; }
+  .topbar-actions { min-width: 0; gap: .25rem; }
+}
+
+@media (max-width: 640px) {
+  .kpi-grid,
+  .overview-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin-inline: 0;
+    padding-inline: 0;
+    overflow: visible;
+  }
+
+  .overview-kpi { min-width: 0; }
+
+  .topbar { gap: .4rem; padding-inline: .5rem; }
+  .brand { flex: 0 1 auto; min-width: 0; }
+  .global-search { flex: 0 0 2rem; width: 2rem; }
+  .topbar-actions { flex: none; }
+
+  .subject-reference-tabs {
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}

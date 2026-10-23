@@ -1,3 +1,4 @@
+import { MemoryRouter } from 'react-router-dom'
 import { render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { InstituteProfilePage } from './InstituteProfilePage'
@@ -15,7 +16,7 @@ describe('InstituteProfilePage identity details', () => {
   })
 
   it('shows the institute slug in the identity section', async () => {
-    render(<InstituteProfilePage accessToken="access-token" />)
+    render(<MemoryRouter><InstituteProfilePage accessToken="access-token" /></MemoryRouter>)
 
     expect(await screen.findByDisplayValue('greenfield-high')).toBeInTheDocument()
   })

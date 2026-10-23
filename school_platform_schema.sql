@@ -1310,3 +1310,206 @@ INSERT INTO batch_definitions (institute_id, category_id, name, description, cri
 -- SECTION 14: ATTENDANCE & LEAVE MANAGEMENT ADDITIONS
 -- ============================================================================
 -- (Consolidated into Section 6C)
+
+
+-- Academic terms referenced by structured exams (existing Django academic model).
+CREATE TABLE academic_terms (
+    id uuid PRIMARY KEY,
+    created_at timestamp with time zone NOT NULL,
+    updated_at timestamp with time zone NOT NULL,
+    academic_year_id uuid NOT NULL REFERENCES academic_years(id) DEFERRABLE INITIALLY DEFERRED,
+    name varchar(80) NOT NULL,
+    start_date date NOT NULL,
+    end_date date NOT NULL,
+    sort_order integer NOT NULL CHECK (sort_order >= 0),
+    CONSTRAINT uq_academic_term_name_per_year UNIQUE (academic_year_id, name),
+    CONSTRAINT ck_academic_term_date_order CHECK (end_date >= start_date)
+);
+CREATE INDEX academic_terms_year_idx ON academic_terms (academic_year_id);
+
+-- Existing document template and legacy-operation prerequisites.
+--
+-- Create model AcademicOperation
+--
+CREATE TABLE "academic_operations" ("created_at" timestamp with time zone NOT NULL, "updated_at" timestamp with time zone NOT NULL, "id" uuid NOT NULL PRIMARY KEY, "kind" varchar(24) NOT NULL, "title" varchar(250) NOT NULL, "status" varchar(40) NOT NULL, "payload" jsonb NOT NULL, "branch_id" uuid NULL, "created_by_id" uuid NULL, "institute_id" uuid NOT NULL);
+ALTER TABLE "academic_operations" ADD CONSTRAINT "academic_operations_branch_id_109cfc16_fk_institutes_branch_id" FOREIGN KEY ("branch_id") REFERENCES "branches" ("id") DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE "academic_operations" ADD CONSTRAINT "academic_operations_created_by_id_ea24c525_fk_identity_user_id" FOREIGN KEY ("created_by_id") REFERENCES "users" ("id") DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE "academic_operations" ADD CONSTRAINT "academic_operations_institute_id_3477507d_fk_institute" FOREIGN KEY ("institute_id") REFERENCES "institutes" ("id") DEFERRABLE INITIALLY DEFERRED;
+CREATE INDEX "academic_operations_branch_id_109cfc16" ON "academic_operations" ("branch_id");
+CREATE INDEX "academic_operations_created_by_id_ea24c525" ON "academic_operations" ("created_by_id");
+CREATE INDEX "academic_operations_institute_id_3477507d" ON "academic_operations" ("institute_id");
+CREATE INDEX "academic_op_institu_63d585_idx" ON "academic_operations" ("institute_id", "kind", "updated_at" DESC);
+CREATE INDEX "academic_op_branch__626d7c_idx" ON "academic_operations" ("branch_id", "kind", "status");
+
+--
+-- Create model DocumentTemplate
+--
+CREATE TABLE "documents_documenttemplate" ("created_at" timestamp with time zone NOT NULL, "updated_at" timestamp with time zone NOT NULL, "id" uuid NOT NULL PRIMARY KEY, "name" varchar(120) NOT NULL, "category" varchar(20) NOT NULL, "layout" jsonb NOT NULL, "is_default" boolean NOT NULL, "created_by_id" uuid NULL, "institute_id" uuid NOT NULL);
+ALTER TABLE "documents_documenttemplate" ADD CONSTRAINT "documents_documentte_created_by_id_fce09d26_fk_identity_" FOREIGN KEY ("created_by_id") REFERENCES "users" ("id") DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE "documents_documenttemplate" ADD CONSTRAINT "documents_documentte_institute_id_28492706_fk_institute" FOREIGN KEY ("institute_id") REFERENCES "institutes" ("id") DEFERRABLE INITIALLY DEFERRED;
+CREATE UNIQUE INDEX "uq_default_document_template_per_category" ON "documents_documenttemplate" ("institute_id", "category") WHERE "is_default";
+CREATE INDEX "documents_documenttemplate_created_by_id_fce09d26" ON "documents_documenttemplate" ("created_by_id");
+CREATE INDEX "documents_documenttemplate_institute_id_28492706" ON "documents_documenttemplate" ("institute_id");
+CREATE INDEX "documents_d_institu_e2b9af_idx" ON "documents_documenttemplate" ("institute_id", "category");
+
+--
+-- Create model DocumentTemplateVersion
+--
+CREATE TABLE "documents_documenttemplateversion" ("created_at" timestamp with time zone NOT NULL, "updated_at" timestamp with time zone NOT NULL, "id" uuid NOT NULL PRIMARY KEY, "version" integer NOT NULL CHECK ("version" >= 0), "name" varchar(120) NOT NULL, "layout" jsonb NOT NULL, "institute_id" uuid NOT NULL, "published_by_id" uuid NULL, "template_id" uuid NOT NULL, CONSTRAINT "uq_document_template_version" UNIQUE ("template_id", "version"));
+--
+-- Add field published_version to documenttemplate
+--
+ALTER TABLE "documents_documenttemplate" ADD COLUMN "published_version_id" uuid NULL CONSTRAINT "documents_documentte_published_version_id_51508ca9_fk_documents" REFERENCES "documents_documenttemplateversion"("id") DEFERRABLE INITIALLY DEFERRED; SET CONSTRAINTS "documents_documentte_published_version_id_51508ca9_fk_documents" IMMEDIATE;
+ALTER TABLE "documents_documenttemplateversion" ADD CONSTRAINT "documents_documentte_institute_id_c75e9fd8_fk_institute" FOREIGN KEY ("institute_id") REFERENCES "institutes" ("id") DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE "documents_documenttemplateversion" ADD CONSTRAINT "documents_documentte_published_by_id_4aa2aefb_fk_identity_" FOREIGN KEY ("published_by_id") REFERENCES "users" ("id") DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE "documents_documenttemplateversion" ADD CONSTRAINT "documents_documentte_template_id_07637e2e_fk_documents" FOREIGN KEY ("template_id") REFERENCES "documents_documenttemplate" ("id") DEFERRABLE INITIALLY DEFERRED;
+CREATE INDEX "documents_documenttemplateversion_institute_id_c75e9fd8" ON "documents_documenttemplateversion" ("institute_id");
+CREATE INDEX "documents_documenttemplateversion_published_by_id_4aa2aefb" ON "documents_documenttemplateversion" ("published_by_id");
+CREATE INDEX "documents_documenttemplateversion_template_id_07637e2e" ON "documents_documenttemplateversion" ("template_id");
+CREATE INDEX "documents_documenttemplate_published_version_id_51508ca9" ON "documents_documenttemplate" ("published_version_id");
+
+-- Structured exam results and private marksheet issuance (academics migration 0023).
+--
+-- Create model ResultBatch
+--
+CREATE TABLE "result_batches" ("created_at" timestamp with time zone NOT NULL, "updated_at" timestamp with time zone NOT NULL, "id" uuid NOT NULL PRIMARY KEY, "request_key" uuid NOT NULL, "config" jsonb NOT NULL, "state" varchar(20) NOT NULL, "issue" boolean NOT NULL, "errors" jsonb NOT NULL, "total" integer NOT NULL CHECK ("total" >= 0), "completed" integer NOT NULL CHECK ("completed" >= 0), "created_by_id" uuid NULL, "institute_id" uuid NOT NULL, "section_id" uuid NOT NULL, "template_version_id" uuid NOT NULL);
+--
+-- Create model ResultDocument
+--
+CREATE TABLE "result_documents" ("created_at" timestamp with time zone NOT NULL, "updated_at" timestamp with time zone NOT NULL, "id" uuid NOT NULL PRIMARY KEY, "snapshot" jsonb NOT NULL, "pdf" bytea NULL, "error" text NOT NULL, "batch_id" uuid NOT NULL, "enrollment_id" uuid NOT NULL, "predecessor_id" uuid NULL);
+--
+-- Create model ResultExam
+--
+CREATE TABLE "result_exams" ("created_at" timestamp with time zone NOT NULL, "updated_at" timestamp with time zone NOT NULL, "id" uuid NOT NULL PRIMARY KEY, "name" varchar(120) NOT NULL, "exam_type" varchar(20) NOT NULL, "exam_date" date NULL, "rules" jsonb NOT NULL, "archived" boolean NOT NULL, "institute_id" uuid NOT NULL, "legacy_operation_id" uuid NULL UNIQUE, "section_id" uuid NOT NULL, "term_id" uuid NULL);
+--
+-- Create model ResultChange
+--
+CREATE TABLE "result_changes" ("created_at" timestamp with time zone NOT NULL, "updated_at" timestamp with time zone NOT NULL, "id" uuid NOT NULL PRIMARY KEY, "action" varchar(30) NOT NULL, "detail" jsonb NOT NULL, "actor_id" uuid NULL, "exam_id" uuid NOT NULL);
+--
+-- Create model ResultCandidate
+--
+CREATE TABLE "result_candidates" ("created_at" timestamp with time zone NOT NULL, "updated_at" timestamp with time zone NOT NULL, "id" uuid NOT NULL PRIMARY KEY, "excluded_subject_ids" jsonb NOT NULL, "remark" text NOT NULL, "enrollment_id" uuid NOT NULL, "exam_id" uuid NOT NULL);
+--
+-- Create model ResultExamSubject
+--
+CREATE TABLE "result_exam_subjects" ("created_at" timestamp with time zone NOT NULL, "updated_at" timestamp with time zone NOT NULL, "id" uuid NOT NULL PRIMARY KEY, "order" integer NOT NULL CHECK ("order" >= 0), "state" varchar(20) NOT NULL, "revision" integer NOT NULL CHECK ("revision" >= 0), "review_note" text NOT NULL, "exam_id" uuid NOT NULL, "reviewed_by_id" uuid NULL, "subject_id" uuid NOT NULL);
+--
+-- Create model ResultComponent
+--
+CREATE TABLE "result_components" ("created_at" timestamp with time zone NOT NULL, "updated_at" timestamp with time zone NOT NULL, "id" uuid NOT NULL PRIMARY KEY, "name" varchar(60) NOT NULL, "maximum" numeric(8, 2) NOT NULL, "pass_marks" numeric(8, 2) NOT NULL, "order" integer NOT NULL CHECK ("order" >= 0), "exam_subject_id" uuid NOT NULL);
+--
+-- Create model ResultImport
+--
+CREATE TABLE "result_imports" ("created_at" timestamp with time zone NOT NULL, "updated_at" timestamp with time zone NOT NULL, "id" uuid NOT NULL PRIMARY KEY, "key" uuid NOT NULL, "filename" varchar(200) NOT NULL, "mapping" jsonb NOT NULL, "rows" jsonb NOT NULL, "errors" jsonb NOT NULL, "revisions" jsonb NOT NULL, "state" varchar(20) NOT NULL, "imported_count" integer NOT NULL CHECK ("imported_count" >= 0), "actor_id" uuid NULL, "exam_id" uuid NOT NULL);
+--
+-- Create model ResultMark
+--
+CREATE TABLE "result_marks" ("created_at" timestamp with time zone NOT NULL, "updated_at" timestamp with time zone NOT NULL, "id" uuid NOT NULL PRIMARY KEY, "score" numeric(8, 2) NULL, "status" varchar(20) NOT NULL, "note" varchar(500) NOT NULL, "candidate_id" uuid NOT NULL, "component_id" uuid NOT NULL, "updated_by_id" uuid NULL);
+--
+-- Create model ResultReport
+--
+CREATE TABLE "result_reports" ("created_at" timestamp with time zone NOT NULL, "updated_at" timestamp with time zone NOT NULL, "id" uuid NOT NULL PRIMARY KEY, "name" varchar(120) NOT NULL, "config" jsonb NOT NULL, "institute_id" uuid NOT NULL, "section_id" uuid NOT NULL, "template_id" uuid NOT NULL);
+--
+-- Create constraint uq_result_batch_key on model resultbatch
+--
+ALTER TABLE "result_batches" ADD CONSTRAINT "uq_result_batch_key" UNIQUE ("institute_id", "request_key");
+--
+-- Create constraint uq_result_batch_student on model resultdocument
+--
+ALTER TABLE "result_documents" ADD CONSTRAINT "uq_result_batch_student" UNIQUE ("batch_id", "enrollment_id");
+--
+-- Create index result_exam_institu_3b7a8a_idx on field(s) institute, section of model resultexam
+--
+CREATE INDEX "result_exam_institu_3b7a8a_idx" ON "result_exams" ("institute_id", "section_id");
+--
+-- Create constraint uq_result_exam_section_name on model resultexam
+--
+ALTER TABLE "result_exams" ADD CONSTRAINT "uq_result_exam_section_name" UNIQUE ("section_id", "name");
+--
+-- Create constraint uq_result_candidate on model resultcandidate
+--
+ALTER TABLE "result_candidates" ADD CONSTRAINT "uq_result_candidate" UNIQUE ("exam_id", "enrollment_id");
+--
+-- Create constraint uq_result_exam_subject on model resultexamsubject
+--
+ALTER TABLE "result_exam_subjects" ADD CONSTRAINT "uq_result_exam_subject" UNIQUE ("exam_id", "subject_id");
+--
+-- Create constraint uq_result_component_name on model resultcomponent
+--
+ALTER TABLE "result_components" ADD CONSTRAINT "uq_result_component_name" UNIQUE ("exam_subject_id", "name");
+--
+-- Create constraint ck_result_max_positive on model resultcomponent
+--
+ALTER TABLE "result_components" ADD CONSTRAINT "ck_result_max_positive" CHECK ("maximum" > 0);
+--
+-- Create constraint ck_result_pass_range on model resultcomponent
+--
+ALTER TABLE "result_components" ADD CONSTRAINT "ck_result_pass_range" CHECK (("pass_marks" >= 0 AND "pass_marks" <= ("maximum")));
+--
+-- Create constraint uq_result_import_key on model resultimport
+--
+ALTER TABLE "result_imports" ADD CONSTRAINT "uq_result_import_key" UNIQUE ("exam_id", "key");
+--
+-- Create constraint uq_result_mark on model resultmark
+--
+ALTER TABLE "result_marks" ADD CONSTRAINT "uq_result_mark" UNIQUE ("candidate_id", "component_id");
+--
+-- Create constraint ck_result_score_status on model resultmark
+--
+ALTER TABLE "result_marks" ADD CONSTRAINT "ck_result_score_status" CHECK ((("score" >= 0 AND "status" = 'PRESENT') OR ("status" IN ('ABSENT', 'EXEMPT', 'NOT_APPLICABLE') AND "score" IS NULL)));
+ALTER TABLE "result_batches" ADD CONSTRAINT "result_batches_created_by_id_22584776_fk_identity_user_id" FOREIGN KEY ("created_by_id") REFERENCES "users" ("id") DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE "result_batches" ADD CONSTRAINT "result_batches_institute_id_89f41a63_fk_institutes_id" FOREIGN KEY ("institute_id") REFERENCES "institutes" ("id") DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE "result_batches" ADD CONSTRAINT "result_batches_section_id_f90f3284_fk_class_sections_id" FOREIGN KEY ("section_id") REFERENCES "class_sections" ("id") DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE "result_batches" ADD CONSTRAINT "result_batches_template_version_id_fd2115ff_fk_documents" FOREIGN KEY ("template_version_id") REFERENCES "documents_documenttemplateversion" ("id") DEFERRABLE INITIALLY DEFERRED;
+CREATE INDEX "result_batches_created_by_id_22584776" ON "result_batches" ("created_by_id");
+CREATE INDEX "result_batches_institute_id_89f41a63" ON "result_batches" ("institute_id");
+CREATE INDEX "result_batches_section_id_f90f3284" ON "result_batches" ("section_id");
+CREATE INDEX "result_batches_template_version_id_fd2115ff" ON "result_batches" ("template_version_id");
+ALTER TABLE "result_documents" ADD CONSTRAINT "result_documents_batch_id_41a55749_fk_result_batches_id" FOREIGN KEY ("batch_id") REFERENCES "result_batches" ("id") DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE "result_documents" ADD CONSTRAINT "result_documents_enrollment_id_3f1c9dfd_fk_student_e" FOREIGN KEY ("enrollment_id") REFERENCES "student_enrollments" ("id") DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE "result_documents" ADD CONSTRAINT "result_documents_predecessor_id_07f4a6bf_fk_result_documents_id" FOREIGN KEY ("predecessor_id") REFERENCES "result_documents" ("id") DEFERRABLE INITIALLY DEFERRED;
+CREATE INDEX "result_documents_batch_id_41a55749" ON "result_documents" ("batch_id");
+CREATE INDEX "result_documents_enrollment_id_3f1c9dfd" ON "result_documents" ("enrollment_id");
+CREATE INDEX "result_documents_predecessor_id_07f4a6bf" ON "result_documents" ("predecessor_id");
+ALTER TABLE "result_exams" ADD CONSTRAINT "result_exams_institute_id_9b23b486_fk_institutes_id" FOREIGN KEY ("institute_id") REFERENCES "institutes" ("id") DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE "result_exams" ADD CONSTRAINT "result_exams_legacy_operation_id_e9b83f82_fk_academic_" FOREIGN KEY ("legacy_operation_id") REFERENCES "academic_operations" ("id") DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE "result_exams" ADD CONSTRAINT "result_exams_section_id_06d3e2fe_fk_class_sections_id" FOREIGN KEY ("section_id") REFERENCES "class_sections" ("id") DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE "result_exams" ADD CONSTRAINT "result_exams_term_id_65b7f9f6_fk_academic_terms_id" FOREIGN KEY ("term_id") REFERENCES "academic_terms" ("id") DEFERRABLE INITIALLY DEFERRED;
+CREATE INDEX "result_exams_institute_id_9b23b486" ON "result_exams" ("institute_id");
+CREATE INDEX "result_exams_section_id_06d3e2fe" ON "result_exams" ("section_id");
+CREATE INDEX "result_exams_term_id_65b7f9f6" ON "result_exams" ("term_id");
+ALTER TABLE "result_changes" ADD CONSTRAINT "result_changes_actor_id_b505aa56_fk_identity_user_id" FOREIGN KEY ("actor_id") REFERENCES "users" ("id") DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE "result_changes" ADD CONSTRAINT "result_changes_exam_id_13357919_fk_result_exams_id" FOREIGN KEY ("exam_id") REFERENCES "result_exams" ("id") DEFERRABLE INITIALLY DEFERRED;
+CREATE INDEX "result_changes_actor_id_b505aa56" ON "result_changes" ("actor_id");
+CREATE INDEX "result_changes_exam_id_13357919" ON "result_changes" ("exam_id");
+ALTER TABLE "result_candidates" ADD CONSTRAINT "result_candidates_enrollment_id_4d82cfbf_fk_student_e" FOREIGN KEY ("enrollment_id") REFERENCES "student_enrollments" ("id") DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE "result_candidates" ADD CONSTRAINT "result_candidates_exam_id_8a389f04_fk_result_exams_id" FOREIGN KEY ("exam_id") REFERENCES "result_exams" ("id") DEFERRABLE INITIALLY DEFERRED;
+CREATE INDEX "result_candidates_enrollment_id_4d82cfbf" ON "result_candidates" ("enrollment_id");
+CREATE INDEX "result_candidates_exam_id_8a389f04" ON "result_candidates" ("exam_id");
+ALTER TABLE "result_exam_subjects" ADD CONSTRAINT "result_exam_subjects_exam_id_18ce2d49_fk_result_exams_id" FOREIGN KEY ("exam_id") REFERENCES "result_exams" ("id") DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE "result_exam_subjects" ADD CONSTRAINT "result_exam_subjects_reviewed_by_id_da20ead4_fk_identity_" FOREIGN KEY ("reviewed_by_id") REFERENCES "users" ("id") DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE "result_exam_subjects" ADD CONSTRAINT "result_exam_subjects_subject_id_64594332_fk_subjects_id" FOREIGN KEY ("subject_id") REFERENCES "subjects" ("id") DEFERRABLE INITIALLY DEFERRED;
+CREATE INDEX "result_exam_subjects_exam_id_18ce2d49" ON "result_exam_subjects" ("exam_id");
+CREATE INDEX "result_exam_subjects_reviewed_by_id_da20ead4" ON "result_exam_subjects" ("reviewed_by_id");
+CREATE INDEX "result_exam_subjects_subject_id_64594332" ON "result_exam_subjects" ("subject_id");
+ALTER TABLE "result_components" ADD CONSTRAINT "result_components_exam_subject_id_abfc2b9f_fk_result_ex" FOREIGN KEY ("exam_subject_id") REFERENCES "result_exam_subjects" ("id") DEFERRABLE INITIALLY DEFERRED;
+CREATE INDEX "result_components_exam_subject_id_abfc2b9f" ON "result_components" ("exam_subject_id");
+ALTER TABLE "result_imports" ADD CONSTRAINT "result_imports_actor_id_9a698540_fk_identity_user_id" FOREIGN KEY ("actor_id") REFERENCES "users" ("id") DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE "result_imports" ADD CONSTRAINT "result_imports_exam_id_b0ec3125_fk_result_exams_id" FOREIGN KEY ("exam_id") REFERENCES "result_exams" ("id") DEFERRABLE INITIALLY DEFERRED;
+CREATE INDEX "result_imports_actor_id_9a698540" ON "result_imports" ("actor_id");
+CREATE INDEX "result_imports_exam_id_b0ec3125" ON "result_imports" ("exam_id");
+ALTER TABLE "result_marks" ADD CONSTRAINT "result_marks_candidate_id_c944a012_fk_result_candidates_id" FOREIGN KEY ("candidate_id") REFERENCES "result_candidates" ("id") DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE "result_marks" ADD CONSTRAINT "result_marks_component_id_153c07eb_fk_result_components_id" FOREIGN KEY ("component_id") REFERENCES "result_components" ("id") DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE "result_marks" ADD CONSTRAINT "result_marks_updated_by_id_36e80e00_fk_identity_user_id" FOREIGN KEY ("updated_by_id") REFERENCES "users" ("id") DEFERRABLE INITIALLY DEFERRED;
+CREATE INDEX "result_marks_candidate_id_c944a012" ON "result_marks" ("candidate_id");
+CREATE INDEX "result_marks_component_id_153c07eb" ON "result_marks" ("component_id");
+CREATE INDEX "result_marks_updated_by_id_36e80e00" ON "result_marks" ("updated_by_id");
+ALTER TABLE "result_reports" ADD CONSTRAINT "result_reports_institute_id_c70ce313_fk_institutes_id" FOREIGN KEY ("institute_id") REFERENCES "institutes" ("id") DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE "result_reports" ADD CONSTRAINT "result_reports_section_id_da2f4a23_fk_class_sections_id" FOREIGN KEY ("section_id") REFERENCES "class_sections" ("id") DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE "result_reports" ADD CONSTRAINT "result_reports_template_id_975ff45a_fk_documents" FOREIGN KEY ("template_id") REFERENCES "documents_documenttemplate" ("id") DEFERRABLE INITIALLY DEFERRED;
+CREATE INDEX "result_reports_institute_id_c70ce313" ON "result_reports" ("institute_id");
+CREATE INDEX "result_reports_section_id_da2f4a23" ON "result_reports" ("section_id");
+CREATE INDEX "result_reports_template_id_975ff45a" ON "result_reports" ("template_id");
+
+-- Exam-scoped spreadsheet profile values for the marksheet engine.
+ALTER TABLE result_candidates ADD COLUMN IF NOT EXISTS profile jsonb NOT NULL DEFAULT '{}'::jsonb;

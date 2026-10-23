@@ -2,22 +2,17 @@ import { FormEvent, useEffect, useState, type CSSProperties, type ReactNode } fr
 import {
   Building2,
   ChevronRight,
-  MapPin,
   MoreHorizontal,
   Plus,
-  Lock,
   Edit2,
-  Phone,
-  Mail,
   UserCheck,
   Users,
   GraduationCap,
   Layers,
-  Sparkles,
-  ExternalLink,
   Eye,
   GitCompare,
   Network,
+  Search,
 } from 'lucide-react'
 import { ConfirmationDialog, DataTable, Modal, PageSkeleton, Tabs, type DataTableColumn } from '../../components/admin-ui'
 import { Card, SectionHeader } from '../../components/ui/primitives'
@@ -45,31 +40,6 @@ interface Branch {
   sectionCount: number
   latitude?: string
   longitude?: string
-}
-
-interface ClassSectionRow {
-  id: string
-  className: string
-  sectionName: string
-  academicYear: string
-  teacherName: string
-  studentCount: number
-}
-
-interface StaffRow {
-  id: string
-  name: string
-  code: string
-  roles: string[]
-  phone: string
-}
-
-interface StudentRow {
-  id: string
-  name: string
-  adm: string
-  cls: string
-  status: string
 }
 
 interface InstituteAssociation {
@@ -146,6 +116,7 @@ export function InstituteSetupPage({
   onBranchesChanged: () => void
 }) {
   const [data, setData] = useState<PageData<Branch>>(emptyPage)
+  const [loading, setLoading] = useState(true)
   const [branch, setBranch] = useState<Branch | null>(null)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'INACTIVE'>('ALL')
@@ -166,6 +137,7 @@ export function InstituteSetupPage({
   // Fetch Branches List
   useEffect(() => {
     const c = new AbortController()
+    setLoading(true)
     setError('')
     const q = new URLSearchParams({ page: String(page), pageSize: '25' })
     if (search) q.set('search', search)
@@ -177,6 +149,7 @@ export function InstituteSetupPage({
         if (c.signal.aborted) return
         setError(e instanceof Error ? e.message : 'Campus sites could not be loaded.')
       })
+      .finally(() => { if (!c.signal.aborted) setLoading(false) })
     return () => c.abort()
   }, [accessToken, page, revision, search, statusFilter])
 
@@ -308,11 +281,6 @@ export function InstituteSetupPage({
 
   const columns: DataTableColumn<Branch>[] = [
     {
-      id: 'select',
-      header: <input type="checkbox" aria-label="Select all" />,
-      cell: () => <input type="checkbox" aria-label="Select row" />,
-    },
-    {
       id: 'name',
       header: 'Campus site',
       sortable: true,
@@ -392,26 +360,42 @@ export function InstituteSetupPage({
 
   // Branches List View
   return (
-    <div className="entity-page branch-reference-page">
+    <div className="entity-page institute-setup-page branch-reference-page">
       <div className="branch-reference-header">
         <div>
           <p className="breadcrumb">Home <span>›</span> Institute Setup <span>›</span> Branches &amp; Campuses</p>
           <h1>Branches &amp; Campuses</h1>
-          <p>Independent campus sites under this institute. Switch branches to scope all data.</p>
+          <p>Manage campus sites and open the records scoped to each one.</p>
           {data.items[0]?.instituteUrl && <p className="section-caption">Institute URL: <a href={data.items[0].instituteUrl} target="_blank" rel="noreferrer">{data.items[0].instituteUrl}</a> · Branch codes are short 3–4 character identifiers.</p>}
         </div>
         <div className="page-actions"><button className="button-secondary" type="button" onClick={() => setComparisonOpen(true)}><GitCompare size={16} /> Compare</button><button className="button-secondary" type="button" onClick={() => setAssociationModal('create')}><Building2 size={16} /> Add Institute</button><button className="button-primary" type="button" onClick={() => { setEditing(undefined); setDrawerOpen(true) }}><Plus size={16} /> Add Branch</button></div>
       </div>
-      <div className="branch-kpi-grid" aria-label="Branch summary">
-        <BranchKpi label="Total Branches" value={data.count} hint={`${new Set(data.items.map((item) => item.city).filter(Boolean)).size} cities identified`} tone="blue" icon={<Network size={20} />} />
-        <BranchKpi label="Total Students" value={data.items.reduce((total, item) => total + item.studentCount, 0)} hint={`▲ ${data.items.reduce((total, item) => total + item.studentCount, 0)} active`} tone="green" icon={<GraduationCap size={20} />} />
-        <BranchKpi label="Total Staff" value={data.items.reduce((total, item) => total + item.staffCount, 0)} hint={`▲ ${data.items.reduce((total, item) => total + item.staffCount, 0)} active`} tone="gold" icon={<Users size={20} />} />
-        <BranchKpi label="Head Offices" value={data.items.filter((item) => item.isHeadOffice).length} hint="Designated across these campuses" tone="purple" icon={<Building2 size={20} />} />
+      <div className="branch-kpi-grid" aria-label="Campus summary">
+        <BranchKpi label="Campus sites" value={loading ? '—' : data.count} hint={loading ? 'Loading campuses' : `${data.items.length} shown on this page`} tone="blue" icon={<Network size={20} />} />
+        <BranchKpi label="Students in view" value={loading ? '—' : data.items.reduce((total, item) => total + item.studentCount, 0)} hint="Across shown campuses" tone="green" icon={<GraduationCap size={20} />} />
+        <BranchKpi label="Staff in view" value={loading ? '—' : data.items.reduce((total, item) => total + item.staffCount, 0)} hint="Across shown campuses" tone="gold" icon={<Users size={20} />} />
+        <BranchKpi label="Head offices in view" value={loading ? '—' : data.items.filter((item) => item.isHeadOffice).length} hint="On this page" tone="purple" icon={<Building2 size={20} />} />
       </div>
 
       {error ? <div role="alert" className="inline-error">{error}</div> : null}
 
-      <div className="branch-card-grid">{data.items.map((item, index) => <BranchReferenceCard key={item.id} branch={item} color={['#2e5aac', '#1e8e5a', '#bd7b17'][index % 3]} onView={() => setViewing(item)} onEdit={() => { setEditing(item); setDrawerOpen(true) }} />)}</div>
+      <section className="branch-list" aria-label="Campus sites">
+        <div className="branch-list-toolbar">
+          <label className="branch-search">
+            <Search size={17} aria-hidden="true" />
+            <span className="sr-only">Search campuses</span>
+            <input type="search" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1) }} placeholder="Search by campus, city, or code" />
+          </label>
+          <label className="branch-status-filter"><span>Status</span><select value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value as typeof statusFilter); setPage(1) }}><option value="ALL">All campuses</option><option value="ACTIVE">Active</option><option value="INACTIVE">Inactive</option></select></label>
+          <div className="branch-list-pagination" aria-label="Campus list pagination">
+            <span>{loading ? 'Loading campuses…' : data.count ? `Showing ${(data.page - 1) * data.pageSize + 1}–${Math.min(data.page * data.pageSize, data.count)} of ${data.count}` : 'No campuses to show'}</span>
+            <button className="button-secondary btn-sm" type="button" aria-label="Previous page" disabled={loading || !data.previous} onClick={() => setPage((value) => Math.max(1, value - 1))}>Previous</button>
+            <span>Page {data.page} of {data.totalPages}</span>
+            <button className="button-secondary btn-sm" type="button" aria-label="Next page" disabled={loading || !data.next} onClick={() => setPage((value) => value + 1)}>Next</button>
+          </div>
+        </div>
+        {loading ? <div className="branch-list-state" role="status">Loading campus sites…</div> : data.items.length ? <div className="branch-card-grid">{data.items.map((item, index) => <BranchReferenceCard key={item.id} branch={item} color={['#2e5aac', '#1e8e5a', '#bd7b17'][index % 3]} onView={() => setViewing(item)} onEdit={() => { setEditing(item); setDrawerOpen(true) }} />)}</div> : <div className="branch-list-empty"><h2>{search || statusFilter !== 'ALL' ? 'No campuses match these filters' : 'No campuses yet'}</h2><p>{search || statusFilter !== 'ALL' ? 'Try another search or status, or clear the filters.' : 'Add a campus to start managing branch-specific records.'}</p>{search || statusFilter !== 'ALL' ? <button className="button-secondary" type="button" onClick={() => { setSearch(''); setStatusFilter('ALL'); setPage(1) }}>Clear filters</button> : <button className="button-primary" type="button" onClick={() => { setEditing(undefined); setDrawerOpen(true) }}><Plus size={16} /> Add Branch</button>}</div>}
+      </section>
 
       <CampusSiteModal
         isOpen={drawerOpen}
@@ -438,7 +422,7 @@ export function InstituteSetupPage({
         }}
       />
 
-      <Modal open={comparisonOpen} title="Branch Comparison" description="Live operational totals across all campus sites." size="large" onClose={() => setComparisonOpen(false)} footer={<button className="button-primary" type="button" onClick={() => setComparisonOpen(false)}>Close</button>}><table className="mini-table"><thead><tr><th>Branch</th><th>Students</th><th>Staff</th><th>Sections</th><th>Status</th></tr></thead><tbody>{data.items.map((item) => <tr key={item.id}><td><strong>{item.name}</strong></td><td>{item.studentCount}</td><td>{item.staffCount}</td><td>{item.sectionCount}</td><td><span className={`status-badge ${item.isActive ? 'tone-success' : 'tone-danger'}`}>{item.isActive ? 'Active' : 'Inactive'}</span></td></tr>)}</tbody></table></Modal>
+      <Modal open={comparisonOpen} title="Campus comparison" description={`Compare the ${data.items.length === 1 ? 'campus' : 'campuses'} shown on this page.`} size="large" onClose={() => setComparisonOpen(false)} footer={<button className="button-primary" type="button" onClick={() => setComparisonOpen(false)}>Close</button>}><table className="mini-table"><thead><tr><th>Campus</th><th>Students</th><th>Staff</th><th>Sections</th><th>Status</th></tr></thead><tbody>{data.items.map((item) => <tr key={item.id}><td><strong>{item.name}</strong></td><td>{item.studentCount}</td><td>{item.staffCount}</td><td>{item.sectionCount}</td><td><span className={`status-badge ${item.isActive ? 'tone-success' : 'tone-danger'}`}>{item.isActive ? 'Active' : 'Inactive'}</span></td></tr>)}</tbody></table></Modal>
 
       <Modal
         open={associationModal !== null}
@@ -461,7 +445,7 @@ export function InstituteSetupPage({
 
 function BranchDetailModal({ branch, busy, onClose, onEdit, onDeactivate }: { branch: Branch | null; busy: boolean; onClose: () => void; onEdit: () => void; onDeactivate: () => void }) {
   if (!branch) return null
-  return <Modal open title={<span className="branch-modal-title"><Building2 size={18} /> {branch.name}<span className={`status-badge ${branch.isActive ? 'tone-success' : 'tone-danger'}`}>{branch.isActive ? 'Active' : 'Inactive'}</span></span>} description="Campus site details" size="large" onClose={() => { if (!busy) onClose() }} footer={<><button className="button-secondary" type="button" onClick={onClose}>Close</button><button className="button-primary" type="button" onClick={onEdit}><Edit2 size={15} /> Edit site</button></>}><BranchDetail branch={branch} onEdit={onEdit} onDeactivate={onDeactivate} /></Modal>
+  return <Modal open title={<span className="branch-modal-title"><Building2 size={18} /> {branch.name}<span className={`status-badge ${branch.isActive ? 'tone-success' : 'tone-danger'}`}>{branch.isActive ? 'Active' : 'Inactive'}</span></span>} description="Campus site details" size="large" onClose={() => { if (!busy) onClose() }} footer={<><button className="button-secondary" type="button" onClick={onClose}>Close</button><button className="button-primary" type="button" onClick={onEdit}><Edit2 size={15} /> Edit site</button></>}><BranchDetail branch={branch} onDeactivate={onDeactivate} /></Modal>
 }
 
 function BranchKpi({ label, value, hint, tone, icon }: { label: string; value: string | number; hint: string; tone: string; icon: ReactNode }) {
@@ -473,43 +457,16 @@ function BranchReferenceCard({ branch, color, onView, onEdit }: { branch: Branch
   const location = [branch.city, branch.state].filter(Boolean).join(', ')
   return <article className="branch-reference-card" style={{ '--branch-color': color } as CSSProperties}>
     <header><div className="branch-card-name"><b>{abbreviation}</b><div><strong>{branch.name}</strong><small>{location || 'Location not set'}</small></div></div><em>{branch.isHeadOffice ? 'Head office' : 'Branch'}</em></header>
-    <div className="branch-card-body"><div className="branch-counts"><div><strong>{branch.studentCount}</strong><span>Students</span></div><div><strong>{branch.staffCount}</strong><span>Staff</span></div></div><dl><div><dt>Branch Head</dt><dd>{branch.branch_admin_name || 'Unassigned'}</dd></div><div><dt>Status</dt><dd><mark>{branch.isActive ? 'Active' : 'Inactive'}</mark></dd></div></dl><footer><button className="button-secondary btn-sm" type="button" onClick={onView}><Eye size={15} /> Details</button><button className="button-secondary btn-sm" type="button" onClick={onEdit}><Edit2 size={15} /> Edit</button><button className="button-primary btn-sm" type="button" onClick={onView}><Network size={15} /> Switch</button></footer></div>
+    <div className="branch-card-body"><div className="branch-counts"><div><strong>{branch.studentCount}</strong><span>Students</span></div><div><strong>{branch.staffCount}</strong><span>Staff</span></div></div><dl><div><dt>Branch Head</dt><dd>{branch.branch_admin_name || 'Unassigned'}</dd></div><div><dt>Status</dt><dd><mark>{branch.isActive ? 'Active' : 'Inactive'}</mark></dd></div></dl><footer><button className="button-secondary btn-sm" type="button" onClick={onView}><Eye size={15} /> Details</button><button className="button-secondary btn-sm" type="button" onClick={onEdit}><Edit2 size={15} /> Edit</button></footer></div>
   </article>
 }
 
 /* =========================================================
-   BRANCH DETAIL (5 TABS: Overview, Staff, Students, Class Sections, Overrides)
+   BRANCH DETAIL
 ========================================================= */
-function BranchDetail({
-  branch,
-  onEdit,
-  onDeactivate,
-}: {
-  branch: Branch
-  onEdit: () => void
-  onDeactivate: () => void
-}) {
+function BranchDetail({ branch, onDeactivate }: { branch: Branch; onDeactivate: () => void }) {
   const [activeId, setActiveId] = useState('overview')
-  const [addSectionModalOpen, setAddSectionModalOpen] = useState(false)
-
-  // Demo sample rows for sub-tabs
-  const sampleStaff: StaffRow[] = [
-    { id: '1', name: 'Meera Nair', code: 'EMP000101', roles: ['Branch Admin'], phone: '98290 11223' },
-    { id: '2', name: 'Kavita Rao', code: 'EMP000102', roles: ['Teacher'], phone: '98290 44556' },
-    { id: '3', name: 'Arjun Malhotra', code: 'EMP000103', roles: ['Teacher', 'Sports Coordinator'], phone: '98290 77889' },
-  ]
-
-  const sampleStudents: StudentRow[] = [
-    { id: '1', name: 'Rohan Verma', adm: 'ADM00012345', cls: 'Grade 8 - A', status: 'Active' },
-    { id: '2', name: 'Aditi Sharma', adm: 'ADM00012346', cls: 'Grade 8 - A', status: 'Active' },
-    { id: '3', name: 'Karan Mehta', adm: 'ADM00012347', cls: 'Grade 6 - B', status: 'Active' },
-  ]
-
-  const sampleSections: ClassSectionRow[] = [
-    { id: '1', className: 'Grade 8', sectionName: 'A', academicYear: '2026-27', teacherName: 'Kavita Rao', studentCount: 32 },
-    { id: '2', className: 'Grade 8', sectionName: 'B', academicYear: '2026-27', teacherName: 'Arjun Malhotra', studentCount: 30 },
-    { id: '3', className: 'Grade 6', sectionName: 'A', academicYear: '2026-27', teacherName: 'Priya Chatterjee', studentCount: 28 },
-  ]
+  const branchParam = `branch=${encodeURIComponent(branch.id)}`
 
   const tabs = [
     {
@@ -519,10 +476,6 @@ function BranchDetail({
         <div className="branch-overview-grid">
           <Card className="branch-overview-card">
             <SectionHeader title="Location & Address" />
-            <div className="map-preview-thumb">
-              <MapPin size={24} color="var(--color-primary)" />
-              <span>🗺️ {branch.city || 'Location Map Preview'}</span>
-            </div>
             <div className="detail-list">
               <div>
                 <span>Address</span>
@@ -534,7 +487,7 @@ function BranchDetail({
               </div>
               <div>
                 <span>Timezone</span>
-                <strong>{branch.timezone}</strong>
+                <strong>{branch.timezone || 'Not provided'}</strong>
               </div>
             </div>
           </Card>
@@ -549,11 +502,11 @@ function BranchDetail({
                 </div>
                 <div>
                   <span>Phone</span>
-                  <strong>{branch.phone || '0141-234 5678'}</strong>
+                  <strong>{branch.phone || 'Not provided'}</strong>
                 </div>
                 <div>
                   <span>Email</span>
-                  <strong>{branch.email || `${branch.name.split(' ')[0].toLowerCase()}@greenfield.edu.in`}</strong>
+                  <strong>{branch.email || 'Not provided'}</strong>
                 </div>
               </div>
             </Card>
@@ -611,36 +564,9 @@ function BranchDetail({
       label: 'Staff',
       panel: (
         <Card className="entity-table-card">
-          <div className="panel-inner-heading">
-            <h3>Staff Assigned to {branch.name}</h3>
-            <span className="badge badge-blue">{branch.staffCount} Members</span>
-          </div>
-          <table className="mini-table">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Code</th>
-                <th>Roles</th>
-                <th>Phone</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sampleStaff.map((s) => (
-                <tr key={s.id}>
-                  <td><strong>{s.name}</strong></td>
-                  <td><span className="code-font">{s.code}</span></td>
-                  <td>
-                    {s.roles.map((r) => (
-                      <span key={r} className="badge badge-blue" style={{ marginRight: '4px' }}>
-                        {r}
-                      </span>
-                    ))}
-                  </td>
-                  <td>{s.phone}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="panel-inner-heading"><h3>Staff at {branch.name}</h3><span className="badge badge-blue">{branch.staffCount} listed</span></div>
+          <p>Open the staff directory to view the current records for this campus.</p>
+          <a className="button-secondary" href={`/staff?${branchParam}`}>Open staff directory</a>
         </Card>
       ),
     },
@@ -649,30 +575,9 @@ function BranchDetail({
       label: 'Students',
       panel: (
         <Card className="entity-table-card">
-          <div className="panel-inner-heading">
-            <h3>Enrolled Students</h3>
-            <span className="badge badge-green">{branch.studentCount} Active</span>
-          </div>
-          <table className="mini-table">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Admission #</th>
-                <th>Class</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sampleStudents.map((s) => (
-                <tr key={s.id}>
-                  <td><strong>{s.name}</strong></td>
-                  <td><span className="code-font">{s.adm}</span></td>
-                  <td>{s.cls}</td>
-                  <td><span className="status-badge tone-success">{s.status}</span></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="panel-inner-heading"><h3>Students at {branch.name}</h3><span className="badge badge-green">{branch.studentCount} listed</span></div>
+          <p>Open the student directory to search and review the current campus records.</p>
+          <a className="button-secondary" href={`/students?${branchParam}`}>Open student directory</a>
         </Card>
       ),
     },
@@ -681,152 +586,13 @@ function BranchDetail({
       label: 'Class Sections',
       panel: (
         <Card className="entity-table-card">
-          <div className="panel-inner-heading">
-            <h3>Configured Sections</h3>
-            <button
-              className="button-primary btn-sm"
-              type="button"
-              onClick={() => setAddSectionModalOpen(true)}
-            >
-              + Add Section
-            </button>
-          </div>
-          <table className="mini-table">
-            <thead>
-              <tr>
-                <th>Class</th>
-                <th>Section</th>
-                <th>Academic Year</th>
-                <th>Class Teacher</th>
-                <th>Students</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sampleSections.map((sec) => (
-                <tr key={sec.id}>
-                  <td><strong>{sec.className}</strong></td>
-                  <td><span className="badge badge-gray">{sec.sectionName}</span></td>
-                  <td>{sec.academicYear}</td>
-                  <td>{sec.teacherName}</td>
-                  <td>{sec.studentCount}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="panel-inner-heading"><h3>Class sections at {branch.name}</h3><span className="badge badge-blue">{branch.sectionCount} listed</span></div>
+          <p>Manage the live classes, sections, and subjects in Academic Structure.</p>
+          <a className="button-secondary" href={`/academics/structure?${branchParam}`}>Open Academic Structure</a>
         </Card>
-      ),
-    },
-    {
-      id: 'overrides',
-      label: 'Overrides',
-      panel: (
-        <div className="overrides-two-col">
-          <Card className="overrides-card locked-bg">
-            <div className="override-header">
-              <Lock size={18} className="lock-icon" />
-              <h3>Locked Institute-Wide</h3>
-            </div>
-            <p className="override-sub text-muted">
-              These configurations are inherited from Institute Setup and apply identically across all branches.
-            </p>
-
-            <div className="override-list">
-              <div className="override-item">
-                <strong>🔒 Point Category Catalog</strong>
-                <p>Set centrally — branches cannot add or rename point categories.</p>
-              </div>
-              <div className="override-item">
-                <strong>🔒 Batch Definitions</strong>
-                <p>Standardized award batches apply across all branches.</p>
-              </div>
-              <div className="override-item">
-                <strong>🔒 Core Grading Scale</strong>
-                <p>Institute-wide percentage to grade mapping.</p>
-              </div>
-              <div className="override-item">
-                <strong>🔒 Class & Subject Naming</strong>
-                <p>Ensures common test results remain directly comparable across branches.</p>
-              </div>
-            </div>
-          </Card>
-
-          <Card className="overrides-card">
-            <div className="override-header">
-              <Sparkles size={18} className="sparkle-icon" />
-              <h3>This Branch Can Override</h3>
-            </div>
-            <p className="override-sub text-muted">
-              Branch-specific customizations permitted by institute governance policy.
-            </p>
-
-            <div className="override-list">
-              <div className="override-item editable-row">
-                <div>
-                  <strong>Local Grading Remarks</strong>
-                  <p>Custom report card remarks allowed for local context.</p>
-                </div>
-                <button type="button" className="btn-link-sm">Edit</button>
-              </div>
-              <div className="override-item editable-row">
-                <div>
-                  <strong>Local Holiday Calendar</strong>
-                  <p>Regional state/city holidays specific to this branch location.</p>
-                </div>
-                <button type="button" className="btn-link-sm">Edit</button>
-              </div>
-            </div>
-          </Card>
-        </div>
       ),
     },
   ]
 
-  return (
-    <>
-      <Tabs tabs={tabs} activeId={activeId} onChange={setActiveId} label="Branch detail" />
-
-      {/* Add Section Modal */}
-      <Modal
-        open={addSectionModalOpen}
-        title="Add Class Section"
-        description={`Create a new section for ${branch.name}.`}
-        onClose={() => setAddSectionModalOpen(false)}
-        footer={
-          <>
-            <button className="button-secondary" onClick={() => setAddSectionModalOpen(false)} type="button">
-              Cancel
-            </button>
-            <button className="button-primary" onClick={() => setAddSectionModalOpen(false)} type="button">
-              Create Section
-            </button>
-          </>
-        }
-      >
-        <div className="admin-form-grid" style={{ gap: '1rem' }}>
-          <label className="field-label">
-            Class
-            <select defaultValue="Grade 8">
-              <option value="UKG">UKG</option>
-              <option value="Grade 1">Grade 1</option>
-              <option value="Grade 6">Grade 6</option>
-              <option value="Grade 8">Grade 8</option>
-              <option value="Grade 10">Grade 10</option>
-            </select>
-          </label>
-          <label className="field-label">
-            Section Name
-            <input placeholder="e.g. C" defaultValue="C" />
-          </label>
-          <label className="field-label">
-            Class Teacher
-            <select defaultValue="Kavita Rao">
-              <option value="Kavita Rao">Kavita Rao</option>
-              <option value="Arjun Malhotra">Arjun Malhotra</option>
-              <option value="Suresh Iyer">Suresh Iyer</option>
-            </select>
-          </label>
-        </div>
-      </Modal>
-    </>
-  )
+  return <Tabs tabs={tabs} activeId={activeId} onChange={setActiveId} label="Branch detail" />
 }

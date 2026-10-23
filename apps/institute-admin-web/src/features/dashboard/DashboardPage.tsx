@@ -131,17 +131,17 @@ export function DashboardPage({
       <section className="overview-split overview-charts">
         <article className="overview-card">
           <SectionTitle icon={Users} title="Enrollment by Branch" />
-          {enrollment.length ? <div className="overview-bar-chart" aria-label="Enrollment by branch chart">
-            {enrollment.map((item) => <button type="button" key={item.branchId} onClick={() => onBranchChange(item.branchId)} title={`${item.name}: ${item.students} students`}>
-              <span className="overview-bar-value">{item.students}</span><i style={{ height: `${Math.max(8, item.students * 100 / maxEnrollment)}%` }} /><small>{item.code}</small>
+          {enrollment.length ? <div className="overview-bar-chart" role="group" aria-label="Enrollment by branch chart">
+            {enrollment.map((item) => <button type="button" key={item.branchId} onClick={() => onBranchChange(item.branchId)} title={`${item.name}: ${item.students} students`} aria-label={`${item.name}: ${item.students} students`}>
+              <span className="overview-bar-value">{item.students}</span><i style={{ height: `${item.students > 0 ? Math.max(8, item.students * 100 / maxEnrollment) : 0}%`, minHeight: 0 }} /><small>{item.code}</small>
             </button>)}
           </div> : <Empty>No active branch enrollment data.</Empty>}
         </article>
         <article className="overview-card">
           <SectionTitle icon={IndianRupee} title="Fee Collection (Last 7 Days)" />
-          {collections.length ? <div className="overview-bar-chart is-green" aria-label="Fee collection for the last seven days">
-            {collections.map((item) => <div key={item.date} title={`${formatDate(item.date)}: ${formatCurrency(item.amount)}`}>
-              <span className="overview-bar-value">{Number(item.amount) ? formatCurrency(item.amount) : '—'}</span><i style={{ height: `${Math.max(4, Number(item.amount) * 100 / maxCollection)}%` }} /><small>{new Date(`${item.date}T00:00:00`).toLocaleDateString('en-IN', { weekday: 'short' })}</small>
+          {collections.length ? <div className="overview-bar-chart is-green" role="group" aria-label="Fee collection for the last seven days">
+            {collections.map((item) => <div key={item.date} title={`${formatDate(item.date)}: ${formatCurrency(item.amount)}`} aria-label={`${formatDate(item.date)}: ${formatCurrency(item.amount)}`}>
+              <span className="overview-bar-value">{Number(item.amount) ? formatCurrency(item.amount) : '—'}</span><i style={{ height: `${Number(item.amount) > 0 ? Math.max(4, Number(item.amount) * 100 / maxCollection) : 0}%`, minHeight: 0 }} /><small>{new Date(`${item.date}T00:00:00`).toLocaleDateString('en-IN', { weekday: 'short' })}</small>
             </div>)}
           </div> : <Empty>No collections recorded in the last seven days.</Empty>}
         </article>

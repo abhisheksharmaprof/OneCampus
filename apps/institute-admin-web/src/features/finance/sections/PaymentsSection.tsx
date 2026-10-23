@@ -72,6 +72,7 @@ export default function PaymentsSection({ accessToken, branchId }: FinanceSectio
       <StatePanel loading={payments.loading} error={payments.error} onRetry={payments.reload}
         empty={!items.length} emptyMessage="No payments recorded yet.">
         <div className="fin-card">
+          <div className="fin-table-wrap" role="region" aria-label="Scrollable payment receipts table" tabIndex={0}>
           <table className="fin-table">
             <thead><tr><th>Receipt</th><th>Student</th><th>Invoice</th><th className="is-right">Amount</th><th>Method</th><th>Date</th><th></th></tr></thead>
             <tbody>
@@ -83,7 +84,7 @@ export default function PaymentsSection({ accessToken, branchId }: FinanceSectio
                   <td className="is-right">{money(payment.amount)}</td>
                   <td>{payment.method}{payment.reference ? ` · ${payment.reference}` : ''}</td>
                   <td>{payment.paidAt.slice(0, 10)}</td>
-                  <td>
+                  <td className="fin-table__actions">
                     <button type="button" className="fin-btn" disabled={printingIds.has(payment.id)} onClick={() => void printReceipt(payment)}>
                       {printingIds.has(payment.id) ? 'Preparing…' : 'Preview receipt'}
                     </button>
@@ -92,6 +93,7 @@ export default function PaymentsSection({ accessToken, branchId }: FinanceSectio
               ))}
             </tbody>
           </table>
+          </div>
         </div>
         <Pagination page={payments.data?.page ?? 1} totalPages={payments.data?.totalPages ?? 1} onPage={setPage} />
       </StatePanel>

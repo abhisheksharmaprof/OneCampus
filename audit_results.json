@@ -1,0 +1,513 @@
+{
+  "results": [
+    {
+      "path": "/dashboard",
+      "title": "CampusOne · Institute Admin",
+      "status": "OK",
+      "isErrorBoundary": false,
+      "isUnavailable": false,
+      "textLength": 1801,
+      "buttonsWithoutLabel": 0,
+      "imagesWithoutAlt": 0,
+      "firstHeading": [
+        "Dashboard Overview",
+        "Enrollment by Branch",
+        "Fee Collection (Last 7 Days)"
+      ]
+    },
+    {
+      "path": "/branches",
+      "title": "CampusOne · Institute Admin",
+      "status": "OK",
+      "isErrorBoundary": false,
+      "isUnavailable": false,
+      "textLength": 910,
+      "buttonsWithoutLabel": 0,
+      "imagesWithoutAlt": 0,
+      "firstHeading": [
+        "Branches & Campuses"
+      ]
+    },
+    {
+      "path": "/academics/structure",
+      "title": "CampusOne · Institute Admin",
+      "status": "OK",
+      "isErrorBoundary": false,
+      "isUnavailable": false,
+      "textLength": 1311,
+      "buttonsWithoutLabel": 0,
+      "imagesWithoutAlt": 0,
+      "firstHeading": [
+        "Academic Structure"
+      ]
+    },
+    {
+      "path": "/setup/rooms-facilities",
+      "title": "CampusOne · Institute Admin",
+      "status": "OK",
+      "isErrorBoundary": false,
+      "isUnavailable": false,
+      "textLength": 730,
+      "buttonsWithoutLabel": 0,
+      "imagesWithoutAlt": 0,
+      "firstHeading": [
+        "Rooms & Facilities"
+      ]
+    },
+    {
+      "path": "/setup/holidays-calendar",
+      "title": "CampusOne · Institute Admin",
+      "status": "OK",
+      "isErrorBoundary": false,
+      "isUnavailable": false,
+      "textLength": 796,
+      "buttonsWithoutLabel": 0,
+      "imagesWithoutAlt": 0,
+      "firstHeading": [
+        "Holidays & Calendar",
+        "Scheduled events (0)",
+        "No calendar events found"
+      ]
+    },
+    {
+      "path": "/settings/institute-details",
+      "title": "CampusOne · Institute Admin",
+      "status": "OK",
+      "isErrorBoundary": false,
+      "isUnavailable": false,
+      "textLength": 2225,
+      "buttonsWithoutLabel": 0,
+      "imagesWithoutAlt": 0,
+      "firstHeading": [
+        "Institute Details",
+        "1. Identity",
+        "2. Legal & Compliance"
+      ]
+    },
+    {
+      "path": "/settings/profile",
+      "title": "CampusOne · Institute Admin",
+      "status": "OK",
+      "isErrorBoundary": false,
+      "isUnavailable": false,
+      "textLength": 1093,
+      "buttonsWithoutLabel": 0,
+      "imagesWithoutAlt": 0,
+      "firstHeading": [
+        "Branding",
+        "Logo & Identity",
+        "Document Header Preview"
+      ]
+    },
+    {
+      "path": "/roles",
+      "title": "CampusOne · Institute Admin",
+      "status": "OK",
+      "isErrorBoundary": false,
+      "isUnavailable": false,
+      "textLength": 1062,
+      "buttonsWithoutLabel": 0,
+      "imagesWithoutAlt": 0,
+      "firstHeading": [
+        "All Roles"
+      ]
+    },
+    {
+      "path": "/roles/assignments",
+      "title": "CampusOne · Institute Admin",
+      "status": "OK",
+      "isErrorBoundary": false,
+      "isUnavailable": false,
+      "textLength": 937,
+      "buttonsWithoutLabel": 0,
+      "imagesWithoutAlt": 0,
+      "firstHeading": [
+        "Role Assignments",
+        "No matching assignments"
+      ]
+    },
+    {
+      "path": "/settings/governance",
+      "title": "CampusOne · Institute Admin",
+      "status": "OK",
+      "isErrorBoundary": false,
+      "isUnavailable": false,
+      "textLength": 863,
+      "buttonsWithoutLabel": 0,
+      "imagesWithoutAlt": 0,
+      "firstHeading": [
+        "Governance Settings",
+        "Require two-person approval for large point awards",
+        "Notify me before a temporary role expires"
+      ]
+    },
+    {
+      "path": "/staff",
+      "title": "CampusOne · Institute Admin",
+      "status": "OK",
+      "isErrorBoundary": false,
+      "isUnavailable": false,
+      "textLength": 5002,
+      "buttonsWithoutLabel": 0,
+      "imagesWithoutAlt": 0,
+      "firstHeading": [
+        "Staff",
+        "Staff members (30)"
+      ]
+    },
+    {
+      "path": "/students",
+      "title": "CampusOne · Institute Admin",
+      "status": "OK",
+      "isErrorBoundary": false,
+      "isUnavailable": false,
+      "textLength": 3909,
+      "buttonsWithoutLabel": 0,
+      "imagesWithoutAlt": 0,
+      "firstHeading": [
+        "Students",
+        "Students (150)"
+      ]
+    },
+    {
+      "path": "/parents",
+      "title": "CampusOne · Institute Admin",
+      "status": "OK",
+      "isErrorBoundary": false,
+      "isUnavailable": false,
+      "textLength": 787,
+      "buttonsWithoutLabel": 0,
+      "imagesWithoutAlt": 0,
+      "firstHeading": [
+        "Parents",
+        "Parent directory (0)"
+      ]
+    },
+    {
+      "path": "/admissions/enquiries",
+      "title": "CampusOne · Institute Admin",
+      "status": "OK",
+      "isErrorBoundary": false,
+      "isUnavailable": false,
+      "textLength": 604,
+      "buttonsWithoutLabel": 0,
+      "imagesWithoutAlt": 0,
+      "firstHeading": [
+        "Enquiries",
+        "Enquiries (0)",
+        "No enquiries found"
+      ]
+    },
+    {
+      "path": "/admissions",
+      "title": "CampusOne · Institute Admin",
+      "status": "OK",
+      "isErrorBoundary": false,
+      "isUnavailable": false,
+      "textLength": 576,
+      "buttonsWithoutLabel": 0,
+      "imagesWithoutAlt": 0,
+      "firstHeading": [
+        "Funnel Report",
+        "Admissions funnel — this month"
+      ]
+    },
+    {
+      "path": "/admissions/forms",
+      "title": "CampusOne · Institute Admin",
+      "status": "OK",
+      "isErrorBoundary": false,
+      "isUnavailable": false,
+      "textLength": 984,
+      "buttonsWithoutLabel": 0,
+      "imagesWithoutAlt": 0,
+      "firstHeading": [
+        "Form Builder",
+        "Form settings",
+        "Applicant experience"
+      ]
+    },
+    {
+      "path": "/attendance",
+      "title": "CampusOne · Institute Admin",
+      "status": "OK",
+      "isErrorBoundary": false,
+      "isUnavailable": false,
+      "textLength": 2603,
+      "buttonsWithoutLabel": 0,
+      "imagesWithoutAlt": 0,
+      "firstHeading": [
+        "Attendance command centre",
+        "Attendance Overview",
+        "Monthly attendance health"
+      ]
+    },
+    {
+      "path": "/attendance/mark",
+      "title": "CampusOne · Institute Admin",
+      "status": "OK",
+      "isErrorBoundary": false,
+      "isUnavailable": false,
+      "textLength": 16930,
+      "buttonsWithoutLabel": 0,
+      "imagesWithoutAlt": 0,
+      "firstHeading": [
+        "Attendance command centre",
+        "Mark Attendance",
+        "Mark daily attendance"
+      ]
+    },
+    {
+      "path": "/attendance/student-leave",
+      "title": "CampusOne · Institute Admin",
+      "status": "OK",
+      "isErrorBoundary": false,
+      "isUnavailable": false,
+      "textLength": 1369,
+      "buttonsWithoutLabel": 0,
+      "imagesWithoutAlt": 0,
+      "firstHeading": [
+        "Attendance command centre",
+        "Student Leave",
+        "Student leave decisions"
+      ]
+    },
+    {
+      "path": "/attendance/staff-leave",
+      "title": "CampusOne · Institute Admin",
+      "status": "OK",
+      "isErrorBoundary": false,
+      "isUnavailable": false,
+      "textLength": 1298,
+      "buttonsWithoutLabel": 0,
+      "imagesWithoutAlt": 0,
+      "firstHeading": [
+        "Attendance command centre",
+        "Staff Leave",
+        "Staff leave decisions"
+      ]
+    },
+    {
+      "path": "/attendance/reports",
+      "status": "FAILED",
+      "error": "page.goto: Timeout 8000ms exceeded.\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:5173/attendance/reports\", waiting until \"networkidle\"\u001b[22m\n"
+    },
+    {
+      "path": "/attendance/settings",
+      "title": "CampusOne · Institute Admin",
+      "status": "OK",
+      "isErrorBoundary": false,
+      "isUnavailable": false,
+      "textLength": 1869,
+      "buttonsWithoutLabel": 0,
+      "imagesWithoutAlt": 0,
+      "firstHeading": [
+        "Attendance command centre",
+        "Attendance Settings",
+        "Attendance & Leave Configuration"
+      ]
+    },
+    {
+      "path": "/academics",
+      "title": "CampusOne · Institute Admin",
+      "status": "OK",
+      "isErrorBoundary": false,
+      "isUnavailable": false,
+      "textLength": 1012,
+      "buttonsWithoutLabel": 0,
+      "imagesWithoutAlt": 0,
+      "firstHeading": [
+        "Keep learning operations moving.",
+        "Set up the academic engine",
+        "Recently updated"
+      ]
+    },
+    {
+      "path": "/academics/teaching-learning",
+      "title": "CampusOne · Institute Admin",
+      "status": "OK",
+      "isErrorBoundary": false,
+      "isUnavailable": false,
+      "textLength": 943,
+      "buttonsWithoutLabel": 0,
+      "imagesWithoutAlt": 0,
+      "firstHeading": [
+        "Teaching & Learning",
+        "Lesson Plans",
+        "No lesson plans yet"
+      ]
+    },
+    {
+      "path": "/academics/assessment-results",
+      "title": "CampusOne · Institute Admin",
+      "status": "OK",
+      "isErrorBoundary": false,
+      "isUnavailable": false,
+      "textLength": 955,
+      "buttonsWithoutLabel": 0,
+      "imagesWithoutAlt": 0,
+      "firstHeading": [
+        "Assessment & Results",
+        "Exams",
+        "No exams yet"
+      ]
+    },
+    {
+      "path": "/communication/circulars",
+      "title": "CampusOne · Institute Admin",
+      "status": "OK",
+      "isErrorBoundary": false,
+      "isUnavailable": false,
+      "textLength": 694,
+      "buttonsWithoutLabel": 0,
+      "imagesWithoutAlt": 0,
+      "firstHeading": [
+        "Circulars"
+      ]
+    },
+    {
+      "path": "/communication/templates",
+      "title": "CampusOne · Institute Admin",
+      "status": "OK",
+      "isErrorBoundary": false,
+      "isUnavailable": false,
+      "textLength": 595,
+      "buttonsWithoutLabel": 0,
+      "imagesWithoutAlt": 0,
+      "firstHeading": [
+        "Templates"
+      ]
+    },
+    {
+      "path": "/finance",
+      "title": "CampusOne · Institute Admin",
+      "status": "OK",
+      "isErrorBoundary": false,
+      "isUnavailable": false,
+      "textLength": 987,
+      "buttonsWithoutLabel": 0,
+      "imagesWithoutAlt": 0,
+      "firstHeading": [
+        "Overview",
+        "Monthly collections"
+      ]
+    },
+    {
+      "path": "/template-studio",
+      "title": "CampusOne · Institute Admin",
+      "status": "OK",
+      "isErrorBoundary": false,
+      "isUnavailable": false,
+      "textLength": 752,
+      "buttonsWithoutLabel": 0,
+      "imagesWithoutAlt": 0,
+      "firstHeading": [
+        "Template Studio",
+        "Fee Invoice",
+        "Fee Receipt"
+      ]
+    },
+    {
+      "path": "/timetable",
+      "title": "CampusOne · Institute Admin",
+      "status": "OK",
+      "isErrorBoundary": false,
+      "isUnavailable": false,
+      "textLength": 596,
+      "buttonsWithoutLabel": 0,
+      "imagesWithoutAlt": 0,
+      "firstHeading": [
+        "View Timetable",
+        "No saved timetables"
+      ]
+    },
+    {
+      "path": "/timetable/generate",
+      "status": "FAILED",
+      "error": "page.goto: Target page, context or browser has been closed\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:5173/timetable/generate\", waiting until \"networkidle\"\u001b[22m\n"
+    },
+    {
+      "path": "/recognition/points",
+      "status": "FAILED",
+      "error": "page.goto: Target page, context or browser has been closed"
+    },
+    {
+      "path": "/recognition/badges",
+      "status": "FAILED",
+      "error": "page.goto: Target page, context or browser has been closed"
+    },
+    {
+      "path": "/recognition/leaderboard",
+      "status": "FAILED",
+      "error": "page.goto: Target page, context or browser has been closed"
+    },
+    {
+      "path": "/recognition/award-approvals",
+      "status": "FAILED",
+      "error": "page.goto: Target page, context or browser has been closed"
+    },
+    {
+      "path": "/recognition/partnerships",
+      "status": "FAILED",
+      "error": "page.goto: Target page, context or browser has been closed"
+    },
+    {
+      "path": "/audit-log",
+      "status": "FAILED",
+      "error": "page.goto: Target page, context or browser has been closed"
+    },
+    {
+      "path": "/settings/privacy",
+      "status": "FAILED",
+      "error": "page.goto: Target page, context or browser has been closed"
+    },
+    {
+      "path": "/settings/billing",
+      "status": "FAILED",
+      "error": "page.goto: Target page, context or browser has been closed"
+    },
+    {
+      "path": "/addons/transport",
+      "status": "FAILED",
+      "error": "page.goto: Target page, context or browser has been closed"
+    },
+    {
+      "path": "/addons/library",
+      "status": "FAILED",
+      "error": "page.goto: Target page, context or browser has been closed"
+    },
+    {
+      "path": "/addons/hostel",
+      "status": "FAILED",
+      "error": "page.goto: Target page, context or browser has been closed"
+    },
+    {
+      "path": "/notifications",
+      "status": "FAILED",
+      "error": "page.goto: Target page, context or browser has been closed"
+    },
+    {
+      "path": "/account",
+      "status": "FAILED",
+      "error": "page.goto: Target page, context or browser has been closed"
+    },
+    {
+      "path": "/help",
+      "status": "FAILED",
+      "error": "page.goto: Target page, context or browser has been closed"
+    }
+  ],
+  "consoleLogs": [
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "url": "http://127.0.0.1:5173/login"
+    },
+    {
+      "type": "error",
+      "text": "`value` prop on `%s` should not be null. Consider using an empty string to clear the component or `undefined` for uncontrolled components. input",
+      "url": "http://127.0.0.1:5173/settings/institute-details"
+    }
+  ],
+  "networkErrors": []
+}

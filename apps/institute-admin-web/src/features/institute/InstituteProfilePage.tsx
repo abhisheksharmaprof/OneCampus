@@ -1,4 +1,5 @@
-import { FormEvent, useEffect, useState } from 'react'
+import { FormEvent, useEffect, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { CheckCircle2, FileText, Image as ImageIcon, Save, Eye } from 'lucide-react'
 import { FileUploadField, Modal, PageSkeleton } from '../../components/admin-ui'
 import { Card, SectionHeader } from '../../components/ui/primitives'
@@ -21,9 +22,7 @@ interface InstituteProfile {
   registrationNo?: string
   panNo?: string
   gstNo?: string
-  primaryColor?: string
-  gradingScale?: string
-  startMonth?: string
+  brandColor?: string
   displayName?: string
   postalCode?: string
   country?: string
@@ -64,10 +63,11 @@ interface LogoAsset {
 export function InstituteProfilePage({ accessToken }: { accessToken: string }) {
   const [profile, setProfile] = useState<InstituteProfile | null>(null)
   const [headOffice, setHeadOffice] = useState<Branch | null>(null)
-  const [activeSection, setActiveSection] = useState<'identity' | 'legal' | 'contact' | 'academic'>('identity')
+  const [activeSection, setActiveSection] = useState<'identity' | 'legal' | 'contact' | 'academic' | 'branding'>('identity')
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [pendingHeadOfficeSave, setPendingHeadOfficeSave] = useState<string | null>(null)
   const [uploadModalOpen, setUploadModalOpen] = useState(false)
   const [documentFile, setDocumentFile] = useState<File | null>(null)
   const [documentType, setDocumentType] = useState('affiliation_certificate')
@@ -195,17 +195,17 @@ export function InstituteProfilePage({ accessToken }: { accessToken: string }) {
   }
 
   // Live preview branding state
-  const [displayName, setDisplayName] = useState('Greenfield High Group')
+  const [displayName, setDisplayName] = useState('')
   const [primaryColor, setPrimaryColor] = useState('#2E5AAC')
-  const [gradingScale, setGradingScale] = useState('percentage')
   const [isDirty, setIsDirty] = useState(false)
+  const editRevision = useRef(0)
 
   useEffect(() => {
     void adminRequest<InstituteProfile>(accessToken, 'institute')
       .then((data) => {
         setProfile(data)
-        if (data.name) setDisplayName(data.name)
-        if (data.primaryColor) setPrimaryColor(data.primaryColor)
+        setDisplayName(data.displayName ?? data.name ?? '')
+        if (data.brandColor) setPrimaryColor(data.brandColor)
         void adminRequest<LogoAsset[]>(accessToken, `files?ownerType=INSTITUTE&ownerId=${encodeURIComponent(data.id)}&assetType=LOGO`)
           .then((assets) => {
             const logo = assets[0]
@@ -241,11 +241,57 @@ export function InstituteProfilePage({ accessToken }: { accessToken: string }) {
       .catch(() => {})
   }, [accessToken])
 
+  const headOfficePayloadFromForm = (form: FormData): Record<string, string> => {
+    const payload: Record<string, string> = {}
+    const branchName = String(form.get('branchName') ?? '')
+    const timezone = String(form.get('branchTimezone') ?? '')
+    if (branchName) payload.name = branchName
+    if (timezone) payload.timezone = timezone
+    for (const field of ['address_line_1', 'city', 'state', 'primaryEmail', 'primaryPhone']) {
+      const value = form.get(field)
+      if (typeof value === 'string') payload[field === 'primaryEmail' ? 'email' : field === 'primaryPhone' ? 'phone' : field] = value
+    }
+    return payload
+  }
+
+  const retryHeadOfficeSave = async () => {
+    if (!pendingHeadOfficeSave) return
+    const formElement = document.getElementById('institute-profile-form')
+    if (!(formElement instanceof HTMLFormElement)) return
+    const submittedRevision = editRevision.current
+    const branchId = pendingHeadOfficeSave
+    setSaving(true)
+    setSaved(false)
+    setError('')
+    try {
+      const updatedBranch = await adminRequest<Branch>(accessToken, `branches/${branchId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(headOfficePayloadFromForm(new FormData(formElement))),
+      })
+      setHeadOffice(updatedBranch)
+      setPendingHeadOfficeSave(null)
+      if (editRevision.current === submittedRevision) {
+        setIsDirty(false)
+        setSaved(true)
+        setTimeout(() => setSaved(false), 4000)
+      } else {
+        setIsDirty(true)
+        setError('Head office contact details were saved. Other changes made while saving are still unsaved.')
+      }
+    } catch (cause) {
+      setError(`Institute details are saved, but head office contact details are still not saved: ${cause instanceof Error ? cause.message : 'The update failed.'}`)
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const save = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     const form = new FormData(event.currentTarget)
+    const submittedRevision = editRevision.current
     setSaving(true)
     setSaved(false)
+    setPendingHeadOfficeSave(null)
 
     const rawEstYear = form.get('estYear')
     let parsedEstYear: number | null = null
@@ -300,35 +346,35 @@ export function InstituteProfilePage({ accessToken }: { accessToken: string }) {
       setProfile(data)
 
       if (headOffice) {
-        const branchPayload: Record<string, any> = {}
-        const branchName = form.get('branchName') as string
-        if (branchName) branchPayload.name = branchName
-        const timezone = form.get('branchTimezone') as string
-        if (timezone) branchPayload.timezone = timezone
-        const addr1 = form.get('address_line_1') as string
-        if (addr1 !== null && addr1 !== undefined) branchPayload.address_line_1 = addr1
-        const city = form.get('city') as string
-        if (city !== null && city !== undefined) branchPayload.city = city
-        const state = form.get('state') as string
-        if (state !== null && state !== undefined) branchPayload.state = state
-        const email = form.get('primaryEmail') as string
-        if (email !== null && email !== undefined) branchPayload.email = email
-        const phone = form.get('primaryPhone') as string
-        if (phone !== null && phone !== undefined) branchPayload.phone = phone
-
-        if (Object.keys(branchPayload).length > 0) {
+        try {
           const updatedBranch = await adminRequest<Branch>(accessToken, `branches/${headOffice.id}`, {
             method: 'PATCH',
-            body: JSON.stringify(branchPayload),
+            body: JSON.stringify(headOfficePayloadFromForm(form)),
           })
           setHeadOffice(updatedBranch)
+        } catch (cause) {
+          if (editRevision.current === submittedRevision) {
+            setPendingHeadOfficeSave(headOffice.id)
+            setIsDirty(false)
+            setError(`Institute details were saved, but head office contact details were not: ${cause instanceof Error ? cause.message : 'The update failed.'}`)
+          } else {
+            setIsDirty(true)
+            setError(`Institute details were saved, but head office contact details were not. Review the current values and save again. ${cause instanceof Error ? cause.message : ''}`)
+          }
+          return
         }
       }
 
       setError('')
-      setSaved(true)
-      setIsDirty(false)
-      setTimeout(() => setSaved(false), 4000)
+      if (editRevision.current === submittedRevision) {
+        setSaved(true)
+        setIsDirty(false)
+        setTimeout(() => setSaved(false), 4000)
+      } else {
+        setSaved(false)
+        setIsDirty(true)
+        setError('The submitted details were saved. Changes made while saving are still unsaved.')
+      }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Institute profile could not be saved.')
     } finally {
@@ -340,27 +386,31 @@ export function InstituteProfilePage({ accessToken }: { accessToken: string }) {
     { id: 'identity', label: 'Identity' },
     { id: 'legal', label: 'Legal & Compliance' },
     { id: 'contact', label: 'Head Office Contact' },
-    { id: 'academic', label: 'Academic Defaults' },
+    { id: 'branding', label: 'Branding Assets' },
+    { id: 'academic', label: 'Academic Setup' },
   ] as const
   const logoSource = logoPreview || profile?.logoUrl || ''
+  const contactFields = [profile?.contactName, profile?.contactDesignation, profile?.contactPhone, profile?.contactEmail]
+  const filledContactFields = contactFields.filter(Boolean).length
+  const contactStatus = filledContactFields === contactFields.length ? 'Complete' : filledContactFields ? 'Needs details' : 'Not provided'
 
   return (
-    <div className="entity-page profile-page-layout">
+    <div className="entity-page profile-page-layout institute-setup-page">
       <div className="page-heading institute-subpage-heading">
         <div>
           <p className="breadcrumb">Institute Setup / Institute Details</p>
           <h1>Institute Details</h1>
-          <p className="page-subtitle">Manage institute identity, legal records, contact details, and academic defaults.</p>
+          <p className="page-subtitle">Manage institute identity, legal records, head office contact, and brand assets.</p>
         </div>
       </div>
 
-      {error && <div className="inline-error" role="alert">{error}</div>}
-      {saved && <div className="prototype-success-banner" role="status"><CheckCircle2 size={18} /> Institute profile updated successfully.</div>}
+      {error && <div className="inline-error" role="alert">{error}{pendingHeadOfficeSave && <button className="button-secondary btn-sm" type="button" disabled={saving} onClick={() => void retryHeadOfficeSave()}>{saving ? 'Retrying…' : 'Retry head office update'}</button>}</div>}
+      {saved && <div className="prototype-success-banner" role="status"><CheckCircle2 size={18} /> Institute details saved.</div>}
 
       {!profile ? (
         error ? null : <PageSkeleton name="institute-profile" label="Loading institute profile" variant="form" />
       ) : (
-        <form className="profile-form-layout" onSubmit={save} onInput={() => setIsDirty(true)} onChange={() => setIsDirty(true)}>
+        <form id="institute-profile-form" className="profile-form-layout" onSubmit={save} onInput={() => { editRevision.current += 1; setIsDirty(true); if (pendingHeadOfficeSave) { setPendingHeadOfficeSave(null); setError('') } }} onChange={() => { editRevision.current += 1; setIsDirty(true); if (pendingHeadOfficeSave) { setPendingHeadOfficeSave(null); setError('') } }}>
           {/* Left Sticky Section Navigation */}
           <aside className="profile-section-nav-sticky">
             <nav className="section-nav-list" aria-label="Profile sections">
@@ -369,6 +419,7 @@ export function InstituteProfilePage({ accessToken }: { accessToken: string }) {
                   key={s.id}
                   type="button"
                   className={`section-nav-item ${activeSection === s.id ? 'active' : ''}`}
+                  aria-current={activeSection === s.id ? 'location' : undefined}
                   onClick={() => {
                     setActiveSection(s.id)
                     const elem = document.getElementById(`sec-${s.id}`)
@@ -390,13 +441,13 @@ export function InstituteProfilePage({ accessToken }: { accessToken: string }) {
                 <div className="admin-form-grid">
                   <label className="field-label">
                     Legal Name
-                    <input name="legalName" defaultValue={profile.legalName ?? 'Greenfield Educational Trust'} placeholder="Full registered legal entity name" />
+                    <input name="legalName" defaultValue={profile.legalName ?? ''} placeholder="Full registered legal entity name" />
                   </label>
                   <label className="field-label">
                     Display Name <span className="req">*</span>
                     <input
                       name="name"
-                      defaultValue={profile.name}
+                      defaultValue={profile.displayName ?? profile.name}
                       onChange={(e) => setDisplayName(e.target.value)}
                       minLength={2}
                       maxLength={200}
@@ -406,7 +457,8 @@ export function InstituteProfilePage({ accessToken }: { accessToken: string }) {
 
                   <label className="field-label">
                     Institute Type
-                    <select name="instituteType" defaultValue={profile.instituteType ?? 'School'}>
+                    <select name="instituteType" defaultValue={profile.instituteType ?? ''}>
+                      <option value="">Not set — choose if known</option>
                       <option value="School">School</option>
                       <option value="College">College</option>
                       <option value="Coaching Center">Coaching Center</option>
@@ -416,7 +468,8 @@ export function InstituteProfilePage({ accessToken }: { accessToken: string }) {
                   </label>
                   <label className="field-label">
                     Board Affiliation
-                    <select name="boardAffiliation" defaultValue={profile.boardAffiliation ?? 'CBSE'}>
+                    <select name="boardAffiliation" defaultValue={profile.boardAffiliation ?? ''}>
+                      <option value="">Not set — choose if known</option>
                       <option value="CBSE">CBSE (Central Board of Secondary Education)</option>
                       <option value="ICSE">ICSE / CISCE</option>
                       <option value="IB">IB (International Baccalaureate)</option>
@@ -427,20 +480,20 @@ export function InstituteProfilePage({ accessToken }: { accessToken: string }) {
 
                   <label className="field-label">
                     Board Affiliation Number
-                    <input name="boardAffiliationNo" defaultValue={profile.boardAffiliationNo ?? 'CBSE/AFF/1730489'} placeholder="e.g. CBSE/AFF/1730489" />
+                    <input name="boardAffiliationNo" defaultValue={profile.boardAffiliationNo ?? ''} placeholder="e.g. CBSE/AFF/1730489" />
                   </label>
                   <label className="field-label">
                     UDISE Code
-                    <input name="udiseCode" defaultValue={profile.udiseCode ?? '08120304501'} placeholder="11-digit UDISE code" />
+                    <input name="udiseCode" defaultValue={profile.udiseCode ?? ''} placeholder="11-digit UDISE code" />
                   </label>
 
                   <label className="field-label">
                     Establishment Year
-                    <input name="estYear" type="number" defaultValue={profile.estYear ?? '1998'} placeholder="1998" />
+                    <input name="estYear" type="number" defaultValue={profile.estYear ?? ''} placeholder="e.g. 1998" />
                   </label>
                   <label className="field-label">
                     Medium of Instruction
-                    <input name="medium" defaultValue={profile.medium ?? 'English'} placeholder="English" />
+                    <input name="medium" defaultValue={profile.medium ?? ''} placeholder="e.g. English" />
                   </label>
 
                   <div className="field-full-width">
@@ -466,7 +519,8 @@ export function InstituteProfilePage({ accessToken }: { accessToken: string }) {
                 <div className="admin-form-grid">
                   <label className="field-label">
                     Registered Entity Type
-                    <select name="entityType" defaultValue={profile.entityType ?? 'Trust'}>
+                    <select name="entityType" defaultValue={profile.entityType ?? ''}>
+                      <option value="">Not set — choose if known</option>
                       <option value="Trust">Trust</option>
                       <option value="Society">Society</option>
                       <option value="Section 8 Company">Section 8 Company</option>
@@ -476,16 +530,16 @@ export function InstituteProfilePage({ accessToken }: { accessToken: string }) {
                   </label>
                   <label className="field-label">
                     Registration Number
-                    <input name="registrationNo" defaultValue={profile.registrationNo ?? 'REG/JPR/1998/442'} placeholder="Registration number" />
+                    <input name="registrationNo" defaultValue={profile.registrationNo ?? ''} placeholder="Registration number" />
                   </label>
 
                   <label className="field-label">
                     PAN Number
-                    <input name="panNo" defaultValue={profile.panNo ?? 'AAATG1234F'} placeholder="10-digit PAN" />
+                    <input name="panNo" defaultValue={profile.panNo ?? ''} placeholder="10-digit PAN" />
                   </label>
                   <label className="field-label">
                     GST Number
-                    <input name="gstNo" defaultValue={profile.gstNo ?? '08AAATG1234F1Z5'} placeholder="15-digit GSTIN" />
+                    <input name="gstNo" defaultValue={profile.gstNo ?? ''} placeholder="15-digit GSTIN" />
                   </label>
                 </div>
 
@@ -500,7 +554,7 @@ export function InstituteProfilePage({ accessToken }: { accessToken: string }) {
                   <div className="field-full-width">
                     <label className="field-label">
                       Branch Name
-                      <input name="branchName" defaultValue={headOffice?.name ?? 'Jaipur Main Campus'} required />
+                      <input name="branchName" defaultValue={headOffice?.name ?? ''} placeholder="Head office campus name" required />
                     </label>
 
                     <label className="field-label">
@@ -521,38 +575,38 @@ export function InstituteProfilePage({ accessToken }: { accessToken: string }) {
                   <div className="field-full-width">
                     <label className="field-label">
                       Address Line 1
-                      <input name="address_line_1" defaultValue={headOffice?.address_line_1 ?? 'Plot 12, Greenfield Campus, Tonk Road'} />
+                      <input name="address_line_1" defaultValue={headOffice?.address_line_1 ?? ''} placeholder="Street address" />
                     </label>
                   </div>
 
                   <label className="field-label">
                     City
-                    <input name="city" defaultValue={headOffice?.city ?? 'Jaipur'} />
+                    <input name="city" defaultValue={headOffice?.city ?? ''} />
                   </label>
                   <label className="field-label">
                     State
-                    <input name="state" defaultValue={headOffice?.state ?? 'Rajasthan'} />
+                    <input name="state" defaultValue={headOffice?.state ?? ''} />
                   </label>
 
                   <label className="field-label">
                     Primary Email
-                    <input name="primaryEmail" type="email" defaultValue={profile.primaryEmail ?? headOffice?.email ?? 'info@greenfield.edu.in'} />
+                    <input name="primaryEmail" type="email" defaultValue={profile.primaryEmail ?? headOffice?.email ?? ''} />
                   </label>
                   <label className="field-label">
                     Primary Phone
-                    <input name="primaryPhone" defaultValue={profile.primaryPhone ?? headOffice?.phone ?? '0141-234 5678'} />
+                    <input name="primaryPhone" defaultValue={profile.primaryPhone ?? headOffice?.phone ?? ''} />
                   </label>
                   <label className="field-label">Postal Code<input name="postalCode" defaultValue={profile.postalCode ?? headOffice?.postal_code ?? ''} /></label>
-                  <label className="field-label">Country<input name="country" defaultValue={profile.country ?? 'India'} /></label>
+                  <label className="field-label">Country<input name="country" defaultValue={profile.country ?? ''} /></label>
                   <label className="field-label">Alternate Phone<input name="alternatePhone" defaultValue={profile.alternatePhone ?? ''} /></label>
                   <label className="field-label">Website URL<input name="websiteUrl" type="url" defaultValue={profile.websiteUrl ?? ''} placeholder="https://example.edu" /></label>
 
                   <label className="field-label">
                     Timezone
-                    <input name="branchTimezone" defaultValue={headOffice?.timezone ?? 'Asia/Kolkata'} required />
+                    <input name="branchTimezone" defaultValue={headOffice?.timezone ?? ''} placeholder="e.g. Asia/Kolkata" required />
                   </label>
                 </div>
-                <div className="primary-contact-panel"><div className="panel-inner-heading"><h3 className="h3">Primary point of contact</h3><span className="status-badge tone-warning">Missing</span></div><div className="admin-form-grid"><label className="field-label">Name<input name="contactName" defaultValue={profile.contactName ?? ''} /></label><label className="field-label">Designation<input name="contactDesignation" defaultValue={profile.contactDesignation ?? ''} /></label><label className="field-label">Phone<input name="contactPhone" defaultValue={profile.contactPhone ?? ''} /></label><label className="field-label">Email<input name="contactEmail" type="email" defaultValue={profile.contactEmail ?? ''} /></label></div></div>
+                <div className="primary-contact-panel"><div className="panel-inner-heading"><h3 className="h3">Primary point of contact</h3><span className={`status-badge ${contactStatus === 'Complete' ? 'tone-success' : 'tone-warning'}`}>{contactStatus}</span></div><div className="admin-form-grid"><label className="field-label">Name<input name="contactName" defaultValue={profile.contactName ?? ''} /></label><label className="field-label">Designation<input name="contactDesignation" defaultValue={profile.contactDesignation ?? ''} /></label><label className="field-label">Phone<input name="contactPhone" defaultValue={profile.contactPhone ?? ''} /></label><label className="field-label">Email<input name="contactEmail" type="email" defaultValue={profile.contactEmail ?? ''} /></label></div></div>
               </Card>
             </div>
 
@@ -560,6 +614,7 @@ export function InstituteProfilePage({ accessToken }: { accessToken: string }) {
             <div id="sec-branding">
               <Card className="profile-card">
                 <SectionHeader title="4. Branding Assets" />
+                <p className="section-caption">Logo and letterhead uploads or removals apply immediately. Save Changes applies institute and head office details.</p>
                 <div className="branding-two-col">
                   <div className="branding-controls">
                     <section className="branding-asset-panel">
@@ -608,69 +663,22 @@ export function InstituteProfilePage({ accessToken }: { accessToken: string }) {
               </Card>
             </div>
 
-            {/* 5. Academic Defaults Section */}
+            {/* 5. Academic Setup Section */}
             <div id="sec-academic">
               <Card className="profile-card">
-                <SectionHeader title="5. Academic Defaults" />
-                <div className="admin-form-grid">
-                  <div className="field-full-width">
-                    <label className="field-label">Default Grading Scale</label>
-                    <div className="radio-group-options">
-                      <label className="radio-opt">
-                        <input
-                          type="radio"
-                          name="gradingScaleRadio"
-                          checked={gradingScale === 'percentage'}
-                          onChange={() => { setGradingScale('percentage'); setIsDirty(true) }}
-                        />
-                        Percentage (0–100%)
-                      </label>
-                      <label className="radio-opt">
-                        <input
-                          type="radio"
-                          name="gradingScaleRadio"
-                          checked={gradingScale === 'gpa'}
-                          onChange={() => { setGradingScale('gpa'); setIsDirty(true) }}
-                        />
-                        GPA (4.0 or 10.0 Scale)
-                      </label>
-                      <label className="radio-opt">
-                        <input
-                          type="radio"
-                          name="gradingScaleRadio"
-                          checked={gradingScale === 'letter'}
-                          onChange={() => { setGradingScale('letter'); setIsDirty(true) }}
-                        />
-                        Letter Grade (A+, A, B, C, F)
-                      </label>
-                    </div>
-                  </div>
-
-                  <label className="field-label">
-                    Academic Year Start Month
-                    <select name="startMonth" defaultValue={profile.startMonth ?? 'April'}>
-                      <option value="January">January</option>
-                      <option value="April">April</option>
-                      <option value="June">June</option>
-                      <option value="September">September</option>
-                    </select>
-                  </label>
-                  <label className="field-label">Number of Terms<input name="numberOfTerms" type="number" min={1} max={4} defaultValue={2} /></label>
-                  <label className="field-label">Language<input name="language" defaultValue={profile.medium ?? 'English'} /></label>
-                  <label className="field-label">Currency<select name="currency" defaultValue="INR"><option value="INR">INR — Indian Rupee</option><option value="USD">USD — US Dollar</option><option value="EUR">EUR — Euro</option></select></label>
-                </div>
+                <SectionHeader title="5. Academic Setup" />
+                <p className="section-caption">Academic years, terms, classes, and grading records are managed in Academic Structure. The institute language is saved under Identity.</p>
+                <Link className="button-secondary profile-academic-link" to={`/academics/structure${window.location.search}`}>Open Academic Structure</Link>
               </Card>
             </div>
           </div>
 
-          {/* Sticky Bottom Action Bar — rendered only when data is dirty */}
-          {isDirty && (
-            <div className="profile-sticky-footer">
-              <button className="button-primary" type="submit" disabled={saving}>
-                <Save size={16} /> {saving ? 'Saving…' : 'Save Changes'}
-              </button>
-            </div>
-          )}
+          <div className="profile-sticky-footer">
+            <span role="status">{saving ? 'Saving institute details…' : isDirty ? 'Unsaved changes' : saved ? 'Changes saved' : 'No unsaved changes'}</span>
+            <button className="button-primary" type="submit" disabled={saving || !isDirty}>
+              <Save size={16} /> {saving ? 'Saving…' : 'Save Changes'}
+            </button>
+          </div>
         </form>
       )}
 

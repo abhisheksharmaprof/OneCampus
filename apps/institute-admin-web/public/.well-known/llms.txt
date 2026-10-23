@@ -1,0 +1,7 @@
+# CampusOne
+
+> Multi-tenant school ERP for academic, attendance, finance, timetable, and people operations.
+
+See the canonical [CampusOne LLM guide](../llms.txt) and [comprehensive API reference](../llms-full.txt). The API OpenAPI schema is available at `/api/schema/`.
+
+AI agents must honor authentication, institute/branch scope, permissions, and personal-data protections. Public documentation does not authorize access to protected records.

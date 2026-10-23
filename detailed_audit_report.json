@@ -1,0 +1,624 @@
+{
+  "results": [
+    {
+      "name": "Dashboard",
+      "path": "/dashboard",
+      "status": "OK",
+      "isErrorBoundary": false,
+      "isComingSoon": false,
+      "isNotFound": false,
+      "headings": [],
+      "visibleButtons": 22,
+      "textSample": "Branch context Academic year AY 2026-27 AY 2025-26 AY 2024-25 Global search / 11 AM CampusOne Dashboard Institute Setup Roles & Permissions People Admissions CRM Attendance Academics Communication Fin"
+    },
+    {
+      "name": "Branches",
+      "path": "/branches",
+      "status": "OK",
+      "isErrorBoundary": false,
+      "isComingSoon": false,
+      "isNotFound": false,
+      "headings": [
+        "Branches & Campuses"
+      ],
+      "visibleButtons": 31,
+      "textSample": "Branch context Academic year AY 2026-27 AY 2025-26 AY 2024-25 Global search / 11 AM CampusOne Dashboard Institute Setup Branches & Campuses Academic Structure Rooms & Facilities Holidays & Calendar In"
+    },
+    {
+      "name": "Academic Structure",
+      "path": "/academics/structure",
+      "status": "OK",
+      "isErrorBoundary": false,
+      "isComingSoon": false,
+      "isNotFound": false,
+      "headings": [
+        "Academic Structure"
+      ],
+      "visibleButtons": 34,
+      "textSample": "Branch context Academic year AY 2026-27 AY 2025-26 AY 2024-25 Global search / 11 AM CampusOne Dashboard Institute Setup Branches & Campuses Academic Structure Rooms & Facilities Holidays & Calendar In"
+    },
+    {
+      "name": "Rooms & Facilities",
+      "path": "/setup/rooms-facilities",
+      "status": "OK",
+      "isErrorBoundary": false,
+      "isComingSoon": false,
+      "isNotFound": false,
+      "headings": [
+        "Rooms & Facilities"
+      ],
+      "visibleButtons": 31,
+      "textSample": "Branch context Academic year AY 2026-27 AY 2025-26 AY 2024-25 Global search / 11 AM CampusOne Dashboard Institute Setup Branches & Campuses Academic Structure Rooms & Facilities Holidays & Calendar In"
+    },
+    {
+      "name": "Holidays & Calendar",
+      "path": "/setup/holidays-calendar",
+      "status": "OK",
+      "isErrorBoundary": false,
+      "isComingSoon": false,
+      "isNotFound": false,
+      "headings": [
+        "Holidays & Calendar",
+        "Scheduled events (0)"
+      ],
+      "visibleButtons": 31,
+      "textSample": "Branch context Academic year AY 2026-27 AY 2025-26 AY 2024-25 Global search / 11 AM CampusOne Dashboard Institute Setup Branches & Campuses Academic Structure Rooms & Facilities Holidays & Calendar In"
+    },
+    {
+      "name": "Institute Details",
+      "path": "/settings/institute-details",
+      "status": "OK",
+      "isErrorBoundary": false,
+      "isComingSoon": false,
+      "isNotFound": false,
+      "headings": [
+        "Institute Details"
+      ],
+      "visibleButtons": 28,
+      "textSample": "Branch context Academic year AY 2026-27 AY 2025-26 AY 2024-25 Global search / 11 AM CampusOne Dashboard Institute Setup Branches & Campuses Academic Structure Rooms & Facilities Holidays & Calendar In"
+    },
+    {
+      "name": "Branding",
+      "path": "/settings/profile",
+      "status": "OK",
+      "isErrorBoundary": false,
+      "isComingSoon": false,
+      "isNotFound": false,
+      "headings": [
+        "Branding",
+        "Logo & Identity",
+        "Document Header Preview"
+      ],
+      "visibleButtons": 31,
+      "textSample": "Branch context Academic year AY 2026-27 AY 2025-26 AY 2024-25 Global search / 11 AM CampusOne Dashboard Institute Setup Branches & Campuses Academic Structure Rooms & Facilities Holidays & Calendar In"
+    },
+    {
+      "name": "Role Builder",
+      "path": "/roles",
+      "status": "OK",
+      "isErrorBoundary": false,
+      "isComingSoon": false,
+      "isNotFound": false,
+      "headings": [
+        "All Roles"
+      ],
+      "visibleButtons": 32,
+      "textSample": "Branch context Academic year AY 2026-27 AY 2025-26 AY 2024-25 Global search / 11 AM CampusOne Dashboard Institute Setup Roles & Permissions Role Builder Assignments Governance Settings People Admissio"
+    },
+    {
+      "name": "Assignments",
+      "path": "/roles/assignments",
+      "status": "OK",
+      "isErrorBoundary": false,
+      "isComingSoon": false,
+      "isNotFound": false,
+      "headings": [
+        "Role Assignments"
+      ],
+      "visibleButtons": 28,
+      "textSample": "Branch context Academic year AY 2026-27 AY 2025-26 AY 2024-25 Global search / 11 AM CampusOne Dashboard Institute Setup Roles & Permissions Role Builder Assignments Governance Settings People Admissio"
+    },
+    {
+      "name": "Governance Settings",
+      "path": "/settings/governance",
+      "status": "OK",
+      "isErrorBoundary": false,
+      "isComingSoon": false,
+      "isNotFound": false,
+      "headings": [
+        "Governance Settings",
+        "Require two-person approval for large point awards",
+        "Notify me before a temporary role expires"
+      ],
+      "visibleButtons": 29,
+      "textSample": "Branch context Academic year AY 2026-27 AY 2025-26 AY 2024-25 Global search / 11 AM CampusOne Dashboard Institute Setup Roles & Permissions Role Builder Assignments Governance Settings People Admissio"
+    },
+    {
+      "name": "Staff",
+      "path": "/staff",
+      "status": "OK",
+      "isErrorBoundary": false,
+      "isComingSoon": false,
+      "isNotFound": false,
+      "headings": [
+        "Staff",
+        "Staff members (0)"
+      ],
+      "visibleButtons": 29,
+      "textSample": "Branch context Academic year AY 2026-27 AY 2025-26 AY 2024-25 Global search / 11 AM CampusOne Dashboard Institute Setup Roles & Permissions People Staff Students Parents Admissions CRM Attendance Acad"
+    },
+    {
+      "name": "Students",
+      "path": "/students",
+      "status": "OK",
+      "isErrorBoundary": false,
+      "isComingSoon": false,
+      "isNotFound": false,
+      "headings": [
+        "Students",
+        "Students (0)"
+      ],
+      "visibleButtons": 29,
+      "textSample": "Branch context Academic year AY 2026-27 AY 2025-26 AY 2024-25 Global search / 11 AM CampusOne Dashboard Institute Setup Roles & Permissions People Staff Students Parents Admissions CRM Attendance Acad"
+    },
+    {
+      "name": "Parents",
+      "path": "/parents",
+      "status": "OK",
+      "isErrorBoundary": false,
+      "isComingSoon": false,
+      "isNotFound": false,
+      "headings": [
+        "Parents"
+      ],
+      "visibleButtons": 25,
+      "textSample": "Branch context Academic year AY 2026-27 AY 2025-26 AY 2024-25 Global search / 11 AM CampusOne Dashboard Institute Setup Roles & Permissions People Staff Students Parents Admissions CRM Attendance Acad"
+    },
+    {
+      "name": "Enquiries",
+      "path": "/admissions/enquiries",
+      "status": "OK",
+      "isErrorBoundary": false,
+      "isComingSoon": false,
+      "isNotFound": false,
+      "headings": [
+        "Enquiries",
+        "Enquiries (0)"
+      ],
+      "visibleButtons": 28,
+      "textSample": "Branch context Academic year AY 2026-27 AY 2025-26 AY 2024-25 Global search / 11 AM CampusOne Dashboard Institute Setup Roles & Permissions People Admissions CRM Enquiries Funnel Report Form Builder A"
+    },
+    {
+      "name": "Funnel Report",
+      "path": "/admissions",
+      "status": "OK",
+      "isErrorBoundary": false,
+      "isComingSoon": false,
+      "isNotFound": false,
+      "headings": [
+        "Funnel Report",
+        "Admissions funnel — this month"
+      ],
+      "visibleButtons": 25,
+      "textSample": "Branch context Academic year AY 2026-27 AY 2025-26 AY 2024-25 Global search / 11 AM CampusOne Dashboard Institute Setup Roles & Permissions People Admissions CRM Enquiries Funnel Report Form Builder A"
+    },
+    {
+      "name": "Form Builder",
+      "path": "/admissions/forms",
+      "status": "OK",
+      "isErrorBoundary": false,
+      "isComingSoon": false,
+      "isNotFound": false,
+      "headings": [
+        "Form Builder",
+        "Form settings",
+        "Applicant experience"
+      ],
+      "visibleButtons": 43,
+      "textSample": "Branch context Academic year AY 2026-27 AY 2025-26 AY 2024-25 Global search / 11 AM CampusOne Dashboard Institute Setup Roles & Permissions People Admissions CRM Enquiries Funnel Report Form Builder A"
+    },
+    {
+      "name": "Attendance Overview",
+      "path": "/attendance",
+      "status": "OK",
+      "isErrorBoundary": false,
+      "isComingSoon": false,
+      "isNotFound": false,
+      "headings": [
+        "Attendance command centre",
+        "Attendance Overview",
+        "Monthly attendance health"
+      ],
+      "visibleButtons": 28,
+      "textSample": "Branch context Academic year AY 2026-27 AY 2025-26 AY 2024-25 Global search / 11 AM CampusOne Dashboard Institute Setup Roles & Permissions People Admissions CRM Attendance Overview Mark Attendance St"
+    },
+    {
+      "name": "Mark Attendance",
+      "path": "/attendance/mark",
+      "status": "OK",
+      "isErrorBoundary": false,
+      "isComingSoon": false,
+      "isNotFound": false,
+      "headings": [
+        "Attendance command centre",
+        "Mark Attendance",
+        "Mark daily attendance"
+      ],
+      "visibleButtons": 32,
+      "textSample": "Branch context Academic year AY 2026-27 AY 2025-26 AY 2024-25 Global search / 11 AM CampusOne Dashboard Institute Setup Roles & Permissions People Admissions CRM Attendance Overview Mark Attendance St"
+    },
+    {
+      "name": "Student Leave",
+      "path": "/attendance/student-leave",
+      "status": "OK",
+      "isErrorBoundary": false,
+      "isComingSoon": false,
+      "isNotFound": false,
+      "headings": [
+        "Attendance command centre",
+        "Student Leave",
+        "Student leave decisions"
+      ],
+      "visibleButtons": 28,
+      "textSample": "Branch context Academic year AY 2026-27 AY 2025-26 AY 2024-25 Global search / 11 AM CampusOne Dashboard Institute Setup Roles & Permissions People Admissions CRM Attendance Overview Mark Attendance St"
+    },
+    {
+      "name": "Staff Leave",
+      "path": "/attendance/staff-leave",
+      "status": "OK",
+      "isErrorBoundary": false,
+      "isComingSoon": false,
+      "isNotFound": false,
+      "headings": [
+        "Attendance command centre",
+        "Staff Leave",
+        "Staff leave decisions"
+      ],
+      "visibleButtons": 28,
+      "textSample": "Branch context Academic year AY 2026-27 AY 2025-26 AY 2024-25 Global search / 11 AM CampusOne Dashboard Institute Setup Roles & Permissions People Admissions CRM Attendance Overview Mark Attendance St"
+    },
+    {
+      "name": "Attendance Reports",
+      "path": "/attendance/reports",
+      "status": "OK",
+      "isErrorBoundary": false,
+      "isComingSoon": false,
+      "isNotFound": false,
+      "headings": [
+        "Attendance command centre",
+        "Reports & Analytics",
+        "Attendance intelligence"
+      ],
+      "visibleButtons": 30,
+      "textSample": "Branch context Academic year AY 2026-27 AY 2025-26 AY 2024-25 Global search / 11 AM CampusOne Dashboard Institute Setup Roles & Permissions People Admissions CRM Attendance Overview Mark Attendance St"
+    },
+    {
+      "name": "Attendance Settings",
+      "path": "/attendance/settings",
+      "status": "OK",
+      "isErrorBoundary": false,
+      "isComingSoon": false,
+      "isNotFound": false,
+      "headings": [
+        "Attendance command centre",
+        "Attendance Settings"
+      ],
+      "visibleButtons": 28,
+      "textSample": "Branch context Academic year AY 2026-27 AY 2025-26 AY 2024-25 Global search / 11 AM CampusOne Dashboard Institute Setup Roles & Permissions People Admissions CRM Attendance Overview Mark Attendance St"
+    },
+    {
+      "name": "Academic Overview",
+      "path": "/academics",
+      "status": "OK",
+      "isErrorBoundary": false,
+      "isComingSoon": false,
+      "isNotFound": false,
+      "headings": [
+        "Keep learning operations moving.",
+        "Set up the academic engine",
+        "Recently updated"
+      ],
+      "visibleButtons": 33,
+      "textSample": "Branch context Academic year AY 2026-27 AY 2025-26 AY 2024-25 Global search / 11 AM CampusOne Dashboard Institute Setup Roles & Permissions People Admissions CRM Attendance Academics Academic Overview"
+    },
+    {
+      "name": "Teaching & Learning",
+      "path": "/academics/teaching-learning",
+      "status": "OK",
+      "isErrorBoundary": false,
+      "isComingSoon": false,
+      "isNotFound": false,
+      "headings": [
+        "Teaching & Learning",
+        "Lesson Plans"
+      ],
+      "visibleButtons": 30,
+      "textSample": "Branch context Academic year AY 2026-27 AY 2025-26 AY 2024-25 Global search / 11 AM CampusOne Dashboard Institute Setup Roles & Permissions People Admissions CRM Attendance Academics Academic Overview"
+    },
+    {
+      "name": "Assessment & Results",
+      "path": "/academics/assessment-results",
+      "status": "OK",
+      "isErrorBoundary": false,
+      "isComingSoon": false,
+      "isNotFound": false,
+      "headings": [
+        "Assessment & Results",
+        "Exams"
+      ],
+      "visibleButtons": 34,
+      "textSample": "Branch context Academic year AY 2026-27 AY 2025-26 AY 2024-25 Global search / 11 AM CampusOne Dashboard Institute Setup Roles & Permissions People Admissions CRM Attendance Academics Academic Overview"
+    },
+    {
+      "name": "Circulars",
+      "path": "/communication/circulars",
+      "status": "OK",
+      "isErrorBoundary": false,
+      "isComingSoon": false,
+      "isNotFound": false,
+      "headings": [
+        "Circulars"
+      ],
+      "visibleButtons": 29,
+      "textSample": "Branch context Academic year AY 2026-27 AY 2025-26 AY 2024-25 Global search / 11 AM CampusOne Dashboard Institute Setup Roles & Permissions People Admissions CRM Attendance Academics Communication Cir"
+    },
+    {
+      "name": "Templates",
+      "path": "/communication/templates",
+      "status": "OK",
+      "isErrorBoundary": false,
+      "isComingSoon": false,
+      "isNotFound": false,
+      "headings": [
+        "Templates"
+      ],
+      "visibleButtons": 31,
+      "textSample": "Branch context Academic year AY 2026-27 AY 2025-26 AY 2024-25 Global search / 11 AM CampusOne Dashboard Institute Setup Roles & Permissions People Admissions CRM Attendance Academics Communication Cir"
+    },
+    {
+      "name": "Finance Overview",
+      "path": "/finance",
+      "status": "OK",
+      "isErrorBoundary": false,
+      "isComingSoon": false,
+      "isNotFound": false,
+      "headings": [
+        "Overview"
+      ],
+      "visibleButtons": 35,
+      "textSample": "Branch context Academic year AY 2026-27 AY 2025-26 AY 2024-25 Global search / 11 AM CampusOne Dashboard Institute Setup Roles & Permissions People Admissions CRM Attendance Academics Communication Fin"
+    },
+    {
+      "name": "Template Studio",
+      "path": "/template-studio",
+      "status": "OK",
+      "isErrorBoundary": false,
+      "isComingSoon": false,
+      "isNotFound": false,
+      "headings": [
+        "Template Studio",
+        "Fee Invoice",
+        "Fee Receipt"
+      ],
+      "visibleButtons": 27,
+      "textSample": "Branch context Academic year AY 2026-27 AY 2025-26 AY 2024-25 Global search / 11 AM CampusOne Dashboard Institute Setup Roles & Permissions People Admissions CRM Attendance Academics Communication Fin"
+    },
+    {
+      "name": "Timetable View",
+      "path": "/timetable",
+      "status": "OK",
+      "isErrorBoundary": false,
+      "isComingSoon": false,
+      "isNotFound": false,
+      "headings": [
+        "View Timetable"
+      ],
+      "visibleButtons": 24,
+      "textSample": "Branch context Academic year AY 2026-27 AY 2025-26 AY 2024-25 Global search / 11 AM CampusOne Dashboard Institute Setup Roles & Permissions People Admissions CRM Attendance Academics Communication Fin"
+    },
+    {
+      "name": "Timetable Generate",
+      "path": "/timetable/generate",
+      "status": "OK",
+      "isErrorBoundary": false,
+      "isComingSoon": false,
+      "isNotFound": false,
+      "headings": [],
+      "visibleButtons": 24,
+      "textSample": "Branch context Academic year AY 2026-27 AY 2025-26 AY 2024-25 Global search / 11 AM CampusOne Dashboard Institute Setup Roles & Permissions People Admissions CRM Attendance Academics Communication Fin"
+    },
+    {
+      "name": "Gamification Points",
+      "path": "/recognition/points",
+      "status": "OK",
+      "isErrorBoundary": false,
+      "isComingSoon": false,
+      "isNotFound": false,
+      "headings": [
+        "Points & Categories",
+        "Academic",
+        "Sports"
+      ],
+      "visibleButtons": 32,
+      "textSample": "Branch context Academic year AY 2026-27 AY 2025-26 AY 2024-25 Global search / 11 AM CampusOne Dashboard Institute Setup Roles & Permissions People Admissions CRM Attendance Academics Communication Fin"
+    },
+    {
+      "name": "Gamification Badges",
+      "path": "/recognition/badges",
+      "status": "OK",
+      "isErrorBoundary": false,
+      "isComingSoon": false,
+      "isNotFound": false,
+      "headings": [
+        "Batch Catalog",
+        "Academic Performance",
+        "Subject Star"
+      ],
+      "visibleButtons": 33,
+      "textSample": "Branch context Academic year AY 2026-27 AY 2025-26 AY 2024-25 Global search / 11 AM CampusOne Dashboard Institute Setup Roles & Permissions People Admissions CRM Attendance Academics Communication Fin"
+    },
+    {
+      "name": "Gamification Leaderboard",
+      "path": "/recognition/leaderboard",
+      "status": "OK",
+      "isErrorBoundary": false,
+      "isComingSoon": false,
+      "isNotFound": false,
+      "headings": [
+        "Leaderboards"
+      ],
+      "visibleButtons": 30,
+      "textSample": "Branch context Academic year AY 2026-27 AY 2025-26 AY 2024-25 Global search / 11 AM CampusOne Dashboard Institute Setup Roles & Permissions People Admissions CRM Attendance Academics Communication Fin"
+    },
+    {
+      "name": "Award Approvals",
+      "path": "/recognition/award-approvals",
+      "status": "OK",
+      "isErrorBoundary": false,
+      "isComingSoon": false,
+      "isNotFound": false,
+      "headings": [
+        "Award Approvals"
+      ],
+      "visibleButtons": 34,
+      "textSample": "Branch context Academic year AY 2026-27 AY 2025-26 AY 2024-25 Global search / 11 AM CampusOne Dashboard Institute Setup Roles & Permissions People Admissions CRM Attendance Academics Communication Fin"
+    },
+    {
+      "name": "Partnerships",
+      "path": "/recognition/partnerships",
+      "status": "OK",
+      "isErrorBoundary": false,
+      "isComingSoon": false,
+      "isNotFound": false,
+      "headings": [
+        "Partnerships",
+        "Awaiting your response",
+        "Network Leaderboard Preview"
+      ],
+      "visibleButtons": 29,
+      "textSample": "Branch context Academic year AY 2026-27 AY 2025-26 AY 2024-25 Global search / 11 AM CampusOne Dashboard Institute Setup Roles & Permissions People Admissions CRM Attendance Academics Communication Fin"
+    },
+    {
+      "name": "Audit Log",
+      "path": "/audit-log",
+      "status": "OK",
+      "isErrorBoundary": false,
+      "isComingSoon": false,
+      "isNotFound": false,
+      "headings": [
+        "Audit Log"
+      ],
+      "visibleButtons": 26,
+      "textSample": "Branch context Academic year AY 2026-27 AY 2025-26 AY 2024-25 Global search / 11 AM CampusOne Dashboard Institute Setup Roles & Permissions People Admissions CRM Attendance Academics Communication Fin"
+    },
+    {
+      "name": "Compliance & Consent",
+      "path": "/settings/privacy",
+      "status": "OK",
+      "isErrorBoundary": false,
+      "isComingSoon": false,
+      "isNotFound": false,
+      "headings": [
+        "Compliance & Consent"
+      ],
+      "visibleButtons": 26,
+      "textSample": "Branch context Academic year AY 2026-27 AY 2025-26 AY 2024-25 Global search / 11 AM CampusOne Dashboard Institute Setup Roles & Permissions People Admissions CRM Attendance Academics Communication Fin"
+    },
+    {
+      "name": "Subscription & Plan",
+      "path": "/settings/billing",
+      "status": "OK",
+      "isErrorBoundary": false,
+      "isComingSoon": false,
+      "isNotFound": false,
+      "headings": [
+        "Subscription & Billing"
+      ],
+      "visibleButtons": 22,
+      "textSample": "Branch context Academic year AY 2026-27 AY 2025-26 AY 2024-25 Global search / 11 AM CampusOne Dashboard Institute Setup Roles & Permissions People Admissions CRM Attendance Academics Communication Fin"
+    },
+    {
+      "name": "Add-on Transport",
+      "path": "/addons/transport",
+      "status": "OK",
+      "isErrorBoundary": false,
+      "isComingSoon": true,
+      "isNotFound": false,
+      "headings": [
+        "Transport",
+        "Transport — Coming Soon"
+      ],
+      "visibleButtons": 25,
+      "textSample": "Branch context Academic year AY 2026-27 AY 2025-26 AY 2024-25 Global search / 11 AM CampusOne Dashboard Institute Setup Roles & Permissions People Admissions CRM Attendance Academics Communication Fin"
+    },
+    {
+      "name": "Add-on Library",
+      "path": "/addons/library",
+      "status": "OK",
+      "isErrorBoundary": false,
+      "isComingSoon": true,
+      "isNotFound": false,
+      "headings": [
+        "Library",
+        "Library — Coming Soon"
+      ],
+      "visibleButtons": 25,
+      "textSample": "Branch context Academic year AY 2026-27 AY 2025-26 AY 2024-25 Global search / 11 AM CampusOne Dashboard Institute Setup Roles & Permissions People Admissions CRM Attendance Academics Communication Fin"
+    },
+    {
+      "name": "Add-on Hostel",
+      "path": "/addons/hostel",
+      "status": "OK",
+      "isErrorBoundary": false,
+      "isComingSoon": true,
+      "isNotFound": false,
+      "headings": [
+        "Hostel",
+        "Hostel — Coming Soon"
+      ],
+      "visibleButtons": 25,
+      "textSample": "Branch context Academic year AY 2026-27 AY 2025-26 AY 2024-25 Global search / 11 AM CampusOne Dashboard Institute Setup Roles & Permissions People Admissions CRM Attendance Academics Communication Fin"
+    },
+    {
+      "name": "Notifications",
+      "path": "/notifications",
+      "status": "OK",
+      "isErrorBoundary": false,
+      "isComingSoon": false,
+      "isNotFound": false,
+      "headings": [],
+      "visibleButtons": 22,
+      "textSample": "Branch context Academic year AY 2026-27 AY 2025-26 AY 2024-25 Global search / 11 AM CampusOne Dashboard Institute Setup Roles & Permissions People Admissions CRM Attendance Academics Communication Fin"
+    },
+    {
+      "name": "My Account",
+      "path": "/account",
+      "status": "OK",
+      "isErrorBoundary": false,
+      "isComingSoon": false,
+      "isNotFound": false,
+      "headings": [],
+      "visibleButtons": 22,
+      "textSample": "Branch context Academic year AY 2026-27 AY 2025-26 AY 2024-25 Global search / 11 AM CampusOne Dashboard Institute Setup Roles & Permissions People Admissions CRM Attendance Academics Communication Fin"
+    },
+    {
+      "name": "Help & Support",
+      "path": "/help",
+      "status": "OK",
+      "isErrorBoundary": false,
+      "isComingSoon": false,
+      "isNotFound": false,
+      "headings": [],
+      "visibleButtons": 22,
+      "textSample": "Branch context Academic year AY 2026-27 AY 2025-26 AY 2024-25 Global search / 11 AM CampusOne Dashboard Institute Setup Roles & Permissions People Admissions CRM Attendance Academics Communication Fin"
+    }
+  ],
+  "consoleLogs": [
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "url": "http://127.0.0.1:5173/login"
+    }
+  ],
+  "networkErrors": []
+}

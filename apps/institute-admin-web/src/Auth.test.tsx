@@ -63,47 +63,60 @@ describe('Institute authentication and onboarding', () => {
     expect(window.location.pathname).toBe('/onboarding/account')
     await user.click(screen.getByRole('button', { name: /continue/i }))
 
-    expect(screen.getByText(/complete the required fields/i)).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: /your account/i })).toBeInTheDocument()
+    expect(screen.getByRole('alert')).toHaveTextContent(/complete the required fields/i)
+    expect(screen.getByRole('heading', { name: /create your account/i })).toBeInTheDocument()
     expect(window.location.pathname).toBe('/onboarding/account')
   })
 
   it('gives every onboarding step a stable URL with browser history support', async () => {
     const user = userEvent.setup()
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      success: true,
+      data: { slug: 'riverdale', available: true, message: 'This URL name is available.' },
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } })))
     render(<App />)
 
     await user.click(screen.getByRole('button', { name: /create your institute/i }))
     await user.type(screen.getByLabelText(/full name/i), 'Aarav Sharma')
-    await user.type(screen.getByLabelText(/^phone/i), '9876543210')
+    await user.type(screen.getByLabelText(/work email/i), 'aarav@riverdale.test')
+    await user.type(screen.getAllByLabelText(/password/i)[0], 'StrongPass123!')
+    await user.type(screen.getByLabelText(/confirm password/i), 'StrongPass123!')
     await user.click(screen.getByRole('button', { name: /continue/i }))
     expect(window.location.pathname).toBe('/onboarding/institute')
 
-    await user.type(screen.getByLabelText(/legal name/i), 'Riverdale International School')
+    await user.type(screen.getByLabelText(/legal institute name/i), 'Riverdale International School')
     await user.type(screen.getByLabelText(/display name/i), 'Riverdale')
+    await user.type(screen.getByLabelText(/institute url name/i), 'riverdale')
+    expect(await screen.findByRole('status')).toHaveTextContent(/available/i)
     await user.click(screen.getByRole('button', { name: /continue/i }))
-    expect(window.location.pathname).toBe('/onboarding/legal-documents')
+    expect(window.location.pathname).toBe('/onboarding/review')
 
     window.history.back()
-    expect(await screen.findByRole('heading', { name: /institute identity/i })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: /name your institute/i })).toBeInTheDocument()
     expect(window.location.pathname).toBe('/onboarding/institute')
   })
 
   it.each([
-    ['/onboarding/account', 'Your account', false],
-    ['/onboarding/institute', 'Institute identity', false],
-    ['/onboarding/legal-documents', 'Legal & documents', false],
-    ['/onboarding/contact', 'Head office & contact', false],
-    ['/onboarding/scale', 'Scale & plan', false],
-    ['/onboarding/branch', 'First branch', true],
-    ['/onboarding/review', 'Review & consent', false],
-  ])('restores the directly opened onboarding route %s', async (path, heading, hasBranches) => {
-    if (hasBranches) localStorage.setItem('campusone.onboarding-draft', JSON.stringify({ hasBranches: true }))
+    ['/onboarding/account', 'Create your account'],
+    ['/onboarding/institute', 'Name your institute'],
+    ['/onboarding/review', 'Review and submit'],
+  ])('restores the directly opened onboarding route %s', async (path, heading) => {
     window.history.pushState({}, '', path)
     render(<App />)
 
     expect(await screen.findByRole('heading', { name: heading })).toBeInTheDocument()
     expect(window.location.pathname).toBe(path)
   })
+
+  it.each(['/onboarding/legal-documents', '/onboarding/contact', '/onboarding/scale', '/onboarding/branch'])(
+    'redirects a legacy onboarding route to the current account step: %s', async (path) => {
+      window.history.pushState({}, '', path)
+      render(<App />)
+
+      expect(await screen.findByRole('heading', { name: 'Create your account' })).toBeInTheDocument()
+      expect(window.location.pathname).toBe('/onboarding/account')
+    },
+  )
 
   it('completes an OTP challenge after password authentication', async () => {
     const user = userEvent.setup()

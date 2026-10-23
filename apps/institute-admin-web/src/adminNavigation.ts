@@ -25,6 +25,7 @@ export interface AdminNavigationItem {
   icon: NavigationIcon
   route?: AdminRoute
   children?: AdminRoute[]
+  comingSoon?: boolean
 }
 
 const route = (id: string, label: string, path: string, section: string, view: AdminView = 'operational', description?: string, subTabs?: string[]): AdminRoute => ({
@@ -51,7 +52,7 @@ export const adminNavigation: AdminNavigationItem[] = [
     route('SD1', 'Students', '/students', 'People', 'students'),
     route('PD1', 'Parents', '/parents', 'People', 'parents'),
   ] },
-  { label: 'Admissions CRM', icon: 'admissions', children: [
+  { label: 'Admissions CRM', icon: 'admissions', comingSoon: true, children: [
     route('AD2', 'Enquiries', '/admissions/enquiries', 'Admissions CRM', 'enquiries'),
     route('AD1', 'Funnel Report', '/admissions', 'Admissions CRM', 'admissions-funnel'),
     route('AD4', 'Form Builder', '/admissions/forms', 'Admissions CRM'),
@@ -82,7 +83,7 @@ export const adminNavigation: AdminNavigationItem[] = [
     route('TT1', 'View Timetable', '/timetable', 'Timetable', 'timetable'),
     route('TTG1', 'Generate Timetable', '/timetable/generate', 'Timetable', 'timetable'),
   ] },
-  { label: 'Gamification', icon: 'gamification', children: [
+  { label: 'Gamification', icon: 'gamification', comingSoon: true, children: [
     route('RG1', 'Points & Categories', '/recognition/points', 'Gamification'),
     route('RG2', 'Batch Catalog', '/recognition/badges', 'Gamification'),
     route('RG4', 'Leaderboards', '/recognition/leaderboard', 'Gamification'),
@@ -94,7 +95,7 @@ export const adminNavigation: AdminNavigationItem[] = [
   { label: 'Audit Log', icon: 'audit', route: route('AL1', 'Audit Log', '/audit-log', 'Audit Log') },
   { label: 'Compliance & Consent', icon: 'compliance', route: route('SE4', 'Compliance & Consent', '/settings/privacy', 'Compliance & Consent') },
   { label: 'Subscription & Plan', icon: 'subscription', route: route('SE3', 'Subscription & Plan', '/settings/billing', 'Subscription & Plan') },
-  { label: 'Add-on Modules', icon: 'addons', children: [
+  { label: 'Add-on Modules', icon: 'addons', comingSoon: true, children: [
     route('AO1', 'Transport', '/addons/transport', 'Add-on Modules', 'coming-soon'),
     route('AO2', 'Library', '/addons/library', 'Add-on Modules', 'coming-soon'),
     route('AO3', 'Hostel', '/addons/hostel', 'Add-on Modules', 'coming-soon'),
@@ -107,7 +108,6 @@ export const globalRoutes: AdminRoute[] = [
   route('HP1', 'Help & Support', '/help', 'Help & Support'),
 ]
 
-export const authScreenIds = ['A1', 'A2'] as const
 export const adminRoutes = adminNavigation.flatMap((item) => item.route ? [item.route] : item.children ?? [])
 // Detail and builder screens are reachable from their parent-screen actions, not sidebar items.
 export const auxiliaryRoutes: AdminRoute[] = [

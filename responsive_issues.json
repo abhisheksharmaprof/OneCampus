@@ -1,0 +1,294 @@
+[
+  {
+    "viewport": "tablet",
+    "route": "/dashboard",
+    "hasOverflow": false,
+    "scrollWidth": 768,
+    "clientWidth": 768,
+    "overflowingElements": [
+      {
+        "tag": "DIV",
+        "className": "card kpi-card",
+        "rectRight": 928,
+        "docWidth": 768
+      },
+      {
+        "tag": "SPAN",
+        "className": "admin-skeleton",
+        "rectRight": 834,
+        "docWidth": 768
+      },
+      {
+        "tag": "SPAN",
+        "className": "admin-skeleton",
+        "rectRight": 806,
+        "docWidth": 768
+      },
+      {
+        "tag": "SPAN",
+        "className": "admin-skeleton",
+        "rectRight": 858,
+        "docWidth": 768
+      },
+      {
+        "tag": "DIV",
+        "className": "card kpi-card",
+        "rectRight": 1160,
+        "docWidth": 768
+      },
+      {
+        "tag": "SPAN",
+        "className": "admin-skeleton",
+        "rectRight": 1066,
+        "docWidth": 768
+      }
+    ],
+    "screenshot": "/media/abhi/Shared/CampusOne/responsive_audit_screenshots/tablet__dashboard.png"
+  },
+  {
+    "viewport": "tablet",
+    "route": "/staff",
+    "hasOverflow": false,
+    "scrollWidth": 768,
+    "clientWidth": 768,
+    "overflowingElements": [
+      {
+        "tag": "TABLE",
+        "className": "",
+        "rectRight": 1024,
+        "docWidth": 768
+      },
+      {
+        "tag": "THEAD",
+        "className": "",
+        "rectRight": 1024,
+        "docWidth": 768
+      },
+      {
+        "tag": "TR",
+        "className": "",
+        "rectRight": 1024,
+        "docWidth": 768
+      },
+      {
+        "tag": "TH",
+        "className": "",
+        "rectRight": 855,
+        "docWidth": 768
+      },
+      {
+        "tag": "BUTTON",
+        "className": "",
+        "rectRight": 839,
+        "docWidth": 768
+      },
+      {
+        "tag": "svg",
+        "className": {},
+        "rectRight": 839,
+        "docWidth": 768
+      }
+    ],
+    "screenshot": "/media/abhi/Shared/CampusOne/responsive_audit_screenshots/tablet__staff.png"
+  },
+  {
+    "viewport": "tablet",
+    "route": "/students",
+    "hasOverflow": false,
+    "scrollWidth": 768,
+    "clientWidth": 768,
+    "overflowingElements": [
+      {
+        "tag": "TABLE",
+        "className": "",
+        "rectRight": 856,
+        "docWidth": 768
+      },
+      {
+        "tag": "THEAD",
+        "className": "",
+        "rectRight": 856,
+        "docWidth": 768
+      },
+      {
+        "tag": "TR",
+        "className": "",
+        "rectRight": 856,
+        "docWidth": 768
+      },
+      {
+        "tag": "TH",
+        "className": "",
+        "rectRight": 779,
+        "docWidth": 768
+      },
+      {
+        "tag": "TH",
+        "className": "is-end",
+        "rectRight": 856,
+        "docWidth": 768
+      },
+      {
+        "tag": "TBODY",
+        "className": "",
+        "rectRight": 856,
+        "docWidth": 768
+      }
+    ],
+    "screenshot": "/media/abhi/Shared/CampusOne/responsive_audit_screenshots/tablet__students.png"
+  },
+  {
+    "viewport": "mobile",
+    "route": "/dashboard",
+    "hasOverflow": false,
+    "scrollWidth": 375,
+    "clientWidth": 375,
+    "overflowingElements": [
+      {
+        "tag": "DIV",
+        "className": "",
+        "rectRight": 385,
+        "docWidth": 375
+      },
+      {
+        "tag": "DIV",
+        "className": "",
+        "rectRight": 401,
+        "docWidth": 375
+      },
+      {
+        "tag": "DIV",
+        "className": "",
+        "rectRight": 532,
+        "docWidth": 375
+      },
+      {
+        "tag": "DIV",
+        "className": "",
+        "rectRight": 514,
+        "docWidth": 375
+      },
+      {
+        "tag": "DIV",
+        "className": "",
+        "rectRight": 547,
+        "docWidth": 375
+      },
+      {
+        "tag": "DIV",
+        "className": "",
+        "rectRight": 678,
+        "docWidth": 375
+      }
+    ],
+    "screenshot": "/media/abhi/Shared/CampusOne/responsive_audit_screenshots/mobile__dashboard.png"
+  },
+  {
+    "viewport": "mobile",
+    "route": "/staff",
+    "hasOverflow": false,
+    "scrollWidth": 375,
+    "clientWidth": 375,
+    "overflowingElements": [
+      {
+        "tag": "TH",
+        "className": "",
+        "rectRight": 443,
+        "docWidth": 375
+      },
+      {
+        "tag": "BUTTON",
+        "className": "",
+        "rectRight": 427,
+        "docWidth": 375
+      },
+      {
+        "tag": "svg",
+        "className": {},
+        "rectRight": 427,
+        "docWidth": 375
+      },
+      {
+        "tag": "path",
+        "className": {},
+        "rectRight": 423,
+        "docWidth": 375
+      },
+      {
+        "tag": "path",
+        "className": {},
+        "rectRight": 423,
+        "docWidth": 375
+      },
+      {
+        "tag": "TH",
+        "className": "",
+        "rectRight": 525,
+        "docWidth": 375
+      }
+    ],
+    "screenshot": "/media/abhi/Shared/CampusOne/responsive_audit_screenshots/mobile__staff.png"
+  },
+  {
+    "viewport": "mobile",
+    "route": "/students",
+    "hasOverflow": false,
+    "scrollWidth": 375,
+    "clientWidth": 375,
+    "overflowingElements": [
+      {
+        "tag": "TH",
+        "className": "",
+        "rectRight": 468,
+        "docWidth": 375
+      },
+      {
+        "tag": "BUTTON",
+        "className": "",
+        "rectRight": 452,
+        "docWidth": 375
+      },
+      {
+        "tag": "svg",
+        "className": {},
+        "rectRight": 452,
+        "docWidth": 375
+      },
+      {
+        "tag": "path",
+        "className": {},
+        "rectRight": 448,
+        "docWidth": 375
+      },
+      {
+        "tag": "path",
+        "className": {},
+        "rectRight": 448,
+        "docWidth": 375
+      },
+      {
+        "tag": "TH",
+        "className": "",
+        "rectRight": 562,
+        "docWidth": 375
+      }
+    ],
+    "screenshot": "/media/abhi/Shared/CampusOne/responsive_audit_screenshots/mobile__students.png"
+  },
+  {
+    "viewport": "mobile",
+    "route": "/academics/structure",
+    "hasOverflow": false,
+    "scrollWidth": 375,
+    "clientWidth": 375,
+    "overflowingElements": [
+      {
+        "tag": "BUTTON",
+        "className": "",
+        "rectRight": 465,
+        "docWidth": 375
+      }
+    ],
+    "screenshot": "/media/abhi/Shared/CampusOne/responsive_audit_screenshots/mobile__academics_structure.png"
+  }
+]

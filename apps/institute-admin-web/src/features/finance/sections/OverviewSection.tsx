@@ -47,14 +47,15 @@ export default function OverviewSection({ accessToken, branchId, onNavigate }: F
         <div className="fin-card">
           <div className="fin-card__header"><div><h3>Monthly collections</h3><p>Compare recorded payments across the last 12 months.</p></div></div>
           {series.length ? (
-            <div className="fin-chart">
+            <div className="fin-chart fin-chart--overview" role="list" aria-label="Monthly collections for the last 12 months">
               {series.map((point) => (
-                <div
-                  key={point.month}
-                  className="bar"
-                  style={{ height: `${Math.max(2, (Number(point.collected || 0) / maxCollected) * 100)}%` }}
-                  title={`${point.month}: ${money(point.collected)}`}
-                >
+                <div className="fin-chart__point fin-chart__point--overview" key={point.month} role="listitem" tabIndex={0} aria-label={`${point.month}: ${money(point.collected)}`} title={`${point.month}: ${money(point.collected)}`}>
+                  <div className="fin-chart__bar-track">
+                    <div
+                      className="bar"
+                      style={{ height: `${Number(point.collected || 0) > 0 ? Math.max(3, (Number(point.collected || 0) / maxCollected) * 100) : 0}%` }}
+                    />
+                  </div>
                   <span>{point.month}</span>
                 </div>
               ))}

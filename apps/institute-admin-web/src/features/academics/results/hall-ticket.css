@@ -1,0 +1,481 @@
+.ht-manager {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.ht-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.25rem;
+  background: var(--surface-bg, #ffffff);
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 8px;
+}
+
+.ht-header h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-primary, #0f172a);
+}
+
+.ht-header p {
+  margin: 0.25rem 0 0;
+  font-size: 0.875rem;
+  color: var(--text-secondary, #64748b);
+}
+
+.ht-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.ht-tabs {
+  display: flex;
+  gap: 0.5rem;
+  border-bottom: 2px solid var(--border-color, #e2e8f0);
+  padding-bottom: 0.25rem;
+}
+
+.ht-tab-button {
+  background: none;
+  border: none;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-secondary, #64748b);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.ht-tab-button:hover {
+  color: var(--text-primary, #0f172a);
+  background: var(--bg-hover, #f1f5f9);
+}
+
+.ht-tab-button.is-active {
+  color: var(--primary, #2563eb);
+  background: var(--primary-light, #eff6ff);
+  font-weight: 700;
+}
+
+/* Schedule Editor */
+.ht-schedule-card {
+  background: #ffffff;
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 8px;
+  padding: 1.25rem;
+}
+
+.ht-schedule-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1rem;
+  font-size: 0.875rem;
+}
+
+.ht-schedule-table th {
+  text-align: left;
+  padding: 0.75rem;
+  background: #f8fafc;
+  color: #475569;
+  font-weight: 600;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.ht-schedule-table td {
+  padding: 0.75rem;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: middle;
+}
+
+.ht-input-date,
+.ht-input-time,
+.ht-input-text {
+  padding: 0.4rem 0.6rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.ht-input-date:focus,
+.ht-input-time:focus,
+.ht-input-text:focus {
+  border-color: #2563eb;
+}
+
+/* Candidate selection & preview toolbar */
+.ht-preview-layout {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .ht-preview-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.ht-sidebar {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.ht-candidate-list {
+  max-height: 480px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.ht-candidate-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.15s ease;
+}
+
+.ht-candidate-row:hover {
+  background: #f8fafc;
+}
+
+.ht-candidate-row.is-active {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+}
+
+.ht-candidate-info {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.8125rem;
+}
+
+.ht-candidate-name {
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.ht-candidate-meta {
+  color: #64748b;
+  font-size: 0.75rem;
+}
+
+/* Admit Card Canvas */
+.ht-preview-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.ht-preview-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #ffffff;
+  padding: 0.75rem 1rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+}
+
+.ht-ticket-wrapper {
+  background: #f1f5f9;
+  padding: 1.5rem;
+  border-radius: 8px;
+  display: flex;
+  justify-content: center;
+  overflow-x: auto;
+}
+
+.ht-ticket {
+  width: 100%;
+  max-width: 780px;
+  background: #ffffff;
+  border: 2px solid #0f172a;
+  padding: 2rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  color: #0f172a;
+  box-sizing: border-box;
+}
+
+.ht-school-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 2px solid #0f172a;
+  padding-bottom: 1rem;
+  margin-bottom: 1rem;
+  gap: 1rem;
+}
+
+.ht-school-logo {
+  max-height: 72px;
+  max-width: 120px;
+  object-fit: contain;
+}
+
+.ht-school-logo-placeholder {
+  width: 68px;
+  height: 68px;
+  border: 2px dashed #94a3b8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 0.75rem;
+  color: #64748b;
+  border-radius: 4px;
+}
+
+.ht-school-details {
+  text-align: center;
+  flex: 1;
+}
+
+.ht-school-name {
+  font-size: 1.4rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  margin: 0;
+  letter-spacing: 0.5px;
+  color: #0f172a;
+}
+
+.ht-school-address {
+  font-size: 0.8125rem;
+  color: #334155;
+  margin: 0.25rem 0 0;
+}
+
+.ht-ticket-banner {
+  text-align: center;
+  background: #0f172a;
+  color: #ffffff;
+  padding: 0.4rem 1rem;
+  font-weight: 700;
+  font-size: 1rem;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin-bottom: 1rem;
+  border-radius: 2px;
+}
+
+.ht-exam-title-row {
+  display: flex;
+  justify-content: space-between;
+  font-weight: 600;
+  font-size: 0.875rem;
+  border-bottom: 1px solid #cbd5e1;
+  padding-bottom: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.ht-student-info-grid {
+  display: grid;
+  grid-template-columns: 1fr 130px;
+  gap: 1.25rem;
+  margin-bottom: 1.25rem;
+}
+
+.ht-details-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.ht-details-table td {
+  padding: 0.35rem 0.5rem;
+  vertical-align: top;
+}
+
+.ht-details-label {
+  width: 38%;
+  font-weight: 600;
+  color: #475569;
+}
+
+.ht-details-value {
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.ht-photo-box {
+  width: 120px;
+  height: 145px;
+  border: 1px solid #0f172a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  background: #f8fafc;
+  overflow: hidden;
+  margin-left: auto;
+}
+
+.ht-photo-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.ht-photo-fallback {
+  font-size: 0.75rem;
+  color: #64748b;
+  padding: 0.5rem;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.ht-timetable-card {
+  margin-bottom: 1.25rem;
+}
+
+.ht-timetable-card h4 {
+  margin: 0 0 0.5rem;
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.ht-ticket-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+
+.ht-ticket-table th,
+.ht-ticket-table td {
+  border: 1px solid #0f172a;
+  padding: 0.45rem 0.6rem;
+  text-align: left;
+}
+
+.ht-ticket-table th {
+  background: #f1f5f9;
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+}
+
+.ht-instructions-box {
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1.5rem;
+  border-radius: 4px;
+}
+
+.ht-instructions-box h5 {
+  margin: 0 0 0.4rem;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #0f172a;
+}
+
+.ht-instructions-box ol {
+  margin: 0;
+  padding-left: 1.25rem;
+  font-size: 0.75rem;
+  color: #334155;
+  line-height: 1.45;
+}
+
+.ht-signature-grid {
+  display: grid;
+  grid-template-columns: 140px 1fr 140px;
+  gap: 1.5rem;
+  align-items: end;
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+}
+
+.ht-sig-block {
+  text-align: center;
+}
+
+.ht-sig-line {
+  border-top: 1px solid #0f172a;
+  padding-top: 0.4rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.ht-qr-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.ht-qr-box img {
+  width: 80px;
+  height: 80px;
+}
+
+.ht-qr-label {
+  font-size: 0.65rem;
+  color: #64748b;
+  margin-top: 0.2rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Print view rules */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  .ht-print-area,
+  .ht-print-area * {
+    visibility: visible;
+  }
+
+  .ht-print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    background: #ffffff;
+  }
+
+  .ht-ticket {
+    max-width: 100%;
+    box-shadow: none;
+    border: 2px solid #000000;
+    margin: 0 0 20mm 0;
+    page-break-after: always;
+    break-after: page;
+  }
+
+  .ht-ticket:last-child {
+    page-break-after: auto;
+    break-after: auto;
+  }
+}
+
