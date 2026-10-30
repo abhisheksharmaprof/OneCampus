@@ -176,7 +176,11 @@ def initiate_upload(
             owner_type=owner.owner_type,
             owner_id=owner.owner_id,
             asset_type=category,
-            container_name=settings.R2_PRIVATE_BUCKET,
+            container_name=(
+                settings.R2_PUBLIC_BUCKET
+                if visibility == FileAsset.Visibility.PUBLIC
+                else settings.R2_PRIVATE_BUCKET
+            ),
             blob_name=final_key,
             original_file_name=normalized_name,
             extension=extension,

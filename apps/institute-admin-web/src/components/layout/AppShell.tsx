@@ -59,11 +59,13 @@ const globalSearchLinks = [
   { label: 'Circulars', destination: 'Circulars', description: 'Review announcements' },
 ]
 
-export function AppShell({ children, branch, branches, activePage, academicYear, onAcademicYearChange, onBranchChange, onNavigate, onSignOut, isBranchAdmin = false, canViewAllBranches = false, canViewAudit = false }: PropsWithChildren<{
+export function AppShell({ children, branch, branches, activePage, academicYear, academicYears = [], currentAcademicYear, onAcademicYearChange, onBranchChange, onNavigate, onSignOut, isBranchAdmin = false, canViewAllBranches = false, canViewAudit = false, examOnly = false }: PropsWithChildren<{
   branch: BranchContext
   branches: BranchOption[]
   activePage: string
   academicYear: string
+  academicYears?: readonly { id: string; name: string; isCurrent: boolean }[]
+  currentAcademicYear?: string
   onAcademicYearChange: (year: string) => void
   onBranchChange: (branch: BranchContext) => void
   onNavigate: (page: string) => void
@@ -71,6 +73,7 @@ export function AppShell({ children, branch, branches, activePage, academicYear,
   isBranchAdmin?: boolean
   canViewAllBranches?: boolean
   canViewAudit?: boolean
+  examOnly?: boolean
 }>) {
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem('campusone.sidebar.collapsed') === 'true')
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -82,12 +85,14 @@ export function AppShell({ children, branch, branches, activePage, academicYear,
   const profileMenuRef = useRef<HTMLDivElement>(null)
   const globalSearchRef = useRef<HTMLLabelElement>(null)
   const navigationItems = useMemo(
-    () => canViewAllBranches && canViewAudit
+    () => examOnly
+      ? adminNavigation.filter((item) => item.children?.some((child) => ['AAR1', 'AAR2'].includes(child.id))).map((item) => ({ ...item, children: item.children?.filter((child) => ['AAR1', 'AAR2'].includes(child.id)) }))
+      : canViewAllBranches && canViewAudit
       ? adminNavigation
       : adminNavigation.map((item) => item.children
         ? { ...item, children: item.children.filter((child) => (canViewAllBranches || child.id !== 'BR1') && (canViewAudit || child.id !== 'AL1')) }
         : item).filter((item) => !item.children || item.children.length > 0),
-    [canViewAllBranches, canViewAudit],
+    [canViewAllBranches, canViewAudit, examOnly],
   )
 
 
@@ -125,11 +130,12 @@ export function AppShell({ children, branch, branches, activePage, academicYear,
     setMobileOpen(false)
   }
 
-  const historical = academicYear !== '2026-27'
   const instituteContext = useMemo(
     () => branches.find((item) => item.id === branch)?.name ?? 'Selected Branch',
     [branch, branches],
   )
+  const currentYearName = currentAcademicYear ?? academicYears.find((year) => year.isCurrent)?.name ?? '2026-27'
+  const historical = academicYear !== currentYearName
 
   return (
     <div className="app-shell" data-sidebar-collapsed={collapsed}>
@@ -147,6 +153,7 @@ export function AppShell({ children, branch, branches, activePage, academicYear,
         </div>
 
         <div className="topbar-context">
+          {!examOnly && <>
           <label className="select-control branch-control">
             <span className="sr-only">Branch context</span>
             <Building2 aria-hidden="true" />
@@ -164,15 +171,14 @@ export function AppShell({ children, branch, branches, activePage, academicYear,
           <label className="select-control year-control">
             <span className="sr-only">Academic year</span>
             <select aria-label="Academic year" value={academicYear} onChange={(event) => onAcademicYearChange(event.target.value)}>
-              <option value="2026-27">AY 2026-27</option>
-              <option value="2025-26">AY 2025-26</option>
-              <option value="2024-25">AY 2024-25</option>
+              {(academicYears.length ? academicYears : [{ id: '2026-27', name: '2026-27', isCurrent: true }, { id: '2025-26', name: '2025-26', isCurrent: false }, { id: '2024-25', name: '2024-25', isCurrent: false }]).map((year) => <option value={year.name} key={year.id}>AY {year.name}</option>)}
             </select>
             <ChevronDown aria-hidden="true" />
           </label>
+          </>}
         </div>
 
-        <label className="global-search" ref={globalSearchRef}>
+        {!examOnly && <label className="global-search" ref={globalSearchRef}>
           <Search aria-hidden="true" />
           <span className="sr-only">Global search</span>
           <input id="app-global-search" type="search" value={searchQuery} placeholder="Search students, staff, roles…" aria-label="Global search" aria-expanded={searchOpen} aria-controls="global-search-results" aria-haspopup="dialog" onFocus={() => setSearchOpen(true)} onChange={(event) => { setSearchQuery(event.target.value); setSearchOpen(true) }} />
@@ -182,9 +188,10 @@ export function AppShell({ children, branch, branches, activePage, academicYear,
             {globalSearchLinks.filter((item) => !searchQuery || `${item.label} ${item.destination} ${item.description}`.toLowerCase().includes(searchQuery.trim().toLowerCase())).map((item) => <button type="button" key={item.label} onMouseDown={(event) => event.preventDefault()} onClick={() => { navigateTo(item.destination); setSearchOpen(false); setSearchQuery('') }}><span className="search-result-icon" aria-hidden="true">{item.label.slice(0, 1)}</span><span><strong>{item.label}</strong><small>{item.description}</small></span></button>)}
             {searchQuery && !globalSearchLinks.some((item) => `${item.label} ${item.destination} ${item.description}`.toLowerCase().includes(searchQuery.trim().toLowerCase())) && <p className="search-results-empty">No quick links match. Try another search.</p>}
           </div>}
-        </label>
+        </label>}
 
         <div className="topbar-actions">
+          {!examOnly && <>
           <IconButton label="Pending approvals" onClick={() => navigateTo('Award Approvals')}>
             <CheckSquare aria-hidden="true" />
             <span className="notification-count">11</span>
@@ -193,6 +200,7 @@ export function AppShell({ children, branch, branches, activePage, academicYear,
             <Bell aria-hidden="true" />
             <span className="notification-dot" />
           </IconButton>
+          </>}
           <div className="profile-menu" ref={profileMenuRef}>
             <button type="button" className="profile-trigger" aria-label="Open profile menu" aria-expanded={profileOpen} onClick={() => setProfileOpen((value) => !value)}>
               <span>AM</span>
@@ -200,8 +208,10 @@ export function AppShell({ children, branch, branches, activePage, academicYear,
             </button>
             {profileOpen && <div className="profile-menu-popover" role="menu">
               <button type="button" role="menuitem" onClick={() => { setProfileOpen(false); navigateTo('My Account') }}>My Profile</button>
+              {!examOnly && <>
               <button type="button" role="menuitem" onClick={() => { setProfileOpen(false); navigateTo('Branding & Profile') }}>Institute Settings</button>
               <button type="button" role="menuitem" onClick={() => { setProfileOpen(false); navigateTo('Help & Support') }}>Help & support</button>
+              </>}
               <button type="button" role="menuitem" disabled={signingOut} onClick={() => {
                 setSigningOut(true)
                 void onSignOut().finally(() => setSigningOut(false))
@@ -266,12 +276,7 @@ export function AppShell({ children, branch, branches, activePage, academicYear,
       </nav>
 
       <main className="main-content">
-        {historical && (
-          <div className="historical-banner" role="alert">
-            Viewing {academicYear} — historical data, read-only.
-            <button type="button" onClick={() => onAcademicYearChange('2026-27')}>Return to current year</button>
-          </div>
-        )}
+        {historical && !examOnly && <div className="historical-banner" role="status">Viewing {academicYear} historical data. Some records may remain editable when your role allows it.<button type="button" onClick={() => onAcademicYearChange(currentYearName)}>Return to current year ({currentYearName})</button></div>}
         <div className="content-container" data-branch={instituteContext}>{children}</div>
       </main>
     </div>

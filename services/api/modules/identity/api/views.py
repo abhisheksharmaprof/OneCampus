@@ -1,10 +1,12 @@
 import logging
+import uuid
+from datetime import timedelta
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.tokens import default_token_generator
 from django.core.mail import send_mail
-from django.db import transaction
+from django.db import DatabaseError, transaction
 from django.db.models import Q
 from django.utils import timezone
 from django.utils.encoding import force_bytes
@@ -12,7 +14,8 @@ from django.utils.http import urlsafe_base64_encode
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.exceptions import AuthenticationFailed
-from rest_framework.permissions import AllowAny
+from rest_framework.parsers import FormParser, MultiPartParser
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.authentication import JWTAuthentication
@@ -20,22 +23,35 @@ from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from modules.identity.models import OtpChallenge
+from modules.file_storage.models import FileAsset, FileRetentionRecord
+from modules.file_storage.services import (
+    FileStorageError,
+    FileValidationError,
+    blob_name,
+    container_for,
+    read_url,
+    upload_blob,
+    validate_upload,
+)
+from modules.identity.models import OtpChallenge, UserProfile
 from modules.identity.services import (
     eligible_session_memberships,
     issue_session_tokens,
     resolve_session_context,
 )
 from modules.institutes.models import Institute, InstituteMembership
+from modules.people.models import StaffProfile
 from platform_core.api.throttles import DynamicScopedRateThrottle
 
 from .errors import SessionContextInactive
 from .serializers import (
+    AccountImportSerializer,
+    AccountProfileUpdateSerializer,
     OtpChallengeSerializer,
     OtpResendSerializer,
     PasswordResetConfirmSerializer,
-    PasswordSetupSerializer,
     PasswordResetRequestSerializer,
+    PasswordSetupSerializer,
     SessionCreateSerializer,
     SessionCurrentSuccessSerializer,
     SessionLogoutSerializer,
@@ -45,6 +61,289 @@ from .serializers import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+ACCOUNT_IMPORT_FIELDS = {
+    "dateOfBirth": "date_of_birth",
+    "gender": "gender",
+    "bloodGroup": "blood_group",
+    "maritalStatus": "marital_status",
+    "fatherName": "father_name",
+    "motherName": "mother_name",
+    "currentAddress": "current_address",
+    "permanentAddress": "permanent_address",
+    "qualification": "qualification",
+    "experienceYears": "experience_years",
+    "previousWorkplace": "previous_workplace",
+}
+
+
+def _account_session_context(request):
+    claims = request.auth or {}
+    client = claims.get("client")
+    if client == "platform-admin":
+        context = resolve_session_context(user=request.user, client=client)
+    elif client and claims.get("membership_id"):
+        context = resolve_session_context(
+            user=request.user,
+            client=client,
+            membership_id=claims.get("membership_id"),
+        )
+    else:
+        context = None
+    if context is None:
+        raise SessionContextInactive()
+    return context
+
+
+def _private_account_response(data):
+    response = Response({"success": True, "data": data})
+    response["Cache-Control"] = "private, no-store"
+    return response
+
+
+def _account_data(user, context):
+    profile, _ = UserProfile.objects.get_or_create(user=user)
+    photo_url = None
+    if profile.photo_asset and profile.photo_asset.status == FileAsset.Status.ACTIVE:
+        try:
+            photo_url = read_url(profile.photo_asset)
+        except FileStorageError:
+            photo_url = None
+    membership = context.membership
+    staff = None
+    if membership:
+        try:
+            staff_profile = StaffProfile.objects.filter(
+                user=user, institute_id=membership.institute_id
+            ).select_related("institute", "user").first()
+        except DatabaseError:
+            logger.warning("account-staff-profile-unavailable user_id=%s", user.id)
+            staff_profile = None
+        if staff_profile:
+            imported = {
+                "dateOfBirth": staff_profile.date_of_birth,
+                "gender": staff_profile.gender,
+                "bloodGroup": staff_profile.blood_group,
+                "maritalStatus": staff_profile.marital_status,
+                "fatherName": staff_profile.father_name,
+                "motherName": staff_profile.mother_name,
+                "currentAddress": staff_profile.current_address,
+                "permanentAddress": staff_profile.permanent_address,
+                "qualification": staff_profile.qualification,
+                "experienceYears": staff_profile.experience_years,
+                "previousWorkplace": staff_profile.previous_school_name,
+            }
+            staff = {
+                "institute": staff_profile.institute.name,
+                "employeeCode": staff_profile.employee_code,
+                "department": staff_profile.department,
+                "employmentType": staff_profile.employment_type,
+                "joiningDate": staff_profile.date_of_joining,
+                "shift": staff_profile.shift,
+                "workLocation": staff_profile.work_location,
+                "importable": {
+                    key: value.isoformat() if hasattr(value, "isoformat") else value
+                    for key, value in imported.items()
+                    if value not in (None, "")
+                    and getattr(profile, ACCOUNT_IMPORT_FIELDS[key]) in (None, "")
+                },
+            }
+    return {
+        "id": str(user.id),
+        "displayName": user.get_full_name().strip() or user.email,
+        "firstName": user.first_name,
+        "lastName": user.last_name,
+        "email": user.email,
+        "phone": user.phone,
+        "phoneVerified": user.phone_verified_at is not None,
+        "photoUrl": photo_url,
+        "alternateEmail": profile.alternate_email,
+        "alternateEmailVerified": False,
+        "activeRole": context.profile["activeRole"],
+        "roles": context.profile["roles"],
+        "institute": membership.institute.name if membership else None,
+        "branch": membership.branch.name if membership and membership.branch else None,
+        "personal": {
+            key: getattr(profile, value)
+            for key, value in {
+                "dateOfBirth": "date_of_birth", "gender": "gender", "bloodGroup": "blood_group",
+                "maritalStatus": "marital_status", "fatherName": "father_name",
+                "motherName": "mother_name", "currentAddress": "current_address",
+                "permanentAddress": "permanent_address",
+            }.items()
+        },
+        "workExperience": {
+            "qualification": profile.qualification,
+            "experienceYears": profile.experience_years,
+            "previousWorkplace": profile.previous_workplace,
+        },
+        "staff": staff,
+    }
+
+
+class AccountProfileView(APIView):
+    permission_classes = (IsAuthenticated,)
+
+    def get(self, request):
+        context = _account_session_context(request)
+        return _private_account_response(_account_data(request.user, context))
+
+    def patch(self, request):
+        context = _account_session_context(request)
+        serializer = AccountProfileUpdateSerializer(
+            data=request.data, context={"user": request.user}
+        )
+        serializer.is_valid(raise_exception=True)
+        profile, _ = UserProfile.objects.get_or_create(user=request.user)
+        fields = []
+        for public, value in serializer.validated_data.items():
+            model_field = {
+                "alternateEmail": "alternate_email",
+                "experienceYears": "experience_years",
+                "previousWorkplace": "previous_workplace",
+            }.get(public, public)
+            setattr(profile, model_field, value.strip() if isinstance(value, str) else value)
+            fields.append(model_field)
+        if fields:
+            profile.save(update_fields=(*fields, "updated_at"))
+        return _private_account_response(_account_data(request.user, context))
+
+
+class AccountProfilePhotoView(APIView):
+    permission_classes = (IsAuthenticated,)
+    parser_classes = (MultiPartParser, FormParser)
+
+    def post(self, request):
+        _account_session_context(request)
+        photo = request.FILES.get("file")
+        if not photo:
+            return Response(
+                {"success": False, "error": {"message": "Choose a photo to upload."}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            extension, mime_type, checksum = validate_upload(
+                photo, FileAsset.AssetType.PROFILE_PHOTO
+            )
+            asset_id = uuid.uuid4()
+            container = container_for(FileAsset.AssetType.PROFILE_PHOTO)
+            name = blob_name(
+                institute_id=None,
+                owner_type=FileAsset.OwnerType.USER_PROFILE,
+                owner_id=request.user.id,
+                asset_type=FileAsset.AssetType.PROFILE_PHOTO,
+                asset_id=asset_id,
+                extension=extension,
+            )
+            etag, version_id = upload_blob(
+                container=container, name=name, upload=photo, content_type=mime_type
+            )
+        except FileValidationError as error:
+            return Response(
+                {"success": False, "error": {"message": str(error)}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except FileStorageError:
+            logger.exception("account-photo-upload-failed user_id=%s", request.user.id)
+            return Response(
+                {
+                    "success": False,
+                    "error": {"message": "The photo could not be saved. Please try again."},
+                },
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+        asset = FileAsset.objects.create(
+            id=asset_id,
+            owner_type=FileAsset.OwnerType.USER_PROFILE,
+            owner_id=request.user.id,
+            asset_type=FileAsset.AssetType.PROFILE_PHOTO,
+            container_name=container,
+            blob_name=name,
+            original_file_name=photo.name[:255], extension=extension, mime_type=mime_type,
+            detected_mime_type=mime_type, file_size=photo.size, sha256_hash=checksum,
+            checksum_algorithm="SHA256", checksum_value=checksum, storage_etag=etag,
+            storage_version_id=version_id, status=FileAsset.Status.ACTIVE,
+            visibility=FileAsset.Visibility.PRIVATE, uploaded_by=request.user,
+        )
+        profile, _ = UserProfile.objects.get_or_create(user=request.user)
+        previous = profile.photo_asset
+        profile.photo_asset = asset
+        profile.save(update_fields=("photo_asset", "updated_at"))
+        if previous:
+            now = timezone.now()
+            previous.status = FileAsset.Status.SOFT_DELETED
+            previous.deleted_at = now
+            previous.retention_until = now + timedelta(days=settings.FILE_STORAGE_RETENTION_DAYS)
+            previous.version += 1
+            previous.save(
+                update_fields=("status", "deleted_at", "retention_until", "version", "updated_at")
+            )
+            FileRetentionRecord.objects.update_or_create(
+                file_asset=previous,
+                defaults={
+                    "deleted_at": now,
+                    "retention_until": previous.retention_until,
+                    "deleted_by": None,
+                    "delete_reason": "REPLACED",
+                },
+            )
+        return _private_account_response({"photoUrl": read_url(asset)})
+
+
+class AccountProfileImportView(APIView):
+    permission_classes = (IsAuthenticated,)
+
+    def post(self, request):
+        context = _account_session_context(request)
+        if not context.membership:
+            return Response(
+                {
+                    "success": False,
+                    "error": {"message": "No active institute staff profile is available."},
+                },
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        serializer = AccountImportSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        staff = StaffProfile.objects.filter(
+            user=request.user, institute_id=context.membership.institute_id
+        ).first()
+        if not staff:
+            return Response(
+                {
+                    "success": False,
+                    "error": {"message": "No staff profile is available in the active institute."},
+                },
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        with transaction.atomic():
+            profile, _ = UserProfile.objects.select_for_update().get_or_create(user=request.user)
+            imported, skipped = [], []
+            for key in serializer.validated_data["fields"]:
+                target = ACCOUNT_IMPORT_FIELDS[key]
+                current = getattr(profile, target)
+                value = getattr(
+                    staff, {"previous_workplace": "previous_school_name"}.get(target, target)
+                )
+                if current not in (None, ""):
+                    skipped.append(key)
+                elif value in (None, ""):
+                    skipped.append(key)
+                else:
+                    setattr(profile, target, value)
+                    imported.append(target)
+            if imported:
+                profile.save(update_fields=(*imported, "updated_at"))
+        return _private_account_response({
+            "imported": [
+                key
+                for key in serializer.validated_data["fields"]
+                if ACCOUNT_IMPORT_FIELDS[key] in imported
+            ],
+            "skipped": skipped,
+            "profile": _account_data(request.user, context),
+        })
 
 
 def deliver_otp_code(*, user, code):

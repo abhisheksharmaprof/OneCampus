@@ -9,6 +9,12 @@ export interface UploadProgress {
   percent: number
 }
 
+export interface CentralUploadOptions extends Omit<InitiateFileUploadInput, 'originalFileName' | 'mediaType' | 'sizeBytes' | 'sha256' | 'contentMd5'> {
+  onPhase?: (phase: 'hashing' | 'initiating' | 'uploading' | 'completing') => void
+  onProgress?: (progress: UploadProgress) => void
+  signal?: AbortSignal
+}
+
 function toHex(buffer: ArrayBuffer): string {
   return Array.from(new Uint8Array(buffer), (byte) => byte.toString(16).padStart(2, '0')).join('')
 }
@@ -86,4 +92,33 @@ export function completeFileUpload(
     body: JSON.stringify({ ...(etag ? { etag: etag.replaceAll('"', '') } : {}) }),
     signal,
   })
+}
+
+export async function uploadFile(
+  accessToken: string,
+  file: File,
+  options: CentralUploadOptions,
+): Promise<FileAsset> {
+  const { onPhase, onProgress, signal, ...declaration } = options
+  onPhase?.('hashing')
+  const checksums = await calculateFileChecksums(file)
+  if (signal?.aborted) throw signal.reason
+  onPhase?.('initiating')
+  const authorization = await initiateFileUpload(
+    accessToken,
+    crypto.randomUUID(),
+    {
+      ...declaration,
+      originalFileName: file.name,
+      mediaType: file.type,
+      sizeBytes: file.size,
+      ...checksums,
+      visibility: declaration.visibility ?? 'PRIVATE',
+    },
+    signal,
+  )
+  onPhase?.('uploading')
+  const etag = await putFileDirectly(authorization, file, onProgress, signal)
+  onPhase?.('completing')
+  return completeFileUpload(accessToken, authorization, etag, signal)
 }

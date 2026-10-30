@@ -75,6 +75,7 @@ export interface ClassSection {
   academicYear: AcademicYear
   sectionName: string
   classTeacher: { id: string; fullName: string; email: string } | null
+  roomId: string | null
   maxStrength: number | null
   enrollmentCount: number
   createdAt: string
@@ -113,6 +114,7 @@ export interface ClassSectionInput {
   academicYearId: string
   sectionName: string
   classTeacherId?: string | null
+  roomId?: string | null
   maxStrength?: number | null
 }
 

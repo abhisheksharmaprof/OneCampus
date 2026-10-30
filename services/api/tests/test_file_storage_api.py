@@ -90,7 +90,7 @@ def test_direct_upload_contract_never_returns_bucket_or_key(authenticated_admin,
     completed_data = completed.json()["data"]
     assert completed_data["state"] == "ACTIVE"
     assert completed_data["owner"] == {"type": "INSTITUTE", "id": str(institute.id)}
-    assert "url" not in completed_data
+    assert completed_data["url"]
 
 
 @pytest.mark.django_db

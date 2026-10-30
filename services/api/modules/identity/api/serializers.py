@@ -163,3 +163,56 @@ class AccountUpdateSerializer(serializers.Serializer):
 
         return attrs
 
+
+class AccountProfileUpdateSerializer(serializers.Serializer):
+    alternateEmail = serializers.EmailField(required=False, allow_blank=True)
+    qualification = serializers.CharField(required=False, allow_blank=True, max_length=160)
+    experienceYears = serializers.IntegerField(
+        required=False, allow_null=True, min_value=0, max_value=80
+    )
+    previousWorkplace = serializers.CharField(required=False, allow_blank=True, max_length=200)
+
+    def to_internal_value(self, data):
+        if hasattr(data, "keys"):
+            unknown = set(data.keys()) - set(self.fields)
+            if unknown:
+                raise serializers.ValidationError(
+                    {key: ["This field cannot be changed here."] for key in unknown}
+                )
+        return super().to_internal_value(data)
+
+    def validate_alternateEmail(self, value):
+        user = self.context["user"]
+        if value and value.casefold() == user.email.casefold():
+            raise serializers.ValidationError(
+                "Use an alternate email different from your sign-in email."
+            )
+        return value
+
+
+class AccountImportSerializer(serializers.Serializer):
+    fields = serializers.ListField(
+        child=serializers.ChoiceField(
+            choices=(
+                "dateOfBirth", "gender", "bloodGroup", "maritalStatus", "fatherName",
+                "motherName", "currentAddress", "permanentAddress", "qualification",
+                "experienceYears", "previousWorkplace",
+            )
+        ),
+        allow_empty=False,
+    )
+
+    def to_internal_value(self, data):
+        if hasattr(data, "keys"):
+            unknown = set(data.keys()) - set(self.fields)
+            if unknown:
+                raise serializers.ValidationError(
+                    {key: ["This field cannot be changed here."] for key in unknown}
+                )
+        return super().to_internal_value(data)
+
+    def validate_fields(self, values):
+        if len(values) != len(set(values)):
+            raise serializers.ValidationError("Choose each field only once.")
+        return values
+

@@ -119,6 +119,13 @@ class IsAttendanceLeaveReviewer(BasePermission):
             InstituteMembership.Role.TEACHER,
         }:
             return False
+        # Exam-scoped admin-web eligibility must not grant a teacher access to
+        # the separate attendance leave-review workflow.
+        if (
+            context.membership.role == InstituteMembership.Role.TEACHER
+            and token.get("client") == "admin-web"
+        ):
+            return False
         _attach_context(request, context.membership)
         _record_api_action(request, context.membership)
         return True

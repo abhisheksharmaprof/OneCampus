@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useReducer, useState } from 'react'
 import { AdminApiError } from '../../admin/admin.api'
-import { fetchInstituteBranding } from '../../finance/finance.api'
-import { patchDocumentTemplate, type DocumentTemplateRecord } from '../documents.api'
+import { fetchInstituteBranding, type InstituteBranding } from '../../finance/finance.api'
+import { listDocumentTemplates, patchDocumentTemplate, type DocumentTemplateRecord } from '../documents.api'
 import { sampleDocumentData } from '../engine/datasets'
 import { openPrintWindow, renderDocumentHtml } from '../engine/docRender'
 import { prepareQrDataUrls } from '../engine/qrPayload'
+import { isLayoutV2 } from '../engine/types'
 import { CanvasStage } from './CanvasStage'
 import { ComponentRail } from './ComponentRail'
 import { PropertiesPanel } from './PropertiesPanel'
@@ -22,23 +23,53 @@ export function StudioEditor({ accessToken, template, onBack }: StudioEditorProp
   const [saving, setSaving] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
   const [savedOnce, setSavedOnce] = useState(false)
+  const [revision, setRevision] = useState(template.revision ?? 1)
 
-  useEffect(() => { dispatch({ type: 'load', layout: template.layout }) }, [template])
+  useEffect(() => {
+    if (isLayoutV2(template.layout)) {
+      dispatch({ type: 'load', layout: template.layout })
+    }
+  }, [template])
 
-  const [branding, setBranding] = useState<{ name: string; logoUrl: string | null } | null>(null)
+  const [branding, setBranding] = useState<InstituteBranding | null>(null)
+  const [letterheads, setLetterheads] = useState<DocumentTemplateRecord[]>([])
 
   useEffect(() => {
     const controller = new AbortController()
     fetchInstituteBranding(accessToken, controller.signal)
-      .then((result) => setBranding({ name: result.name, logoUrl: result.logoUrl }))
+      .then(setBranding)
       .catch(() => { /* sample values remain — branding is a nicety in the editor */ })
     return () => controller.abort()
   }, [accessToken])
 
+  useEffect(() => {
+    if (template.category === 'LETTERHEAD') return
+    const controller = new AbortController()
+    listDocumentTemplates(accessToken, 'LETTERHEAD', controller.signal)
+      .then((result) => setLetterheads(result.items))
+      .catch(() => setLetterheads([]))
+    return () => controller.abort()
+  }, [accessToken, template.category])
+
   const data = useMemo(() => {
     const sample = sampleDocumentData(template.category)
     if (branding) {
-      sample.tokens.school_name = branding.name
+      const schoolAddress = [
+        branding.addressLine1,
+        branding.addressLine2,
+        [branding.city, branding.state, branding.postalCode].filter(Boolean).join(' '),
+        branding.country,
+      ].filter(Boolean).join(', ')
+      Object.assign(sample.tokens, {
+        school_name: branding.name,
+        school_address: schoolAddress,
+        school_gstin: branding.gstNo ?? '',
+        school_pan: branding.panNo ?? '',
+        school_phone: branding.primaryPhone ?? '',
+        school_email: branding.primaryEmail ?? '',
+        school_website: branding.websiteUrl ?? '',
+        authorised_signatory: [branding.contactName, branding.contactDesignation].filter(Boolean).join(' · '),
+      })
       sample.images['institute-logo'] = branding.logoUrl
     }
     return sample
@@ -48,14 +79,22 @@ export function StudioEditor({ accessToken, template, onBack }: StudioEditorProp
     setSaving(true)
     setNotice(null)
     try {
-      await patchDocumentTemplate(accessToken, template.id, { layout: state.layout })
+      const updated = await patchDocumentTemplate(accessToken, template.id, {
+        layout: state.layout,
+        expectedRevision: revision,
+      })
+      if (updated.revision) setRevision(updated.revision)
       dispatch({ type: 'markSaved' })
       setSavedOnce(true)
       setNotice('Saved.')
     } catch (cause) {
-      setNotice(cause instanceof AdminApiError
-        ? (cause.fieldErrors.layout?.[0] ?? cause.message)
-        : 'The template could not be saved.')
+      if (cause instanceof AdminApiError && (cause.code === 'STALE_TEMPLATE_REVISION' || cause.status === 409)) {
+        setNotice('Conflict: This template was updated elsewhere. Reload before saving.')
+      } else {
+        setNotice(cause instanceof AdminApiError
+          ? (cause.fieldErrors.layout?.[0] ?? cause.message)
+          : 'The template could not be saved.')
+      }
     } finally {
       setSaving(false)
     }
@@ -92,6 +131,17 @@ export function StudioEditor({ accessToken, template, onBack }: StudioEditorProp
         </span>
         </div>
         <div className="stu-editor-tools">
+        {template.category !== 'LETTERHEAD' && <label className="stu-letterhead-select">Letterhead<select aria-label="Document letterhead" value={state.layout.letterhead?.templateId ?? ''} onChange={(event) => {
+          const selected = letterheads.find((item) => item.id === event.target.value)
+          const letterhead = selected && isLayoutV2(selected.layout)
+            ? { templateId: selected.id, name: selected.name, elements: selected.layout.pages[0]?.elements ?? [] }
+            : null
+          dispatch({ type: 'setLetterhead', letterhead })
+        }}>
+          <option value="">No letterhead</option>
+          {state.layout.letterhead && !letterheads.some((item) => item.id === state.layout.letterhead?.templateId) && <option value={state.layout.letterhead.templateId}>{state.layout.letterhead.name} (saved copy)</option>}
+          {letterheads.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+        </select>{letterheads.length === 0 && <a href="/template-studio">Create a letterhead in Template Studio</a>}</label>}
         <button type="button" className="stu-btn" aria-label="Undo last change" onClick={() => dispatch({ type: 'undo' })} disabled={state.historyIndex <= 0}>↶ Undo</button>
         <button type="button" className="stu-btn" onClick={() => dispatch({ type: 'redo' })} disabled={state.historyIndex >= state.history.length - 1}>↷ Redo</button>
         <label className="stu-sample-toggle">

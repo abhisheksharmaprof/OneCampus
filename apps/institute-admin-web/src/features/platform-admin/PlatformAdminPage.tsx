@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { PageSkeleton } from '../../components/admin-ui'
 import {
   Activity,
   AlertTriangle,
@@ -181,7 +182,7 @@ export function PlatformAdminPage({ session, onSignOut, onSessionExpired }: { se
     </aside>
     <main className="platform-main">
       {section === 'overview' && <Overview pending={pending} onNavigate={goTo} />}
-      {section === 'registrations' && (loading ? <div className="platform-page"><div className="platform-panel platform-empty">Loading registration queue…</div></div> : <RegistrationQueue applications={applications} allApplications={allApplications} onAction={updateApplication} />)}
+      {section === 'registrations' && (loading ? <div className="platform-page"><PageSkeleton name="platform-registration-queue" label="Loading registration queue" variant="list" /></div> : <RegistrationQueue applications={applications} allApplications={allApplications} onAction={updateApplication} />)}
       {section === 'institutes' && <Institutes query={query} setQuery={setQuery} rows={filteredInstitutes} />}
       {section === 'subscriptions' && <Subscriptions />}
       {section === 'users' && <UsersAccess />}

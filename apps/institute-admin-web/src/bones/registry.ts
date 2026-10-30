@@ -28,12 +28,24 @@ import _attendance_overview_charts from './attendance-overview-charts.bones.json
 import _attendance_overview_calendar from './attendance-overview-calendar.bones.json'
 import _attendance_reports_analytics from './attendance-reports-analytics.bones.json'
 import _attendance_leave_approvals from './attendance-leave-approvals.bones.json'
+import _attendance_settings from './attendance-settings.bones.json'
 import _timetable_teachers from './timetable-teachers.bones.json'
 import _timetable_structure from './timetable-structure.bones.json'
 import _timetable_assignments from './timetable-assignments.bones.json'
 import _timetable_import from './timetable-import.bones.json'
 import _timetable_timetable from './timetable-timetable.bones.json'
 import _timetable_saved_view from './timetable-saved-view.bones.json'
+import _subscription from './subscription.bones.json'
+import _rooms_facilities from './rooms-facilities.bones.json'
+import _finance_section from './finance-section.bones.json'
+import _campus_list from './campus-list.bones.json'
+import _platform_registration_queue from './platform-registration-queue.bones.json'
+import _staff_timetable from './staff-timetable.bones.json'
+import _student_profile from './student-profile.bones.json'
+import _staff_profile from './staff-profile.bones.json'
+import _parent_profile from './parent-profile.bones.json'
+import _role_builder from './role-builder.bones.json'
+import _audit_log_table from './audit-log-table.bones.json'
 
 registerBones({
   "dashboard": _dashboard,
@@ -62,10 +74,22 @@ registerBones({
   "attendance-overview-calendar": _attendance_overview_calendar,
   "attendance-reports-analytics": _attendance_reports_analytics,
   "attendance-leave-approvals": _attendance_leave_approvals,
+  "attendance-settings": _attendance_settings,
   "timetable-teachers": _timetable_teachers,
   "timetable-structure": _timetable_structure,
   "timetable-assignments": _timetable_assignments,
   "timetable-import": _timetable_import,
   "timetable-timetable": _timetable_timetable,
   "timetable-saved-view": _timetable_saved_view,
+  "subscription": _subscription,
+  "rooms-facilities": _rooms_facilities,
+  "finance-section": _finance_section,
+  "campus-list": _campus_list,
+  "platform-registration-queue": _platform_registration_queue,
+  "staff-timetable": _staff_timetable,
+  "student-profile": _student_profile,
+  "staff-profile": _staff_profile,
+  "parent-profile": _parent_profile,
+  "role-builder": _role_builder,
+  "audit-log-table": _audit_log_table,
 })

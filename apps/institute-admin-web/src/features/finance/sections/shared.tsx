@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { AdminApiError } from '../../admin/admin.api'
+import { PageSkeleton } from '../../../components/admin-ui'
 
 export type FinanceSectionProps = { accessToken: string; branchId?: string; onNavigate: (path: string) => void }
 
@@ -50,7 +51,7 @@ export function StatePanel(props: {
   emptyMessage?: string
   children: ReactNode
 }) {
-  if (props.loading) return <div className="fin-state fin-state--loading" role="status">Loading…</div>
+  if (props.loading) return <PageSkeleton name="finance-section" label="Loading finance data" variant="list" />
   if (props.error) {
     return (
       <div className="fin-state fin-state--error" role="alert">

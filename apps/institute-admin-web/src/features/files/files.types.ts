@@ -27,6 +27,7 @@ export interface FileAsset {
   sizeBytes: number
   state: 'PENDING' | 'PROCESSING' | 'ACTIVE' | 'QUARANTINED' | 'FAILED' | 'DELETED' | 'DISPOSED'
   visibility: FileVisibility
+  url?: string | null
   createdAt: string
   deletedAt: string | null
   retentionUntil: string | null

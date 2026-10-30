@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { CheckCircle2, FileText, Image as ImageIcon, Save, Eye } from 'lucide-react'
+import { CheckCircle2, Image as ImageIcon, Save, Eye } from 'lucide-react'
 import { FileUploadField, Modal, PageSkeleton } from '../../components/admin-ui'
 import { Card, SectionHeader } from '../../components/ui/primitives'
 import { adminRequest, adminUpload } from '../admin/admin.api'
@@ -76,10 +76,6 @@ export function InstituteProfilePage({ accessToken }: { accessToken: string }) {
   const [logoFile, setLogoFile] = useState<File | null>(null)
   const [logoAssetId, setLogoAssetId] = useState<string | null>(null)
   const [logoPreview, setLogoPreview] = useState('')
-  const [letterheadFile, setLetterheadFile] = useState<File | null>(null)
-  const [letterheadAssetId, setLetterheadAssetId] = useState<string | null>(null)
-  const [letterheadPreview, setLetterheadPreview] = useState('')
-  const [letterheadMimeType, setLetterheadMimeType] = useState('')
 
   useEffect(() => {
     if (!logoFile) {
@@ -90,14 +86,6 @@ export function InstituteProfilePage({ accessToken }: { accessToken: string }) {
     setLogoPreview(previewUrl)
     return () => URL.revokeObjectURL(previewUrl)
   }, [logoFile])
-
-  useEffect(() => {
-    if (!letterheadFile) return
-    const previewUrl = URL.createObjectURL(letterheadFile)
-    setLetterheadPreview(previewUrl)
-    setLetterheadMimeType(letterheadFile.type)
-    return () => URL.revokeObjectURL(previewUrl)
-  }, [letterheadFile])
 
   const removeLogo = async () => {
     setUploadError('')
@@ -141,59 +129,6 @@ export function InstituteProfilePage({ accessToken }: { accessToken: string }) {
     }
   }
 
-  const removeLetterhead = async () => {
-    setUploadError('')
-    if (!letterheadAssetId) {
-      setLetterheadFile(null)
-      setLetterheadPreview('')
-      return
-    }
-    setUploading(true)
-    try {
-      await adminRequest(accessToken, `files/${letterheadAssetId}`, { method: 'DELETE' })
-      setLetterheadFile(null)
-      setLetterheadAssetId(null)
-      setLetterheadPreview('')
-      setLetterheadMimeType('')
-    } catch (cause) {
-      setUploadError(cause instanceof Error ? cause.message : 'The institute letterhead could not be removed.')
-    } finally {
-      setUploading(false)
-    }
-  }
-
-  const uploadLetterhead = async (file: File | null, validationError?: string) => {
-    setLetterheadFile(file)
-    setUploadError(validationError ?? '')
-    if (validationError) return
-    if (!file) {
-      await removeLetterhead()
-      return
-    }
-    if (!profile?.id) {
-      setUploadError('Institute details are still loading. Please try again.')
-      setLetterheadFile(null)
-      return
-    }
-    setUploading(true)
-    try {
-      const asset = await adminUpload<LogoAsset>(accessToken, 'files', file, {
-        ownerType: 'INSTITUTE',
-        ownerId: profile.id,
-        assetType: 'LETTERHEAD',
-      })
-      setLetterheadAssetId(asset.id)
-      setLetterheadMimeType(asset.mimeType ?? file.type)
-      if (asset.url) setLetterheadPreview(asset.url)
-    } catch (cause) {
-      setLetterheadFile(null)
-      setLetterheadPreview('')
-      setUploadError(cause instanceof Error ? cause.message : 'The institute letterhead could not be uploaded.')
-    } finally {
-      setUploading(false)
-    }
-  }
-
   // Live preview branding state
   const [displayName, setDisplayName] = useState('')
   const [primaryColor, setPrimaryColor] = useState('#2E5AAC')
@@ -215,17 +150,6 @@ export function InstituteProfilePage({ accessToken }: { accessToken: string }) {
           })
           .catch(() => {
             // The profile remains usable if the optional logo metadata request fails.
-          })
-        void adminRequest<LogoAsset[]>(accessToken, `files?ownerType=INSTITUTE&ownerId=${encodeURIComponent(data.id)}&assetType=LETTERHEAD`)
-          .then((assets) => {
-            const letterhead = assets[0]
-            if (!letterhead) return
-            setLetterheadAssetId(letterhead.id)
-            setLetterheadMimeType(letterhead.mimeType ?? '')
-            if (letterhead.url) setLetterheadPreview(letterhead.url)
-          })
-          .catch(() => {
-            // The profile remains usable if the optional letterhead request fails.
           })
         setError('')
       })
@@ -337,6 +261,14 @@ export function InstituteProfilePage({ accessToken }: { accessToken: string }) {
 
     const gstNo = form.get('gstNo') as string
     if (gstNo !== null && gstNo !== undefined) payload.gstNo = gstNo
+
+    for (const field of [
+      'address_line_1', 'city', 'state', 'postalCode', 'country',
+      'primaryEmail', 'primaryPhone', 'alternatePhone', 'websiteUrl',
+      'contactName', 'contactDesignation', 'contactPhone', 'contactEmail',
+    ]) {
+      payload[field] = String(form.get(field) ?? '').trim()
+    }
 
     try {
       const data = await adminRequest<InstituteProfile>(accessToken, 'institute', {
@@ -557,19 +489,6 @@ export function InstituteProfilePage({ accessToken }: { accessToken: string }) {
                       <input name="branchName" defaultValue={headOffice?.name ?? ''} placeholder="Head office campus name" required />
                     </label>
 
-                    <label className="field-label">
-                      Letterhead
-                      <FileUploadField
-                        kind="document"
-                        label="Upload letterhead"
-                        onChange={(file, validationError) => {
-                          if (!file || validationError) return
-                          setDocumentFile(file)
-                          setDocumentType('letterhead')
-                          setUploadModalOpen(true)
-                        }}
-                      />
-                    </label>
                   </div>
 
                   <div className="field-full-width">
@@ -614,7 +533,7 @@ export function InstituteProfilePage({ accessToken }: { accessToken: string }) {
             <div id="sec-branding">
               <Card className="profile-card">
                 <SectionHeader title="4. Branding Assets" />
-                <p className="section-caption">Logo and letterhead uploads or removals apply immediately. Save Changes applies institute and head office details.</p>
+                <p className="section-caption">Logo updates apply immediately. Build reusable letterhead designs in Template Studio. Save Changes applies institute and head office details.</p>
                 <div className="branding-two-col">
                   <div className="branding-controls">
                     <section className="branding-asset-panel">
@@ -630,14 +549,6 @@ export function InstituteProfilePage({ accessToken }: { accessToken: string }) {
                       </div>
                     </section>
 
-                    <section className="branding-asset-panel letterhead-panel">
-                      <div className="branding-asset-heading"><div><strong>Letterhead</strong><small>Upload the official institute letterhead for documents.</small></div><span className="asset-status optional">Optional</span></div>
-                      <div className="letterhead-preview">
-                        {letterheadPreview ? (letterheadMimeType === 'application/pdf' ? <iframe src={letterheadPreview} title="Institute letterhead preview" /> : <img src={letterheadPreview} alt="Institute letterhead preview" />) : <div className="letterhead-empty"><FileText size={20} /><span>No letterhead uploaded</span></div>}
-                      </div>
-                      <div className="letterhead-actions"><FileUploadField kind="document" label="Upload letterhead" value={letterheadFile} disabled={uploading} onChange={uploadLetterhead} /><button type="button" className="btn-link-sm danger-text" onClick={() => void removeLetterhead()} disabled={uploading || !letterheadAssetId}>Remove letterhead</button></div>
-                    </section>
-
                   </div>
 
                   {/* Real-time Live Preview Card */}
@@ -647,7 +558,6 @@ export function InstituteProfilePage({ accessToken }: { accessToken: string }) {
                       className="report-preview-box"
                       style={{ borderTop: `4px solid ${primaryColor}` }}
                     >
-                      {letterheadPreview ? <div className="preview-letterhead-asset">{letterheadMimeType === 'application/pdf' ? <iframe src={letterheadPreview} title="Letterhead live preview" /> : <img src={letterheadPreview} alt="Uploaded institute letterhead" />}</div> : null}
                       <div className="preview-brand-header">
                         {logoSource ? <img src={logoSource} alt="Uploaded institute logo" /> : <span className="preview-logo-fallback">{displayName.slice(0, 2).toUpperCase()}</span>}
                         <div><div className="preview-inst-name">{displayName || 'Institute Name'}</div><small>Official institute document</small></div>

@@ -3,6 +3,7 @@ from datetime import timedelta
 from pathlib import Path
 
 import environ
+from corsheaders.defaults import default_headers
 from django.core.exceptions import ImproperlyConfigured
 
 BASE_DIR = Path(__file__).resolve().parents[2]
@@ -185,6 +186,8 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 AUTH_USER_MODEL = "identity.User"
 
 CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS", default=["http://localhost:5173"])
+# The signed file-upload initiation request uses this header for safe retries.
+CORS_ALLOW_HEADERS = (*default_headers, "idempotency-key")
 # Institute login pages use one subdomain per slug. Keep the wildcard scoped to
 # the configured public app domain instead of allowing arbitrary origins.
 _public_app_domain_pattern = re.escape(PUBLIC_APP_DOMAIN)

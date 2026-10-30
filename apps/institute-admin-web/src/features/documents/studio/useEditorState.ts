@@ -37,6 +37,7 @@ export type EditorAction =
   | { type: 'setPage'; patch: Partial<LayoutV2['page']> }
   | { type: 'setZones'; patch: Partial<LayoutZones> }
   | { type: 'setWatermark'; patch: Partial<LayoutWatermark> }
+  | { type: 'setLetterhead'; letterhead: LayoutV2['letterhead'] }
   | { type: 'undo' } | { type: 'redo' }
   | { type: 'setZoom'; zoom: number }
   | { type: 'setSampleMode'; on: boolean }
@@ -129,6 +130,7 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
     case 'setPage': return { ...state, layout: { ...state.layout, page: { ...state.layout.page, ...action.patch } }, dirty: true }
     case 'setZones': return { ...state, layout: { ...state.layout, zones: { ...state.layout.zones, ...action.patch } }, dirty: true }
     case 'setWatermark': return { ...state, layout: { ...state.layout, watermark: { ...state.layout.watermark, ...action.patch } }, dirty: true }
+    case 'setLetterhead': return pushHistory(state, { ...state.layout, letterhead: action.letterhead })
     case 'undo': {
       if (state.historyIndex <= 0) return state
       const index = state.historyIndex - 1

@@ -115,16 +115,37 @@ function requestHeaders(accessToken: string, options: RequestInit): Record<strin
   return headers
 }
 
-/** Uploads are sent as multipart without setting Content-Type manually (the browser adds the boundary). */
-export function adminUpload<T>(accessToken: string, path: string, file: File, fields: Record<string, string> = {}): Promise<T> {
-  const body = new FormData()
-  body.append('file', file, file.name)
-  Object.entries(fields).forEach(([key, value]) => body.append(key, value))
-  return adminRequest<T>(accessToken, path, { method: 'POST', body })
+/** Compatibility entry point; all admin file uploads use the signed R2 pipeline. */
+export async function adminUpload<T>(accessToken: string, path: string, file: File, fields: Record<string, string> = {}): Promise<T> {
+  const { uploadFile } = await import('../files/files.api')
+  const student = path.match(/^students\/([0-9a-f-]+)\/(photo|documents)$/i)
+  const staff = path.match(/^staff\/([0-9a-f-]+)\/(photo|documents)$/i)
+  let owner: { type: 'STUDENT' | 'STAFF' | 'INSTITUTE'; id: string }
+  let category: 'PROFILE_PHOTO' | 'ID_DOCUMENT' | 'CERTIFICATE' | 'LOGO'
+  let visibility: 'PRIVATE' | 'PUBLIC' = 'PRIVATE'
+
+  if (student || staff) {
+    const match = student ?? staff!
+    owner = { type: student ? 'STUDENT' : 'STAFF', id: match[1] }
+    category = match[2] === 'photo' ? 'PROFILE_PHOTO' : 'ID_DOCUMENT'
+  } else if (path === 'institute/logo') {
+    const institute = await adminRequest<{ id: string }>(accessToken, 'institute')
+    owner = { type: 'INSTITUTE', id: institute.id }
+    category = 'LOGO'
+    visibility = 'PUBLIC'
+  } else if (path === 'institute/documents') {
+    const institute = await adminRequest<{ id: string }>(accessToken, 'institute')
+    owner = { type: 'INSTITUTE', id: institute.id }
+    category = fields.documentType?.toLowerCase().includes('certificate') ? 'CERTIFICATE' : 'ID_DOCUMENT'
+  } else {
+    throw new AdminApiError('This file upload destination is not supported.', { code: 'UPLOAD_DESTINATION_UNSUPPORTED' })
+  }
+
+  return await uploadFile(accessToken, file, { owner, category, visibility }) as T
 }
 
-function fetchAdmin(accessToken: string, path: string, options: RequestInit): Promise<Response> {
-  return fetch(`${apiBaseUrl}/api/v1/admin/${path}`, {
+function fetchApi(accessToken: string, path: string, options: RequestInit, namespace: 'admin' | 'identity'): Promise<Response> {
+  return fetch(`${apiBaseUrl}/api/v1/${namespace}/${path}`, {
     ...options,
     headers: requestHeaders(accessToken, options),
   })
@@ -212,10 +233,11 @@ function isTokenExpired(token: string): boolean {
   }
 }
 
-export async function adminRequest<T>(
+async function authenticatedRequest<T>(
   accessToken: string,
   path: string,
   options: RequestInit = {},
+  namespace: 'admin' | 'identity',
 ): Promise<T> {
   let token = readStoredSession()?.accessToken ?? accessToken
   if (token && isTokenExpired(token)) {
@@ -226,7 +248,7 @@ export async function adminRequest<T>(
     }
   }
 
-  const response = await fetchAdmin(token, path, options)
+  const response = await fetchApi(token, path, options, namespace)
   if (response.status !== 401) return responseData<T>(response)
 
   // Decode before refreshing so a failed refresh preserves the original API error and trace ID.
@@ -250,7 +272,15 @@ export async function adminRequest<T>(
 
   // This is the sole retry path. A second 401 means the replacement credentials
   // cannot authenticate this session, so expire it instead of leaking an API error.
-  const retriedResponse = await fetchAdmin(refreshedAccessToken, path, options)
+  const retriedResponse = await fetchApi(refreshedAccessToken, path, options, namespace)
   if (retriedResponse.status === 401) expireStoredSession()
   return responseData<T>(retriedResponse)
+}
+
+export function adminRequest<T>(accessToken: string, path: string, options: RequestInit = {}): Promise<T> {
+  return authenticatedRequest(accessToken, path, options, 'admin')
+}
+
+export function identityRequest<T>(accessToken: string, path: string, options: RequestInit = {}): Promise<T> {
+  return authenticatedRequest(accessToken, path, options, 'identity')
 }

@@ -40,7 +40,19 @@ def eligible_session_memberships(
     if institute_id:
         memberships = memberships.filter(institute_id=institute_id)
     accepted = list(memberships)
-    if client:
+    if client == "admin-web":
+        from modules.access_control.exam_scopes import has_exam_web_access
+
+        accepted = [
+            membership for membership in accepted
+            if membership.role in CLIENT_ROLES[client]
+            or (
+                membership.role
+                in {InstituteMembership.Role.TEACHER, InstituteMembership.Role.STAFF}
+                and has_exam_web_access(user=user, membership=membership)
+            )
+        ]
+    elif client:
         accepted = [
             membership for membership in accepted if membership.role in CLIENT_ROLES[client]
         ]

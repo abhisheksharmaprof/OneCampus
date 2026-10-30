@@ -11,8 +11,7 @@
 -- alters tables, columns, indexes, constraints, seed permissions, or database
 -- functions must update this file in the same change.
 --
--- Snapshot revision: keep this line current with the latest included Django
--- migrations whenever the schema changes.
+-- Snapshot revision: academics migrations through 0027 (2026-10-29).
 -- ============================================================================
 -- Design principles:
 --  1. UUID primary keys everywhere (gen_random_uuid()) — never leak sequence
@@ -1260,6 +1259,16 @@ SELECT '00000000-0000-0000-0000-000000000004', id, '{}'::JSONB, now()
 FROM access_control_permission
 WHERE permission_key IN ('attendance.view_own_class','marks.view_own_class','leaderboard.view');
 
+-- Exam draft capabilities are deliberately not granted to default roles.
+INSERT INTO access_control_permission (id, permission_key, module, description, is_active, created_at, updated_at)
+VALUES
+(gen_random_uuid(), 'assessment.view', 'academics', 'View authorized exam drafts', TRUE, now(), now()),
+(gen_random_uuid(), 'assessment.edit', 'academics', 'Edit authorized exam drafts', TRUE, now(), now()),
+(gen_random_uuid(), 'assessment.publish', 'academics', 'Publish authorized exam setups', TRUE, now(), now()),
+(gen_random_uuid(), 'assessment.timetable.publish', 'academics', 'Publish validated exam timetables', TRUE, now(), now())
+ON CONFLICT (permission_key) DO UPDATE
+SET module = EXCLUDED.module, description = EXCLUDED.description, is_active = TRUE, updated_at = now();
+
 -- ---- Point categories (platform default, institute_id NULL) ----
 INSERT INTO point_categories (id, institute_id, name, description, icon) VALUES
 ('00000000-0000-0000-0000-000000000101', NULL, 'Academics',            'Test scores, assignments, and academic achievement', 'book'),
@@ -1340,6 +1349,229 @@ CREATE INDEX "academic_operations_created_by_id_ea24c525" ON "academic_operation
 CREATE INDEX "academic_operations_institute_id_3477507d" ON "academic_operations" ("institute_id");
 CREATE INDEX "academic_op_institu_63d585_idx" ON "academic_operations" ("institute_id", "kind", "updated_at" DESC);
 CREATE INDEX "academic_op_branch__626d7c_idx" ON "academic_operations" ("branch_id", "kind", "status");
+
+-- Structured exam drafts and setup publication snapshots. Runtime DDL is owned by
+-- academics.0023/.0024 and access_control.0006/.0007; these definitions keep the
+-- fresh-install snapshot aligned.
+CREATE TABLE exams (
+    created_at TIMESTAMPTZ NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL,
+    id UUID PRIMARY KEY,
+    name VARCHAR(250) NOT NULL,
+    category VARCHAR(16) NOT NULL,
+    custom_label VARCHAR(100) NOT NULL DEFAULT '',
+    starts_on DATE,
+    ends_on DATE,
+    instructions TEXT NOT NULL DEFAULT '',
+    status VARCHAR(16) NOT NULL DEFAULT 'DRAFT',
+    revision INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 0),
+    academic_year_id UUID NOT NULL,
+    branch_id UUID NOT NULL,
+    coordinator_id UUID,
+    created_by_id UUID,
+    institute_id UUID NOT NULL,
+    source_exam_id UUID,
+    term_id UUID,
+    updated_by_id UUID,
+    CONSTRAINT ck_exam_status_valid CHECK (status IN ('DRAFT', 'PUBLISHED')),
+    CONSTRAINT ck_exam_revision_positive CHECK (revision > 0),
+    CONSTRAINT ck_exam_date_pair_order CHECK (
+        (starts_on IS NULL AND ends_on IS NULL)
+        OR (starts_on IS NOT NULL AND ends_on IS NOT NULL AND ends_on >= starts_on)
+    ),
+    CONSTRAINT exams_academic_year_fk FOREIGN KEY (academic_year_id)
+        REFERENCES academic_years(id) ON DELETE RESTRICT,
+    CONSTRAINT exams_branch_fk FOREIGN KEY (branch_id)
+        REFERENCES branches(id) ON DELETE RESTRICT,
+    CONSTRAINT exams_coordinator_fk FOREIGN KEY (coordinator_id)
+        REFERENCES users(id) ON DELETE SET NULL,
+    CONSTRAINT exams_created_by_fk FOREIGN KEY (created_by_id)
+        REFERENCES users(id) ON DELETE SET NULL,
+    CONSTRAINT exams_institute_fk FOREIGN KEY (institute_id)
+        REFERENCES institutes(id) ON DELETE RESTRICT,
+    CONSTRAINT exams_source_exam_fk FOREIGN KEY (source_exam_id)
+        REFERENCES exams(id) ON DELETE SET NULL,
+    CONSTRAINT exams_term_fk FOREIGN KEY (term_id)
+        REFERENCES academic_terms(id) ON DELETE RESTRICT,
+    CONSTRAINT exams_updated_by_fk FOREIGN KEY (updated_by_id)
+        REFERENCES users(id) ON DELETE SET NULL
+);
+CREATE INDEX exam_institute_year_idx
+    ON exams (institute_id, academic_year_id, status, starts_on);
+CREATE INDEX exam_branch_year_idx
+    ON exams (branch_id, academic_year_id, starts_on);
+CREATE INDEX exams_academic_year_id_e95594d4 ON exams (academic_year_id);
+CREATE INDEX exams_branch_id_083dceec ON exams (branch_id);
+CREATE INDEX exams_coordinator_id_3070947e ON exams (coordinator_id);
+CREATE INDEX exams_created_by_id_6cd46f54 ON exams (created_by_id);
+CREATE INDEX exams_institute_id_6a41ed87 ON exams (institute_id);
+CREATE INDEX exams_source_exam_id_360ab91f ON exams (source_exam_id);
+CREATE INDEX exams_term_id_6baa9868 ON exams (term_id);
+CREATE INDEX exams_updated_by_id_4c355ce0 ON exams (updated_by_id);
+
+CREATE TABLE exam_publication_snapshots (
+    created_at TIMESTAMPTZ NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL,
+    id UUID PRIMARY KEY,
+    revision INTEGER NOT NULL CHECK (revision >= 0),
+    snapshot JSONB NOT NULL,
+    published_by_id_snapshot UUID NOT NULL,
+    published_by_display_snapshot VARCHAR(150) NOT NULL DEFAULT '',
+    exam_id UUID NOT NULL,
+    published_by_id UUID,
+    CONSTRAINT ck_exam_publication_revision_positive CHECK (revision > 0),
+    CONSTRAINT uq_exam_publication_revision UNIQUE (exam_id, revision),
+    CONSTRAINT exam_publication_exam_fk FOREIGN KEY (exam_id)
+        REFERENCES exams(id) ON DELETE RESTRICT,
+    CONSTRAINT exam_publication_published_by_fk FOREIGN KEY (published_by_id)
+        REFERENCES users(id) ON DELETE SET NULL
+);
+CREATE INDEX ON exam_publication_snapshots (exam_id);
+CREATE INDEX ON exam_publication_snapshots (published_by_id);
+
+CREATE TABLE exam_draft_changes (
+    created_at TIMESTAMPTZ NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL,
+    id UUID PRIMARY KEY,
+    revision INTEGER NOT NULL CHECK (revision >= 0),
+    actor_id_snapshot UUID NOT NULL,
+    actor_display_snapshot VARCHAR(150) NOT NULL DEFAULT '',
+    action VARCHAR(24) NOT NULL,
+    changes JSONB NOT NULL DEFAULT '{}'::jsonb,
+    actor_id UUID,
+    exam_id UUID NOT NULL,
+    CONSTRAINT ck_exam_change_revision_positive CHECK (revision > 0),
+    CONSTRAINT uq_exam_change_revision UNIQUE (exam_id, revision),
+    CONSTRAINT exam_changes_actor_fk FOREIGN KEY (actor_id)
+        REFERENCES users(id) ON DELETE SET NULL,
+    CONSTRAINT exam_changes_exam_fk FOREIGN KEY (exam_id)
+        REFERENCES exams(id) ON DELETE CASCADE
+);
+CREATE INDEX exam_change_timeline_idx ON exam_draft_changes (exam_id, created_at);
+CREATE INDEX exam_draft_changes_actor_id_eeb2a9f6 ON exam_draft_changes (actor_id);
+CREATE INDEX exam_draft_changes_exam_id_c6615100 ON exam_draft_changes (exam_id);
+
+CREATE TABLE exam_request_receipts (
+    created_at TIMESTAMPTZ NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL,
+    id UUID PRIMARY KEY,
+    actor_id_snapshot UUID NOT NULL,
+    actor_display_snapshot VARCHAR(150) NOT NULL DEFAULT '',
+    action VARCHAR(16) NOT NULL,
+    request_id UUID NOT NULL,
+    fingerprint VARCHAR(64) NOT NULL,
+    saved_revision INTEGER NOT NULL CHECK (saved_revision >= 0),
+    actor_id UUID,
+    exam_id UUID,
+    institute_id UUID NOT NULL,
+    CONSTRAINT ck_exam_receipt_revision_positive CHECK (saved_revision > 0),
+    CONSTRAINT uq_exam_request_receipt_key
+        UNIQUE (institute_id, actor_id_snapshot, action, request_id),
+    CONSTRAINT exam_receipts_actor_fk FOREIGN KEY (actor_id)
+        REFERENCES users(id) ON DELETE SET NULL,
+    CONSTRAINT exam_receipts_exam_fk FOREIGN KEY (exam_id)
+        REFERENCES exams(id) ON DELETE SET NULL,
+    CONSTRAINT exam_receipts_institute_fk FOREIGN KEY (institute_id)
+        REFERENCES institutes(id) ON DELETE RESTRICT
+);
+CREATE INDEX exam_receipt_request_idx ON exam_request_receipts (institute_id, request_id);
+CREATE INDEX exam_request_receipts_actor_id_0b92be6f ON exam_request_receipts (actor_id);
+CREATE INDEX exam_request_receipts_exam_id_73626d4f ON exam_request_receipts (exam_id);
+CREATE INDEX exam_request_receipts_institute_id_4578bad9 ON exam_request_receipts (institute_id);
+
+CREATE TABLE exam_targets (
+    created_at TIMESTAMPTZ NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL,
+    id UUID PRIMARY KEY,
+    class_section_id UUID NOT NULL,
+    exam_id UUID NOT NULL,
+    CONSTRAINT uq_exam_target_section UNIQUE (exam_id, class_section_id),
+    CONSTRAINT exam_targets_class_section_fk FOREIGN KEY (class_section_id)
+        REFERENCES class_sections(id) ON DELETE RESTRICT,
+    CONSTRAINT exam_targets_exam_fk FOREIGN KEY (exam_id)
+        REFERENCES exams(id) ON DELETE CASCADE
+);
+CREATE INDEX exam_targets_class_section_id_6da37e1f ON exam_targets (class_section_id);
+CREATE INDEX exam_targets_exam_id_03b316e7 ON exam_targets (exam_id);
+
+-- Subject selection, draft paper timing, and explicit elective candidate
+-- assignments; runtime DDL is owned by academics.0025–0027.
+CREATE TABLE "exam_subject_selections" (
+    "created_at" TIMESTAMPTZ NOT NULL,
+    "updated_at" TIMESTAMPTZ NOT NULL,
+    "id" UUID NOT NULL PRIMARY KEY,
+    "class_subject_id" UUID NOT NULL,
+    "target_id" UUID NOT NULL,
+    "theory_max" NUMERIC(6,2),
+    "practical_max" NUMERIC(6,2),
+    "pass_marks" NUMERIC(6,2),
+    CONSTRAINT "uq_exam_target_class_subject" UNIQUE ("target_id", "class_subject_id")
+);
+ALTER TABLE "exam_subject_selections"
+    ADD CONSTRAINT "exam_subject_selecti_class_subject_id_09efefd2_fk_class_sub"
+    FOREIGN KEY ("class_subject_id") REFERENCES "class_subjects" ("id")
+    DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE "exam_subject_selections"
+    ADD CONSTRAINT "exam_subject_selections_target_id_a0df717d_fk_exam_targets_id"
+    FOREIGN KEY ("target_id") REFERENCES "exam_targets" ("id")
+    DEFERRABLE INITIALLY DEFERRED;
+CREATE INDEX "exam_subject_selections_class_subject_id_09efefd2"
+    ON "exam_subject_selections" ("class_subject_id");
+CREATE INDEX "exam_subject_selections_target_id_a0df717d"
+    ON "exam_subject_selections" ("target_id");
+
+CREATE TABLE "exam_paper_schedules" (
+    "created_at" TIMESTAMPTZ NOT NULL,
+    "updated_at" TIMESTAMPTZ NOT NULL,
+    "id" UUID NOT NULL PRIMARY KEY,
+    "scheduled_on" DATE NULL,
+    "start_time" TIME NULL,
+    "end_time" TIME NULL,
+    "room_id" UUID NULL REFERENCES "rooms" ("id") DEFERRABLE INITIALLY DEFERRED,
+    "invigilator_id" UUID NULL REFERENCES "users" ("id") DEFERRABLE INITIALLY DEFERRED,
+    "selection_id" UUID NOT NULL UNIQUE,
+    CONSTRAINT "ck_exam_paper_schedule_complete" CHECK (
+        ("end_time" IS NULL AND "scheduled_on" IS NULL AND "start_time" IS NULL)
+        OR ("end_time" IS NOT NULL AND "scheduled_on" IS NOT NULL AND "start_time" IS NOT NULL)
+    ),
+    CONSTRAINT "ck_exam_paper_schedule_time_order" CHECK (
+        "end_time" > "start_time" OR "end_time" IS NULL
+    )
+);
+ALTER TABLE "exam_paper_schedules"
+    ADD CONSTRAINT "exam_paper_schedules_selection_id_93c9c55c_fk_exam_subj"
+    FOREIGN KEY ("selection_id") REFERENCES "exam_subject_selections" ("id")
+    DEFERRABLE INITIALLY DEFERRED;
+
+CREATE TABLE "exam_elective_student_assignments" (
+    "created_at" TIMESTAMPTZ NOT NULL,
+    "updated_at" TIMESTAMPTZ NOT NULL,
+    "id" UUID NOT NULL PRIMARY KEY,
+    "enrollment_id" UUID NOT NULL,
+    "selection_id" UUID NOT NULL,
+    CONSTRAINT "uq_exam_elective_selection_enrollment"
+        UNIQUE ("selection_id", "enrollment_id")
+);
+ALTER TABLE "exam_elective_student_assignments"
+    ADD CONSTRAINT "exam_elective_studen_enrollment_id_4dfbea28_fk_student_e"
+    FOREIGN KEY ("enrollment_id") REFERENCES "student_enrollments" ("id")
+    DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE "exam_elective_student_assignments"
+    ADD CONSTRAINT "exam_elective_studen_selection_id_d830362d_fk_exam_subj"
+    FOREIGN KEY ("selection_id") REFERENCES "exam_subject_selections" ("id")
+    DEFERRABLE INITIALLY DEFERRED;
+CREATE INDEX "exam_elective_student_assignments_enrollment_id_4dfbea28"
+    ON "exam_elective_student_assignments" ("enrollment_id");
+CREATE INDEX "exam_elective_student_assignments_selection_id_d830362d"
+    ON "exam_elective_student_assignments" ("selection_id");
+CREATE INDEX "exam_electi_enrollm_545a99_idx"
+    ON "exam_elective_student_assignments" ("enrollment_id", "selection_id");
+
+-- These exam records are accessed through the Django API; RLS is enabled as
+-- defense in depth and no direct Supabase Data API policies are granted.
+ALTER TABLE "exam_subject_selections" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "exam_paper_schedules" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "exam_elective_student_assignments" ENABLE ROW LEVEL SECURITY;
 
 --
 -- Create model DocumentTemplate

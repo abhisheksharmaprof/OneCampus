@@ -9,10 +9,11 @@ import {
   type AcademicOperationInput, type AcademicOperationKind,
 } from './academics.api'
 import type { AcademicClass, ClassSubject } from './academics.types'
-import { BoneScreen } from '../../components/admin-ui'
+import { ExamDraftsPage } from './exams/ExamDraftsPage'
+import { PageSkeleton } from '../../components/admin-ui'
 import './academic-operations.css'
 
-export type AcademicOperationsPageId = 'ACL1' | 'ACH1' | 'ACE1' | 'ACM1' | 'ACC1' | 'AHT1' | 'AAR1'
+export type AcademicOperationsPageId = 'ACL1' | 'ACH1' | 'ACE1' | 'ACM1' | 'ACC1' | 'AHT1' | 'AAR1' | 'AAR2'
 type Metric = { label: string; value: string | number; hint: string; icon: ReactNode; tone?: 'blue' | 'green' | 'amber' | 'violet' | 'red' }
 type EditorKind = AcademicOperationKind | null
 
@@ -44,8 +45,7 @@ function EmptyState({ noun, onCreate }: { noun: string; onCreate?: () => void })
 }
 
 function LoadingState() {
-  const content = <div className="aop-empty"><span className="aop-spinner" /><h2>Loading academic data…</h2></div>
-  return <BoneScreen name="academics-operations" loading label="Loading academic data" fallback={content}>{content}</BoneScreen>
+  return <PageSkeleton name="academics-operations" label="Loading academic data" variant="list" />
 }
 
 function downloadRecords(filename: string, records: unknown) {
@@ -139,8 +139,9 @@ function TeachingLearning({ props }: { props: OperationViewProps }) {
 type OperationViewProps = { records: AcademicOperation[]; loading: boolean; open: (kind: AcademicOperationKind) => void; edit: (record: AcademicOperation) => void; patch: (record: AcademicOperation, status: string) => void; remove: (record: AcademicOperation) => void; exportData: () => void }
 
 export function AcademicOperationsPage({ page, accessToken, selectedBranch }: { page: AcademicOperationsPageId; accessToken: string; selectedBranch: string }) {
-  if (page === 'AAR1') return <main className="aop-page"><PageHeader title="Assessment & Results" description="This section is being rebuilt from scratch." /><section className="aop-card"><h2>Assessment & Results</h2><p>Exam setup, hall tickets, marks entry, and result documents will be added here.</p></section></main>
-  const kindsByPage: Record<AcademicOperationsPageId, AcademicOperationKind[]> = { ACL1: ['LESSON_PLAN'], ACH1: ['HOMEWORK'], ACE1: ['EXAM', 'QUESTION'], ACM1: ['MARK'], ACC1: [], AHT1: ['LESSON_PLAN', 'HOMEWORK'], AAR1: [] }
+  if (page === 'AAR1') return <ExamDraftsPage accessToken={accessToken} selectedBranch={selectedBranch} />
+  if (page === 'AAR2') return <ExamDraftsPage accessToken={accessToken} selectedBranch={selectedBranch} initialAdmitCards />
+  const kindsByPage: Record<AcademicOperationsPageId, AcademicOperationKind[]> = { ACL1: ['LESSON_PLAN'], ACH1: ['HOMEWORK'], ACE1: ['EXAM', 'QUESTION'], ACM1: ['MARK'], ACC1: [], AHT1: ['LESSON_PLAN', 'HOMEWORK'], AAR1: [], AAR2: [] }
   const store = useOperations(accessToken, kindsByPage[page], selectedBranch); const [editorKind, setEditorKind] = useState<EditorKind>(null); const [editing, setEditing] = useState<AcademicOperation>(); const [saving, setSaving] = useState(false); const [notice, setNotice] = useState('')
   const notify = (message: string) => { setNotice(message); window.setTimeout(() => setNotice(''), 2600) }
   const open = (kind: AcademicOperationKind) => { setEditing(undefined); setEditorKind(kind) }; const edit = (record: AcademicOperation) => { setEditing(record); setEditorKind(record.kind) }

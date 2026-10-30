@@ -2,6 +2,7 @@ import { AlertTriangle, Inbox, X } from 'lucide-react'
 import { Skeleton as BoneyardSkeleton } from 'boneyard-js/react'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { ToastContext, type ToastInput } from './toast-context'
+import { ScreenSkeletonFixture } from './ScreenSkeletonFixture'
 
 export type { ToastInput, ToastTone } from './toast-context'
 
@@ -52,12 +53,14 @@ export interface SkeletonProps {
  * `children` and the generated registry is used for pixel-aligned bones at
  * runtime. `fallback` keeps loading usable before the first registry build.
  */
-export function BoneScreen({ name, loading, children, fallback, label = 'Loading' }: {
+export function BoneScreen({ name, loading, children, fallback, fixture, label = 'Loading', color }: {
   name: string
   loading: boolean
   children: ReactNode
   fallback?: ReactNode
+  fixture?: ReactNode
   label?: string
+  color?: string
 }) {
   return (
     <div role="status" aria-label={label}>
@@ -65,6 +68,8 @@ export function BoneScreen({ name, loading, children, fallback, label = 'Loading
       <BoneyardSkeleton
         name={name}
         loading={loading}
+        fixture={fixture ?? <ScreenSkeletonFixture name={name} />}
+        color={color}
         select="viewport"
         animate="shimmer"
         transition

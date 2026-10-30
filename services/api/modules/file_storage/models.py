@@ -16,6 +16,7 @@ class FileAsset(TimeStampedModel):
         CLASS = "CLASS", "Class"
         SUBJECT = "SUBJECT", "Subject"
         TERM = "TERM", "Term"
+        USER_PROFILE = "USER_PROFILE", "User profile"
 
     class AssetType(models.TextChoices):
         PROFILE_PHOTO = "PROFILE_PHOTO", "Profile photo"
@@ -50,7 +51,11 @@ class FileAsset(TimeStampedModel):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     institute = models.ForeignKey(
-        "institutes.Institute", on_delete=models.CASCADE, related_name="file_assets"
+        "institutes.Institute",
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="file_assets",
     )
     branch = models.ForeignKey(
         "institutes.Branch",

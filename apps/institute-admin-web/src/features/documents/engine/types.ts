@@ -1,7 +1,10 @@
 /** Layout JSON v2 + document data types. Mirrors the backend validator's contract
  *  (services/api/modules/documents/validators.py). Coordinates are millimetres. */
 
-export type DocumentCategory = 'FEE_INVOICE' | 'FEE_RECEIPT' | 'MARKSHEET' | 'ID_CARD' | 'CERTIFICATE'
+import type { LayoutV3 } from '@campusone/document-engine'
+export { isLayoutV3 } from '@campusone/document-engine'
+
+export type DocumentCategory = 'FEE_INVOICE' | 'FEE_RECEIPT' | 'MARKSHEET' | 'ID_CARD' | 'ADMIT_CARD' | 'CERTIFICATE' | 'LETTERHEAD'
 export type PageSizeId = 'A4P' | 'A4L' | 'CR80' | 'A4P_HALF_TOP' | 'A4P_HALF_BOTTOM'
 
 export const PAGE_SIZES_MM: Record<PageSizeId, { w: number; h: number }> = {
@@ -23,6 +26,8 @@ export interface BaseElement {
   w: number
   h: number
   locked?: boolean
+  /** False hides this block in rendered documents while keeping it editable in Studio. */
+  visible?: boolean
 }
 
 export interface TextStyle { fontSize: number; bold: boolean; italic: boolean; align: TextAlign; color: string }
@@ -37,6 +42,8 @@ export interface TableColumn {
   formula?: string
   widthPct: number
   align: TextAlign
+  /** False hides this column while preserving its data binding and formulas. */
+  visible?: boolean
 }
 export interface TableStyle { headerBg: string; headerColor: string; fontSize: number }
 export interface TableElement extends BaseElement { type: 'table'; datasetId: string; columns: TableColumn[]; style: TableStyle }
@@ -67,7 +74,14 @@ export interface LayoutV2 {
   page: { sizeId: PageSizeId; marginMm: number; background: string | { imageUrl: string } }
   zones: LayoutZones
   watermark: LayoutWatermark
+  /** Saved letterhead template pinned by value so later library edits do not change existing documents. */
+  letterhead?: { templateId: string; name: string; elements: CanvasElement[] } | null
   pages: { elements: CanvasElement[] }[]
+}
+
+/** Type guard checking if an unknown value satisfies LayoutV2. */
+export function isLayoutV2(layout: unknown): layout is LayoutV2 {
+  return typeof layout === 'object' && layout !== null && (layout as Record<string, unknown>).version === 2
 }
 
 /** Everything a renderer needs about ONE concrete document (real or sample). */

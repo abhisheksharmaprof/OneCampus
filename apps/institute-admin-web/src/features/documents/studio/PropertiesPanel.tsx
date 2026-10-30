@@ -35,7 +35,7 @@ export function PropertiesPanel({ category, state, dispatch, data }: PropertiesP
       <div className="stu-pbody">
         {tab === 'element'
           ? (selected
-            ? <ElementForm element={selected} dispatch={dispatch} data={data} />
+            ? <ElementForm category={category} element={selected} dispatch={dispatch} data={data} />
             : <p className="stu-empty"><b>Nothing selected.</b><br />Click a block on the page, or drag a component from the left rail.</p>)
           : <PageForm category={category} state={state} dispatch={dispatch} />}
       </div>
@@ -43,13 +43,21 @@ export function PropertiesPanel({ category, state, dispatch, data }: PropertiesP
   )
 }
 
-function ElementForm({ element, dispatch, data }: { element: CanvasElement; dispatch: Dispatch<EditorAction>; data: DocumentData }) {
+function ElementForm({ category, element, dispatch, data }: { category: DocumentCategory; element: CanvasElement; dispatch: Dispatch<EditorAction>; data: DocumentData }) {
   const patch = (values: Partial<CanvasElement>) =>
     dispatch({ type: 'updateElement', id: element.id, patch: values })
   const commit = () => dispatch({ type: 'commit' })
+  const required = element.type === 'table'
+    ? (category === 'ADMIT_CARD' ? element.datasetId === 'exam_schedule' : category === 'MARKSHEET' && element.datasetId === 'marks')
+    : element.type === 'text' && ((category === 'ADMIT_CARD' || category === 'MARKSHEET') && /\{\{\s*(student_name|exam_name)\s*\}\}/.test(element.content))
 
   return (
     <div>
+      <label className="stu-visibility-toggle">
+        <input type="checkbox" checked={element.visible !== false} disabled={required}
+          onChange={(event) => { patch({ visible: event.target.checked }); commit() }} />
+        Show in document{required && <span>Required</span>}
+      </label>
       {element.type === 'text' && (
         <>
           <div className="stu-field">
@@ -96,7 +104,7 @@ function ElementForm({ element, dispatch, data }: { element: CanvasElement; disp
         </>
       )}
 
-      {element.type === 'table' && <TableForm element={element} patch={patch} commit={commit} data={data} />}
+      {element.type === 'table' && <TableForm category={category} element={element} patch={patch} commit={commit} data={data} />}
       {element.type === 'totals' && <TotalsForm element={element} patch={patch} commit={commit} />}
 
       {element.type === 'shape' && (
@@ -142,9 +150,12 @@ function ElementForm({ element, dispatch, data }: { element: CanvasElement; disp
   )
 }
 
-function TableForm({ element, patch, commit, data }: { element: TableElement; patch: (values: Partial<CanvasElement>) => void; commit: () => void; data: DocumentData }) {
+function TableForm({ category, element, patch, commit, data }: { category: DocumentCategory; element: TableElement; patch: (values: Partial<CanvasElement>) => void; commit: () => void; data: DocumentData }) {
   const setColumns = (columns: TableColumn[]) => patch({ columns })
   const previewRows = useMemo(() => computeTableRows(element.columns, data.rows), [element.columns, data.rows])
+  const requiredColumns = category === 'ADMIT_CARD' && element.datasetId === 'exam_schedule'
+    ? ['c1', 'c2', 'c3']
+    : category === 'MARKSHEET' && element.datasetId === 'marks' ? ['c1', 'c3'] : []
   const quickFormulas: [string, string][] = element.datasetId === 'marks'
     ? [['Grade', '=IF([Marks]>=91,"A1",IF([Marks]>=81,"A2","B1"))'], ['Rank', '=RANK([Marks])'], ['Percentile', '=PERCENTILE([Marks])']]
     : [['Amount', '=[Qty]*[Rate]'], ['Amount w/ tax', '=[Qty]*[Rate]*1.18']]
@@ -158,6 +169,8 @@ function TableForm({ element, patch, commit, data }: { element: TableElement; pa
       {element.columns.map((column, index) => (
         <div className="stu-colcard" key={column.id}>
           <div className="top">
+            <label className="stu-column-visibility"><input type="checkbox" checked={column.visible !== false} disabled={requiredColumns.includes(column.id)}
+              onChange={(event) => { setColumns(element.columns.map((item, position) => position === index ? { ...item, visible: event.target.checked } : item)); commit() }} /> Show{requiredColumns.includes(column.id) && <span>Required</span>}</label>
             <input value={column.label} onChange={(event) =>
               setColumns(element.columns.map((candidate, position) => position === index ? { ...candidate, label: event.target.value } : candidate))} onBlur={commit} />
             <select value={column.type} onChange={(event) => {

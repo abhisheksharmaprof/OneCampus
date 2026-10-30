@@ -1,6 +1,6 @@
 import { FormEvent, ReactNode, useEffect, useMemo, useState } from 'react'
 import { BarChart3, CalendarDays, Check, DoorOpen, Pencil, Plus, X } from 'lucide-react'
-import { Modal } from '../../components/admin-ui'
+import { Modal, PageSkeleton } from '../../components/admin-ui'
 import { adminRequest, type PageData } from '../admin/admin.api'
 import './rooms-facilities.css'
 
@@ -105,7 +105,7 @@ export function RoomsFacilitiesPage({ accessToken, branches, selectedBranch }: {
     </header>
     {error ? <div className="inline-error" role="alert">{error}</div> : null}
     {loadError ? <div className="rooms-state rooms-state--error" role="alert"><strong>Rooms could not be loaded</strong><p>{loadError}</p><button className="button-secondary" type="button" onClick={() => setRevision((value) => value + 1)}>Retry</button></div>
-      : loading ? <div className="rooms-state" role="status" aria-live="polite"><span className="rooms-spinner" aria-hidden="true" />Loading rooms and timetable status…</div>
+      : loading ? <PageSkeleton name="rooms-facilities" label="Loading rooms and timetable status" variant="list" />
         : <>
           {timetableError ? <div className="rooms-notice rooms-notice--error" role="status"><strong>Occupancy data unavailable.</strong> {timetableError} Scheduling availability still reflects each room’s saved setting.</div>
             : !timetable ? <div className="rooms-notice" role="status"><strong>No published timetable.</strong> Room occupancy is unknown until a timetable is published. Scheduling availability is shown separately.</div>

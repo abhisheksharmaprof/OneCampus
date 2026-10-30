@@ -1,18 +1,30 @@
 from django.shortcuts import get_object_or_404
+from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from drf_spectacular.utils import extend_schema
 
 from modules.institutes.models import Branch
 from platform_core.api.pagination import paginate_admin_queryset
 
 from ..exceptions import AccessDenied, InvalidOperation
-from ..models import UserRoleAssignment
+from ..models import Permission, UserRoleAssignment
 from ..policies import require_any_permission, require_permission
-from ..selectors import assignments_for_institute, role_for_institute, roles_for_institute
-from ..services import assign_role, clone_role, create_role, delete_role, revoke_assignment, update_role
+from ..selectors import (
+    assignments_for_institute,
+    effective_permission_keys,
+    role_for_institute,
+    roles_for_institute,
+)
+from ..services import (
+    assign_role,
+    clone_role,
+    create_role,
+    delete_role,
+    revoke_assignment,
+    update_role,
+)
 from .permissions import HasAccessControlSession
 from .serializers import (
     AssignmentCreateSerializer,
@@ -87,6 +99,7 @@ class RoleListCreateView(APIView):
             }
         )
 
+
     def post(self, request):
         serializer = RoleWriteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -109,6 +122,29 @@ class RoleListCreateView(APIView):
             {"success": True, "data": RoleSerializer(role).data},
             status=status.HTTP_201_CREATED,
         )
+
+
+class PermissionCatalogView(APIView):
+    permission_classes = (HasAccessControlSession,)
+
+    def get(self, request):
+        branch = _branch(request, request.query_params.get("branchId"))
+        _authorize_read(request, branch)
+        delegable = sorted(effective_permission_keys(
+            user=request.user, institute=request.institute, branch=branch
+        ))
+        permissions = Permission.objects.filter(is_active=True).order_by("module", "permission_key")
+        return Response({
+            "success": True,
+            "data": {
+                "permissions": [
+                    {"permissionKey": item.permission_key, "module": item.module,
+                     "description": item.description}
+                    for item in permissions
+                ],
+                "delegablePermissionKeys": delegable,
+            },
+        })
 
 
 class RoleDetailView(APIView):

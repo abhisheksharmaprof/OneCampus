@@ -1,7 +1,11 @@
 import { AdminApiError, adminRequest } from '../admin/admin.api'
-import type { AssignmentWriteInput, PageData, Role, RoleAssignment, RoleWriteInput } from './types'
+import type { AssignmentWriteInput, PageData, PermissionCatalog, Role, RoleAssignment, RoleWriteInput } from './types'
 
 export { AdminApiError }
+
+export function getPermissionCatalog(accessToken: string, signal?: AbortSignal) {
+  return adminRequest<PermissionCatalog>(accessToken, 'permission-catalog', { signal })
+}
 
 export interface RoleListQuery {
   page?: number

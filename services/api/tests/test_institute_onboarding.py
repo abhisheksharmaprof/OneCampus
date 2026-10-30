@@ -3,6 +3,7 @@ from rest_framework_simplejwt.tokens import AccessToken
 
 from modules.identity.models import User
 from modules.institutes.models import Branch, Institute, InstituteMembership
+from modules.people.models import StaffProfile
 
 
 @pytest.mark.django_db
@@ -73,6 +74,9 @@ def test_public_onboarding_atomically_creates_tenant_and_email_password_admin(ap
     assert membership.institute == institute
     assert membership.branch_id is None
     assert membership.role == InstituteMembership.Role.INSTITUTE_ADMIN
+    admin_profile = StaffProfile.objects.get(user=user, institute=institute)
+    assert admin_profile.department == "Administration"
+    assert admin_profile.invite_pending is False
 
     access_token = AccessToken(response.data["data"]["accessToken"])
     assert access_token["membership_id"] == str(membership.id)

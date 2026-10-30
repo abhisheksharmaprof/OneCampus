@@ -1,5 +1,7 @@
 from rest_framework import serializers
 
+from modules.file_storage.models import FileAsset
+from modules.file_storage.services import FileStorageError, read_url
 from modules.institutes.models import Branch
 from modules.people.models import Student
 
@@ -69,6 +71,7 @@ class StudentSerializer(serializers.ModelSerializer):
     vitaminASupplement = serializers.BooleanField(source="vitamin_a_supplement", read_only=True)
     mobileNumber = serializers.CharField(source="mobile_number", read_only=True)
     emailAddress = serializers.EmailField(source="email_address", read_only=True)
+    profilePhotoUrl = serializers.SerializerMethodField()
     studyingInClass = serializers.SerializerMethodField()
     classSectionName = serializers.SerializerMethodField()
     session = serializers.SerializerMethodField()
@@ -93,6 +96,21 @@ class StudentSerializer(serializers.ModelSerializer):
     def get_session(self, student):
         enrollment = self._current_enrollment(student)
         return enrollment.academic_year.name if enrollment else ""
+
+    def get_profilePhotoUrl(self, student):
+        asset = FileAsset.objects.filter(
+            institute=student.institute,
+            owner_type=FileAsset.OwnerType.STUDENT,
+            owner_id=student.id,
+            asset_type=FileAsset.AssetType.PROFILE_PHOTO,
+            status=FileAsset.Status.ACTIVE,
+        ).first()
+        if not asset:
+            return None
+        try:
+            return read_url(asset)
+        except FileStorageError:
+            return None
 
     class Meta:
         model = Student
@@ -140,6 +158,7 @@ class StudentSerializer(serializers.ModelSerializer):
             "vitaminASupplement",
             "mobileNumber",
             "emailAddress",
+            "profilePhotoUrl",
             "studyingInClass",
             "classSectionName",
             "session",

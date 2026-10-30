@@ -3,6 +3,7 @@ import secrets
 import uuid
 from datetime import timedelta
 
+from django.conf import settings
 from django.contrib.auth.base_user import BaseUserManager
 from django.contrib.auth.models import AbstractUser
 from django.core.exceptions import ValidationError
@@ -61,6 +62,32 @@ class User(AbstractUser):
 
     def __str__(self):
         return self.email
+
+
+class UserProfile(models.Model):
+    """User-owned account details; institute-managed HR data stays on StaffProfile."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="account_profile"
+    )
+    photo_asset = models.ForeignKey(
+        "file_storage.FileAsset", null=True, blank=True, on_delete=models.SET_NULL
+    )
+    alternate_email = models.EmailField(blank=True)
+    date_of_birth = models.DateField(null=True, blank=True)
+    gender = models.CharField(max_length=32, blank=True)
+    blood_group = models.CharField(max_length=12, blank=True)
+    marital_status = models.CharField(max_length=32, blank=True)
+    father_name = models.CharField(max_length=160, blank=True)
+    mother_name = models.CharField(max_length=160, blank=True)
+    current_address = models.TextField(blank=True)
+    permanent_address = models.TextField(blank=True)
+    qualification = models.CharField(max_length=160, blank=True)
+    experience_years = models.PositiveSmallIntegerField(null=True, blank=True)
+    previous_workplace = models.CharField(max_length=200, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
 
 class OtpChallenge(models.Model):

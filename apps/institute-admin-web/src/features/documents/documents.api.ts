@@ -1,3 +1,4 @@
+import type { LayoutV3 } from '@campusone/document-engine'
 import { adminRequest, type PageData } from '../admin/admin.api'
 import type { DocumentCategory, LayoutV2 } from './engine/types'
 
@@ -5,10 +6,11 @@ export interface DocumentTemplateRecord {
   id: string
   name: string
   category: DocumentCategory
-  layout: LayoutV2
+  layout: LayoutV2 | LayoutV3
+  revision?: number
   isDefault: boolean
   createdAt: string
-  publishedVersion?: { id: string; version: number; name: string; layout: LayoutV2 } | null
+  publishedVersion?: { id: string; version: number; name: string; layout: LayoutV2 | LayoutV3 } | null
 }
 
 function query(params: Record<string, string | number | undefined>): string {
@@ -37,7 +39,7 @@ export function getDocumentTemplate(accessToken: string, templateId: string, sig
 
 export function createDocumentTemplate(
   accessToken: string,
-  body: { name: string; category: DocumentCategory; layout: LayoutV2; isDefault?: boolean },
+  body: { name: string; category: DocumentCategory; layout: LayoutV2 | LayoutV3; isDefault?: boolean },
 ) {
   return adminRequest<DocumentTemplateRecord>(accessToken, 'documents/templates', {
     method: 'POST', body: JSON.stringify(body),
@@ -47,11 +49,32 @@ export function createDocumentTemplate(
 export function patchDocumentTemplate(
   accessToken: string,
   templateId: string,
-  body: Partial<{ name: string; category: DocumentCategory; layout: LayoutV2; isDefault: boolean }>,
+  body: Partial<{
+    name: string
+    category: DocumentCategory
+    layout: LayoutV2 | LayoutV3
+    isDefault: boolean
+    expectedRevision: number
+  }>,
 ) {
   return adminRequest<DocumentTemplateRecord>(accessToken, `documents/templates/${templateId}`, {
     method: 'PATCH', body: JSON.stringify(body),
   })
+}
+
+export function convertCopyDocumentTemplate(
+  accessToken: string,
+  templateId: string,
+  body: { name?: string; preview?: boolean } = {},
+) {
+  return adminRequest<{ template?: DocumentTemplateRecord; layout?: LayoutV3; diagnostics: unknown[] }>(
+    accessToken,
+    `documents/templates/${templateId}/convert-copy`,
+    {
+      method: 'POST',
+      body: JSON.stringify(body),
+    },
+  )
 }
 
 export function publishDocumentTemplate(accessToken: string, templateId: string) {

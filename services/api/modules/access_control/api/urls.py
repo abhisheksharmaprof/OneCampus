@@ -3,6 +3,7 @@ from django.urls import path
 from .views import (
     AssignmentListCreateView,
     AssignmentRevokeView,
+    PermissionCatalogView,
     RoleCloneView,
     RoleDetailView,
     RoleListCreateView,
@@ -11,6 +12,8 @@ from .views import (
 app_name = "access_control"
 
 urlpatterns = [
+    path("permission-catalog", PermissionCatalogView.as_view(), name="permission-catalog"),
+    path("permission-catalog/", PermissionCatalogView.as_view()),
     path("roles", RoleListCreateView.as_view(), name="role-list-create"),
     path("roles/", RoleListCreateView.as_view()),
     path("roles/<str:role_id>", RoleDetailView.as_view(), name="role-detail"),

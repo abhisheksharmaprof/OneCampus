@@ -1,3 +1,5 @@
+import uuid
+
 from django.db import IntegrityError, transaction
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema
@@ -32,7 +34,22 @@ class DocumentTemplateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = DocumentTemplate
-        fields = ("id", "name", "category", "layout", "isDefault", "createdAt", "publishedVersion")
+        fields = (
+            "id",
+            "name",
+            "category",
+            "layout",
+            "layout_revision",
+            "isDefault",
+            "createdAt",
+            "publishedVersion",
+        )
+        read_only_fields = ("layout_revision",)
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        data["revision"] = data.pop("layout_revision")
+        return data
 
 
 class DocumentTemplateWriteSerializer(serializers.Serializer):
@@ -47,6 +64,63 @@ class DocumentTemplatePatchSerializer(DocumentTemplateWriteSerializer):
     category = serializers.ChoiceField(choices=DocumentTemplate.Category.choices, required=False)
     layout = serializers.JSONField(required=False)
     isDefault = serializers.BooleanField(required=False)
+    expectedRevision = serializers.IntegerField(required=False, min_value=1)
+
+
+def validate_letterhead_asset(layout, institute):
+    if layout.get("version") == 3:
+        binding = layout.get("masterLetterhead")
+        if binding is None:
+            return
+        if not isinstance(binding, dict) or not isinstance(binding.get("templateId"), str):
+            raise serializers.ValidationError({"layout": ["Choose a valid master letterhead."]})
+        try:
+            master_id = uuid.UUID(binding["templateId"])
+        except (TypeError, ValueError, AttributeError):
+            raise serializers.ValidationError(
+                {"layout": ["Choose a valid master letterhead."]}
+            ) from None
+        master = DocumentTemplate.objects.filter(
+            id=master_id,
+            institute=institute,
+            category=DocumentTemplate.Category.LETTERHEAD,
+        ).first()
+        if not master or not master.published_version_id:
+            raise serializers.ValidationError(
+                {"layout": ["Choose a published letterhead from this institute."]}
+            )
+        mode = binding.get("mode")
+        if mode == "pinned":
+            version_id = binding.get("publishedVersionId")
+            try:
+                version_id = uuid.UUID(version_id)
+            except (TypeError, ValueError, AttributeError):
+                version_id = None
+            if (
+                not version_id
+                or not DocumentTemplateVersion.objects.filter(
+                    id=version_id, template=master, institute=institute
+                ).exists()
+            ):
+                raise serializers.ValidationError(
+                    {"layout": ["Choose a published version of this institute letterhead."]}
+                )
+        elif mode != "followDraft":
+            raise serializers.ValidationError(
+                {"layout": ["Letterhead mode must be followDraft or pinned."]}
+            )
+        return
+    letterhead = layout.get("letterhead")
+    if not letterhead:
+        return
+    template_id = letterhead.get("templateId") if isinstance(letterhead, dict) else None
+    valid = DocumentTemplate.objects.filter(
+        id=template_id, institute=institute, category=DocumentTemplate.Category.LETTERHEAD
+    ).exists()
+    if not valid:
+        raise serializers.ValidationError(
+            {"layout": ["Choose a saved institute letterhead design."]}
+        )
 
 
 def make_default(template):
@@ -111,6 +185,7 @@ class DocumentTemplateListCreateView(APIView):
         serializer.is_valid(raise_exception=True)
         values = serializer.validated_data
         validate_layout(values["layout"], category=values["category"])
+        validate_letterhead_asset(values["layout"], request.institute)
         with transaction.atomic():
             template = DocumentTemplate(
                 institute=request.institute,
@@ -158,6 +233,22 @@ class DocumentTemplateDetailView(APIView):
                 id=template_id,
                 institute=request.institute,
             )
+            incoming_layout = values.get("layout")
+            is_v3_save = (incoming_layout or template.layout).get("version") == 3
+            if is_v3_save:
+                expected_revision = values.get("expectedRevision")
+                if expected_revision != template.layout_revision:
+                    return Response(
+                        {
+                            "success": False,
+                            "data": {"revision": template.layout_revision},
+                            "error": {
+                                "code": "STALE_TEMPLATE_REVISION",
+                                "message": "Reload this template before saving your changes.",
+                            },
+                        },
+                        status=status.HTTP_409_CONFLICT,
+                    )
             new_category = values.get("category", template.category)
             if new_category != template.category and template.is_default:
                 raise serializers.ValidationError(
@@ -165,7 +256,10 @@ class DocumentTemplateDetailView(APIView):
                 )
             if "layout" in values:
                 validate_layout(values["layout"], category=new_category)
+                validate_letterhead_asset(values["layout"], request.institute)
                 template.layout = values["layout"]
+                if is_v3_save:
+                    template.layout_revision += 1
             elif new_category != template.category:
                 validate_layout(template.layout, category=new_category)
             template.name = values.get("name", template.name)
@@ -198,6 +292,22 @@ class DocumentTemplateDetailView(APIView):
                         ]
                     }
                 )
+            if (
+                template.category == DocumentTemplate.Category.LETTERHEAD
+                and DocumentTemplate.objects.filter(
+                    institute=request.institute, layout__letterhead__templateId=str(template.id)
+                ).exists()
+            ):
+                raise serializers.ValidationError(
+                    {
+                        "template": [
+                            (
+                                "This letterhead is in use by a document template. "
+                                "Choose another letterhead before deleting it."
+                            )
+                        ]
+                    }
+                )
             if template.published_version_id:
                 raise serializers.ValidationError(
                     {"publishedVersion": ["Published templates cannot be deleted."]}
@@ -226,12 +336,38 @@ class DocumentTemplatePublishView(APIView):
                 id=template_id,
                 institute=request.institute,
             )
-            if template.category != DocumentTemplate.Category.ID_CARD:
+            if template.category not in (
+                DocumentTemplate.Category.ID_CARD,
+                DocumentTemplate.Category.ADMIT_CARD,
+                DocumentTemplate.Category.MARKSHEET,
+                DocumentTemplate.Category.LETTERHEAD,
+            ) or (
+                template.category == DocumentTemplate.Category.LETTERHEAD
+                and template.layout.get("version") != 3
+            ):
                 raise serializers.ValidationError(
-                    {"category": ["Only ID cards can be published yet."]}
+                    {"category": ["This template type cannot be published yet."]}
                 )
             validate_layout(template.layout, category=template.category)
-            issues = layout_issues(template.layout)
+            validate_letterhead_asset(template.layout, request.institute)
+            issues = (
+                layout_issues(template.layout)
+                if template.category == DocumentTemplate.Category.ID_CARD
+                and template.layout.get("version") != 3
+                else []
+            )
+            if template.category == DocumentTemplate.Category.ADMIT_CARD and not any(
+                page.get("elements") for page in template.layout.get("pages", [])
+            ):
+                issues.append("Add at least one element to the admit-card design.")
+            if template.category == DocumentTemplate.Category.MARKSHEET and not any(
+                element.get("type") == "table"
+                and element.get("datasetId") == "marks"
+                and element.get("visible") is not False
+                for page in template.layout.get("pages", [])
+                for element in page.get("elements", [])
+            ):
+                issues.append("Add a visible marks table to the marksheet design.")
             if issues:
                 raise serializers.ValidationError({"layout": issues})
             last_version = template.versions.order_by("-version").first()
@@ -254,6 +390,65 @@ class DocumentTemplatePublishView(APIView):
             extra_meta={"category": template.category, "version": version.version},
         )
         return Response({"success": True, "data": DocumentTemplateSerializer(template).data})
+
+
+class DocumentTemplateConvertCopyView(APIView):
+    permission_classes = (IsCurrentInstituteAdmin,)
+
+    def post(self, request, template_id):
+        template = get_object_or_404(
+            DocumentTemplate,
+            id=template_id,
+            institute=request.institute,
+        )
+        if template.layout.get("version") != 2:
+            raise serializers.ValidationError(
+                {"layout": ["Only version 2 templates can be converted."]}
+            )
+
+        from modules.documents.layout_v3 import convert_legacy_layout
+
+        converted_layout, diagnostics = convert_legacy_layout(template.layout)
+
+        is_preview = bool(request.data.get("preview"))
+        if is_preview:
+            return Response(
+                {
+                    "success": True,
+                    "data": {
+                        "layout": converted_layout,
+                        "diagnostics": diagnostics,
+                    },
+                }
+            )
+
+        copy_name = request.data.get("name") or f"{template.name} (v3)"
+        with transaction.atomic():
+            new_template = DocumentTemplate.objects.create(
+                institute=request.institute,
+                name=copy_name,
+                category=template.category,
+                layout=converted_layout,
+                is_default=False,
+            )
+        audit_mutation(
+            request=request,
+            verb="Created converted copy",
+            target_label=f"document template '{new_template.name}'",
+            target_type="document_template",
+            target_id=new_template.id,
+            extra_meta={"category": new_template.category, "source_template_id": str(template.id)},
+        )
+        return Response(
+            {
+                "success": True,
+                "data": {
+                    "template": DocumentTemplateSerializer(new_template).data,
+                    "diagnostics": diagnostics,
+                },
+            },
+            status=status.HTTP_201_CREATED,
+        )
 
 
 class IdCardPreflightSerializer(serializers.Serializer):

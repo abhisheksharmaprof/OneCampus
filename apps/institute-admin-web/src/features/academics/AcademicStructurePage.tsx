@@ -3,6 +3,7 @@ import { Building2, BookOpen, CalendarDays, CheckCircle2, ChevronRight, Download
 import {
   DataTable,
   FormField,
+  LoadingState,
   Modal,
   Tabs,
   type DataTableColumn,
@@ -219,7 +220,7 @@ function ResourcePanel<T extends AcademicRecord>({
   )
 }
 
-function ClassesSectionsReference({ branchName, classes, sections, loadingClasses, loadingSections, sectionsError, onRetry, onAddClass, onAddSection, onEditClass, onEditSection }: { branchName: string; classes: AcademicClass[]; sections: ClassSection[]; loadingClasses: boolean; loadingSections: boolean; sectionsError: string; onRetry: () => void; onAddClass: () => void; onAddSection: () => void; onEditClass: (row: AcademicClass) => void; onEditSection: (row: ClassSection) => void }) {
+function ClassesSectionsReference({ branchName, classes, sections, rooms, loadingClasses, loadingSections, sectionsError, onRetry, onAddClass, onAddSection, onEditClass, onEditSection }: { branchName: string; classes: AcademicClass[]; sections: ClassSection[]; rooms: Room[]; loadingClasses: boolean; loadingSections: boolean; sectionsError: string; onRetry: () => void; onAddClass: () => void; onAddSection: () => void; onEditClass: (row: AcademicClass) => void; onEditSection: (row: ClassSection) => void }) {
   const [expanded, setExpanded] = useState<string | null>(classes[0]?.id ?? null)
   const visibleExpanded = classes.some((grade) => grade.id === expanded) ? expanded : classes[0]?.id ?? null
   const enrolled = sections.reduce((sum, item) => sum + item.enrollmentCount, 0)
@@ -231,7 +232,7 @@ function ClassesSectionsReference({ branchName, classes, sections, loadingClasse
     <div className="classes-reference-actions"><button className="button-primary" type="button" onClick={onAddClass}><Plus size={16} /> Add Class</button></div>
     <div className="classes-kpis"><ReferenceMetric label="Grade Levels" value={loadingClasses ? '…' : classes.length} hint={`In ${branchName}`} icon={<School size={19} />} /><ReferenceMetric label="Total Sections" value={sectionsValue} hint={sectionsError ? 'Section records unavailable' : 'Across all grades'} icon={<Users size={19} />} /><ReferenceMetric label="Total Capacity" value={capacityValue} hint={sectionsError ? 'Section records unavailable' : 'Seats across sections'} icon={<GraduationCap size={19} />} /><ReferenceMetric label="Enrolled" value={enrolledValue} hint={sectionsError ? 'Section records unavailable' : 'Students in sections'} icon={<Check size={19} />} /></div>
     {sectionsError ? <div className="admin-error-summary" role="alert"><span>{sectionsError}</span><button className="button-secondary btn-sm" type="button" onClick={onRetry}>Try again</button></div> : null}
-    <div className="classes-grade-list">{loadingClasses ? <p className="section-caption">Loading grade levels…</p> : classes.map((grade) => { const gradeSections = sections.filter((item) => item.grade.id === grade.id); const gradeEnrolled = gradeSections.reduce((sum, item) => sum + item.enrollmentCount, 0); const gradeCapacity = gradeSections.reduce((sum, item) => sum + (item.maxStrength ?? 0), 0); const percent = gradeCapacity ? Math.round((gradeEnrolled / gradeCapacity) * 100) : 0; const open = visibleExpanded === grade.id; const toggle = () => setExpanded(open ? null : grade.id); return <section className="grade-reference-card" key={grade.id}><header><button className="grade-summary" type="button" aria-expanded={open} onClick={toggle}><b>{grade.name.replace('Grade ', 'G').replace('Pre-KG', 'PK')}</b><span><strong>{grade.name}</strong><small>{sectionsError ? 'Section details unavailable' : loadingSections ? 'Loading sections…' : `${gradeSections.length} sections · ${gradeEnrolled}/${gradeCapacity || '—'} enrolled`}</small></span></button><div className="grade-actions">{!loadingSections && !sectionsError ? <span className="grade-progress"><i><em style={{ width: `${percent}%` }} /></i><small>{percent}% full</small></span> : null}<button className="button-secondary btn-sm" type="button" onClick={onAddSection}><Plus size={14} /> Section</button><button className="button-secondary btn-sm" type="button" aria-label={`Edit ${grade.name}`} onClick={() => onEditClass(grade)}><Pencil size={14} /></button><ChevronRight className={open ? 'grade-chevron open' : 'grade-chevron'} size={16} /></div></header>{open ? <div className="grade-section-grid">{sectionsError ? <p className="grade-empty">Section details are unavailable.</p> : loadingSections ? <p className="grade-empty">Loading sections…</p> : gradeSections.length ? gradeSections.map((section) => { const fill = section.maxStrength ? Math.round((section.enrollmentCount / section.maxStrength) * 100) : 0; return <article key={section.id} className="section-reference-card"><div><strong>{grade.name} – {section.sectionName}</strong><button className="button-secondary btn-sm" type="button" aria-label={`Edit ${grade.name} ${section.sectionName}`} onClick={() => onEditSection(section)}><Pencil size={13} /></button></div><small>Capacity: {section.enrollmentCount} / {section.maxStrength ?? '—'}</small><i><em style={{ width: `${fill}%` }} /></i><span>{section.classTeacher?.fullName ?? 'No class teacher assigned'}</span></article> }) : <p className="grade-empty">No sections yet. Add the first section for this class.</p>}</div> : null}</section> })}</div>
+    <div className="classes-grade-list">{loadingClasses ? <LoadingState label="Loading grade levels" rows={3} /> : classes.map((grade) => { const gradeSections = sections.filter((item) => item.grade.id === grade.id); const gradeEnrolled = gradeSections.reduce((sum, item) => sum + item.enrollmentCount, 0); const gradeCapacity = gradeSections.reduce((sum, item) => sum + (item.maxStrength ?? 0), 0); const percent = gradeCapacity ? Math.round((gradeEnrolled / gradeCapacity) * 100) : 0; const open = visibleExpanded === grade.id; const toggle = () => setExpanded(open ? null : grade.id); return <section className="grade-reference-card" key={grade.id}><header><button className="grade-summary" type="button" aria-expanded={open} onClick={toggle}><b>{grade.name.replace('Grade ', 'G').replace('Pre-KG', 'PK')}</b><span><strong>{grade.name}</strong><small>{sectionsError ? 'Section details unavailable' : loadingSections ? 'Loading sections…' : `${gradeSections.length} sections · ${gradeEnrolled}/${gradeCapacity || '—'} enrolled`}</small></span></button><div className="grade-actions">{!loadingSections && !sectionsError ? <span className="grade-progress"><i><em style={{ width: `${percent}%` }} /></i><small>{percent}% full</small></span> : null}<button className="button-secondary btn-sm" type="button" onClick={onAddSection}><Plus size={14} /> Section</button><button className="button-secondary btn-sm" type="button" aria-label={`Edit ${grade.name}`} onClick={() => onEditClass(grade)}><Pencil size={14} /></button><ChevronRight className={open ? 'grade-chevron open' : 'grade-chevron'} size={16} /></div></header>{open ? <div className="grade-section-grid">{sectionsError ? <p className="grade-empty">Section details are unavailable.</p> : loadingSections ? <LoadingState label={`Loading ${grade.name} sections`} rows={2} /> : gradeSections.length ? gradeSections.map((section) => { const fill = section.maxStrength ? Math.round((section.enrollmentCount / section.maxStrength) * 100) : 0; const assignedRoom = rooms.find((room) => room.id === section.roomId); return <article key={section.id} className="section-reference-card"><div><strong>{grade.name} – {section.sectionName}</strong><button className="button-secondary btn-sm" type="button" aria-label={`Edit ${grade.name} ${section.sectionName}`} onClick={() => onEditSection(section)}><Pencil size={13} /></button></div><small>Capacity: {section.enrollmentCount} / {section.maxStrength ?? '—'}</small><i><em style={{ width: `${fill}%` }} /></i><span>{section.classTeacher?.fullName ?? 'No class teacher assigned'}</span><span>{assignedRoom ? `Classroom: ${assignedRoom.name}` : 'No classroom assigned'}</span></article> }) : <p className="grade-empty">No sections yet. Add the first section for this class.</p>}</div> : null}</section> })}</div>
   </div>
 }
 
@@ -502,6 +503,7 @@ function AcademicEditor({
         academicYearId: form.get('academicYearId'),
         sectionName: form.get('sectionName'),
         classTeacherId: form.get('classTeacherId') || null,
+        roomId: form.get('roomId') || null,
         maxStrength: form.get('maxStrength') ? Number(form.get('maxStrength')) : null,
       }
     }
@@ -564,6 +566,7 @@ function AcademicEditor({
           <SectionFields
             record={section}
             teachers={availableTeachers}
+            rooms={rooms.filter((room) => room.isActive && room.roomType.toUpperCase() === 'CLASSROOM' && (!sectionBranchId || room.branch.id === sectionBranchId))}
             years={years}
             classes={classes}
             branchId={sectionBranchId}
@@ -652,6 +655,7 @@ function SectionFields({
   years,
   classes,
   branchId,
+  rooms,
   errors,
 }: {
   record?: ClassSection
@@ -659,6 +663,7 @@ function SectionFields({
   years: readonly AcademicYear[]
   classes: readonly AcademicClass[]
   branchId: string
+  rooms: readonly Room[]
   errors?: Record<string, string[]>
 }) {
   return (
@@ -695,6 +700,12 @@ function SectionFields({
               {teacher.fullName} {teacher.email ? `— ${teacher.email}` : ''}
             </option>
           ))}
+        </select>
+      </FormField>
+      <FormField id="academics-field-roomId" label="Classroom" error={firstError(errors, 'roomId')} hint="Optional. Only active classrooms at this campus are shown.">
+        <select name="roomId" defaultValue={record?.roomId ?? ''} disabled={!branchId}>
+          <option value="">No classroom assigned</option>
+          {rooms.map((room) => <option key={room.id} value={room.id}>{room.name}</option>)}
         </select>
       </FormField>
       <FormField id="academics-field-maxStrength" label="Maximum strength" error={firstError(errors, 'maxStrength')} hint="Leave blank for unlimited.">
@@ -772,11 +783,21 @@ export function AcademicStructurePage({ accessToken, branches, selectedBranch, t
   }, [accessToken, branchId, refreshKey])
 
   useEffect(() => {
+    const controller = new AbortController()
+    setLoadingRooms(true)
+    setRooms([])
+    void listRooms(accessToken, { page: 1, pageSize: 100, branchId }, controller.signal)
+      .then((page) => setRooms(page.items))
+      .catch((cause: unknown) => { if (!controller.signal.aborted) setActionError(asApiError(cause, 'Rooms could not be loaded.')) })
+      .finally(() => { if (!controller.signal.aborted) setLoadingRooms(false) })
+    return () => controller.abort()
+  }, [accessToken, branchId, refreshKey])
+
+  useEffect(() => {
     if (activeTab !== 'subjects') return
     const controller = new AbortController()
-    setLoadingCurriculum(true); setLoadingRooms(true)
+    setLoadingCurriculum(true)
     void listClassSubjects(accessToken, { page: 1, pageSize: 100, branchId }, controller.signal).then((page) => setCurriculum(page.items)).catch((cause: unknown) => { if (!controller.signal.aborted) setActionError(asApiError(cause, 'Curriculum mappings could not be loaded.')) }).finally(() => { if (!controller.signal.aborted) setLoadingCurriculum(false) })
-    void listRooms(accessToken, { page: 1, pageSize: 100, branchId }, controller.signal).then((page) => setRooms(page.items)).catch((cause: unknown) => { if (!controller.signal.aborted) { setRooms([]); setActionError(asApiError(cause, 'Rooms could not be loaded.')) } }).finally(() => { if (!controller.signal.aborted) setLoadingRooms(false) })
     return () => controller.abort()
   }, [accessToken, activeTab, branchId, refreshKey])
 
@@ -789,10 +810,11 @@ export function AcademicStructurePage({ accessToken, branches, selectedBranch, t
   const sectionColumns = useMemo<DataTableColumn<ClassSection>[]>(() => [
     { id: 'section', header: 'Class & section', cell: (row) => <span className="academics-record-title"><strong>{row.grade.name} — {row.sectionName}</strong><small>{row.academicYear.name}</small></span> },
     { id: 'branch', header: 'Branch', cell: (row) => <span className="academics-record-title"><strong>{row.branch.name}</strong><small>{row.branch.code}</small></span> },
+    { id: 'room', header: 'Classroom', cell: (row) => rooms.find((room) => room.id === row.roomId)?.name ?? <span className="academics-muted">Unassigned</span>, hideOnSmall: true },
     { id: 'teacher', header: 'Class teacher', cell: (row) => row.classTeacher?.fullName ?? <span className="academics-muted">Unassigned</span>, hideOnSmall: true },
     { id: 'strength', header: 'Students', cell: (row) => `${row.enrollmentCount}${row.maxStrength ? ` / ${row.maxStrength}` : ''}`, align: 'end' },
     { id: 'actions', header: <span className="admin-sr-only">Actions</span>, align: 'end', cell: (row) => <RecordAction label={`Edit ${row.grade.name} ${row.sectionName}`} onClick={() => edit('sections', row)} /> },
-  ], [edit])
+  ], [edit, rooms])
 
   const tabs = [
     {
@@ -806,7 +828,7 @@ export function AcademicStructurePage({ accessToken, branches, selectedBranch, t
       id: 'classes',
       label: 'Classes',
       panel: (
-        <ClassesSectionsReference branchName={branchName} classes={classesList} sections={sectionsList} loadingClasses={loadingClasses} loadingSections={loadingSections} sectionsError={sectionsError} onRetry={() => { setActionError(null); setRefreshKey((value) => value + 1) }} onAddClass={() => setEditor({ resource: 'classes' })} onAddSection={() => setEditor({ resource: 'sections' })} onEditClass={(record) => edit('classes', record)} onEditSection={(record) => edit('sections', record)} />
+        <ClassesSectionsReference branchName={branchName} classes={classesList} sections={sectionsList} rooms={rooms} loadingClasses={loadingClasses} loadingSections={loadingSections} sectionsError={sectionsError} onRetry={() => { setActionError(null); setRefreshKey((value) => value + 1) }} onAddClass={() => setEditor({ resource: 'classes' })} onAddSection={() => setEditor({ resource: 'sections' })} onEditClass={(record) => edit('classes', record)} onEditSection={(record) => edit('sections', record)} />
       ),
     },
     {

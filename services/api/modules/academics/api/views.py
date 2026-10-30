@@ -4,7 +4,7 @@ from django.db.models import Count, Prefetch, Q
 from django.db.models.deletion import ProtectedError
 from django.shortcuts import get_object_or_404
 from rest_framework import status
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import MethodNotAllowed, ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -30,6 +30,7 @@ from ..models import (
 from ..services import (
     AcademicsValidationError,
     create_enrollment,
+    delete_enrollment,
     save_academic_year,
     save_class_section,
     ensure_default_section,
@@ -66,7 +67,7 @@ class AcademicOperationListCreateView(APIView):
     permission_classes = (IsCurrentInstituteAdmin,)
 
     def get(self, request):
-        records = AcademicOperation.objects.filter(institute=_institute(request)).select_related("branch", "created_by")
+        records = AcademicOperation.objects.filter(institute=_institute(request)).exclude(kind=AcademicOperation.Kind.EXAM).select_related("branch", "created_by")
         kind = request.query_params.get("kind", "").strip().upper()
         if kind:
             if kind not in AcademicOperation.Kind.values:
@@ -87,6 +88,8 @@ class AcademicOperationListCreateView(APIView):
         serializer = AcademicOperationWriteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
+        if data.get("kind") == AcademicOperation.Kind.EXAM:
+            raise MethodNotAllowed("POST", detail="Use the structured exam draft endpoint.")
         branch_id = data.pop("branch_id", None)
         branch = None
         if branch_id:
@@ -111,6 +114,8 @@ class AcademicOperationDetailView(APIView):
 
     def patch(self, request, operation_id):
         record = self.get_object(request, operation_id)
+        if record.kind == AcademicOperation.Kind.EXAM:
+            raise MethodNotAllowed("PATCH", detail="Generic exam records are read-only; use the structured exam draft endpoint.")
         serializer = AcademicOperationWriteSerializer(instance=record, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
@@ -125,7 +130,10 @@ class AcademicOperationDetailView(APIView):
         return _success(AcademicOperationSerializer(record).data)
 
     def delete(self, request, operation_id):
-        return _delete(self.get_object(request, operation_id))
+        record = self.get_object(request, operation_id)
+        if record.kind == AcademicOperation.Kind.EXAM:
+            raise MethodNotAllowed("DELETE", detail="Generic exam records are read-only.")
+        return _delete(record)
 
 
 def _institute(request):
@@ -186,6 +194,19 @@ def _teacher(*, institute, branch, teacher_id):
         institute_memberships__role="TEACHER",
         institute_memberships__is_active=True,
     )
+
+
+def _classroom(*, institute, branch, room_id):
+    if room_id is None:
+        return None
+    room = Room.objects.filter(
+        id=room_id, institute=institute, branch=branch, is_active=True
+    ).first()
+    if room is None:
+        raise ValidationError({"roomId": ["Select an active classroom in this campus."]})
+    if room.room_type.upper() != "CLASSROOM":
+        raise ValidationError({"roomId": ["Only classroom rooms can be assigned to a class section."]})
+    return room
 
 
 def _section_queryset(institute):
@@ -605,12 +626,16 @@ class ClassSectionListCreateView(APIView):
             branch=branch,
             teacher_id=data.get("class_teacher_id"),
         )
+        classroom = _classroom(
+            institute=institute, branch=branch, room_id=data.get("default_room_id")
+        )
         section = ClassSection(
             branch=branch,
             grade=grade,
             academic_year=year,
             section_name=data["section_name"],
             class_teacher=teacher,
+            default_room=classroom,
             max_strength=data.get("max_strength"),
         )
         try:
@@ -659,6 +684,10 @@ class ClassSectionDetailView(APIView):
                 institute=institute,
                 branch=branch,
                 teacher_id=data["class_teacher_id"],
+            )
+        if "default_room_id" in data:
+            section.default_room = _classroom(
+                institute=institute, branch=branch, room_id=data["default_room_id"]
             )
         for field in ("section_name", "max_strength"):
             if field in data:
@@ -888,4 +917,5 @@ class StudentEnrollmentDetailView(APIView):
         return _success(StudentEnrollmentSerializer(enrollment).data)
 
     def delete(self, request, enrollment_id):
-        return _delete(self.get_object(request, enrollment_id))
+        delete_enrollment(enrollment=self.get_object(request, enrollment_id))
+        return Response({"success": True, "data": {"deleted": True}})

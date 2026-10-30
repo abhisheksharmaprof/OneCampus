@@ -40,6 +40,32 @@ if (typeof globalThis.localStorage === 'undefined') {
   }
 }
 
+// Mock HTMLCanvasElement for headless JSDOM testing
+if (typeof window !== 'undefined' && typeof window.HTMLCanvasElement !== 'undefined') {
+  const originalGetContext = window.HTMLCanvasElement.prototype.getContext
+  window.HTMLCanvasElement.prototype.getContext = function (this: HTMLCanvasElement, contextId: string, ...args: any[]) {
+    if (contextId === '2d') {
+      return {
+        canvas: this,
+        drawImage: () => {},
+        getImageData: (_sx: number, _sy: number, sw: number, sh: number) => ({
+          data: new Uint8ClampedArray(sw * sh * 4),
+          width: sw,
+          height: sh,
+        }),
+        putImageData: () => {},
+        clearRect: () => {},
+        fillRect: () => {},
+      } as unknown as CanvasRenderingContext2D
+    }
+    return originalGetContext ? originalGetContext.apply(this, [contextId, ...args] as any) : null
+  } as any
+
+  window.HTMLCanvasElement.prototype.toDataURL = function () {
+    return 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII='
+  }
+}
+
 afterEach(() => {
   cleanup()
   globalThis.localStorage?.clear()

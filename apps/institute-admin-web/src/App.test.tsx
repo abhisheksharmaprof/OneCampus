@@ -98,6 +98,31 @@ describe('Institute Admin dashboard', () => {
     expect(screen.getByRole('button', { name: 'Send Announcement' })).toBeInTheDocument()
   })
 
+  it('keeps exam-permission staff in the exam workspace and skips admin bootstrap calls', async () => {
+    window.history.replaceState({}, '', '/dashboard')
+    localStorage.setItem('campusone.session', JSON.stringify({
+      accessToken: 'staff-token', refreshToken: 'refresh-token',
+      user: { id: 'teacher-1', displayName: 'Teacher One', roles: ['TEACHER'], activeRole: 'TEACHER', instituteId: 'institute-1', branchIds: ['campus-1'], permissions: ['assessment.create'] },
+    }))
+    vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => Promise.resolve({
+      ok: true,
+      json: async () => String(input).includes('/academics/exams/options') ? { success: true, data: {
+        campuses: [{ id: 'campus-1', name: 'North Campus' }],
+        academicYears: [{ id: 'year-1', name: '2026-27', isCurrent: true }],
+        categories: [{ value: 'CLASS_TEST', label: 'Class test' }],
+        actions: { create: true, view: false, edit: false },
+      } } : dashboardResponse,
+    })))
+
+    render(<App />)
+    expect(await screen.findByRole('heading', { name: 'Create-only access' })).toBeInTheDocument()
+    expect(window.location.pathname).toBe('/academics/assessment-results')
+    expect(screen.getByRole('navigation', { name: /primary navigation/i })).toHaveTextContent('Assessment & Results')
+    expect(screen.queryByRole('button', { name: 'Pending approvals' })).not.toBeInTheDocument()
+    expect(vi.mocked(fetch).mock.calls.some(([url]) => String(url).includes('/dashboard'))).toBe(false)
+    expect(vi.mocked(fetch).mock.calls.some(([url]) => String(url).includes('/branches?'))).toBe(false)
+  })
+
   it('collapses and expands the sidebar accessibly', async () => {
     const user = userEvent.setup()
     render(<App />)
@@ -416,6 +441,28 @@ describe('Institute Admin dashboard', () => {
     expect(window.location.pathname).toBe('/login')
     expect(localStorage.getItem('campusone.session')).toBeNull()
     expect(screen.queryByText(/access token expired|refresh token expired/i)).not.toBeInTheDocument()
+  })
+
+  it('allows a teacher with exam-only access to open My Account', async () => {
+    window.history.replaceState({}, '', '/account')
+    localStorage.setItem('campusone.session', JSON.stringify({
+      accessToken: 'teacher-token', refreshToken: 'refresh-token',
+      user: { id: 'teacher-1', displayName: 'Teacher One', roles: ['TEACHER'], activeRole: 'TEACHER', instituteId: 'institute-1', branchIds: ['campus-1'], permissions: ['assessment.create'] },
+    }))
+    vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => Promise.resolve(new Response(JSON.stringify({
+      success: true,
+      data: String(input).includes('/identity/account') ? {
+        id: 'teacher-1', displayName: 'Teacher One', firstName: 'Teacher', lastName: 'One', email: 'teacher@example.test',
+        phone: '', phoneVerified: false, photoUrl: null, alternateEmail: '', alternateEmailVerified: false,
+        activeRole: 'TEACHER', roles: ['TEACHER'], institute: 'North Academy', branch: 'Main Campus',
+        personal: {}, workExperience: { qualification: '', experienceYears: null, previousWorkplace: '' }, staff: null,
+      } : {},
+    }), { headers: { 'Content-Type': 'application/json' } }))))
+
+    render(<App />)
+
+    expect(await screen.findByRole('heading', { name: 'My account' })).toBeInTheDocument()
+    expect(screen.getByText('teacher@example.test')).toBeInTheDocument()
   })
 
   it('renders the public verify page from a QR fragment without a session', async () => {

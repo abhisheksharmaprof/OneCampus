@@ -9,6 +9,17 @@ export interface PermissionGrant {
   configuration: PermissionConfiguration
 }
 
+export interface PermissionDefinition {
+  permissionKey: string
+  module: string
+  description: string
+}
+
+export interface PermissionCatalog {
+  permissions: PermissionDefinition[]
+  delegablePermissionKeys: string[]
+}
+
 export interface Role {
   id: string
   instituteId: string | null

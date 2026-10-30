@@ -34,7 +34,8 @@
 .stu-guide--h { left: 0; right: 0; height: 1px; }
 .stu-el { position: absolute; outline: 1px dashed transparent; cursor: grab; }
 .stu-el:hover { outline-color: #B9C4D3; }
-.stu-el.is-selected { outline: 1.5px solid #173A5E; z-index: 30; }
+.stu-el.is-selected { outline: 1.5px solid #173A5E; }
+.stu-el.is-selected:not([data-typelabel="Shape"]) { z-index: 30; }
 .stu-el.is-selected::before { content: attr(data-typelabel); position: absolute; top: -18px; left: -1px; background: #173A5E; color: #fff; font-size: 9.5px; font-weight: 700; padding: 1px 6px; border-radius: 4px 4px 4px 0; }
 .stu-el.is-locked { cursor: default; }
 .stu-el-inner { pointer-events: none; overflow: hidden; }
@@ -90,6 +91,14 @@
   .stu-workspace[data-mobile-panel="properties"] .stu-props { display: block; }
   .stu-stage { width: 100%; min-width: 0; padding: 16px 8px; }
 }
+
+.stu-el.is-hidden { opacity: .42; outline: 1px dashed #9A5B12; }
+.stu-el.is-hidden::after { content: 'Hidden in output'; position: absolute; inset: 0; display: grid; place-items: center; color: #7A4700; background: repeating-linear-gradient(135deg,rgba(255,244,220,.2),rgba(255,244,220,.2) 6px,rgba(255,244,220,.55) 6px,rgba(255,244,220,.55) 12px); font-size: 10px; font-weight: 700; pointer-events: none; }
+.stu-visibility-toggle { display: flex; align-items: center; gap: 7px; margin: 0 0 12px; padding: 8px; border: 1px solid #D8E0EA; border-radius: 7px; color: #23374D; font-size: 12px; }
+.stu-visibility-toggle span,.stu-column-visibility span { margin-left: auto; color: #697A8D; font-size: 10px; font-weight: 650; }
+.stu-column-visibility { display: flex; align-items: center; gap: 4px; flex: 0 0 auto; font-size: 10px; white-space: nowrap; }
+.stu-letterhead-select { display: inline-flex; align-items: center; gap: 5px; color: #385173; font-size: 11px; white-space: nowrap; }
+.stu-letterhead-select select { max-width: 10rem; min-width: 6rem; height: 2rem; border: 1px solid #d8e0eb; border-radius: 6px; background: #fff; color: #173a5e; font: inherit; }
 
 /* Template Studio library and editor hierarchy */
 .stu-page { color: #17253a; }

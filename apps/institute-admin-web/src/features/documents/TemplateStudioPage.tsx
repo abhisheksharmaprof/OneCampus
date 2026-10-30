@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { AdminApiError } from '../admin/admin.api'
+import { Skeleton } from '../../components/admin-ui'
 import { StatePanel, useAbortableLoad } from '../finance/sections/shared'
 import {
   createDocumentTemplate, deleteDocumentTemplate, listDocumentTemplates, patchDocumentTemplate,
@@ -9,8 +10,9 @@ import {
 import { CATEGORY_CONFIG, sampleDocumentData } from './engine/datasets'
 import { renderDocumentHtml } from './engine/docRender'
 import { prepareQrDataUrls } from './engine/qrPayload'
-import { defaultLayout, PAGE_SIZES_MM, type DocumentCategory, type PageSizeId } from './engine/types'
+import { defaultLayout, isLayoutV3, isLayoutV2, PAGE_SIZES_MM, type DocumentCategory, type LayoutV2, type PageSizeId } from './engine/types'
 import { StudioEditor } from './studio/StudioEditor'
+import { StudioNextPage } from './studio-next/StudioNextPage'
 import './studio.css'
 
 const CATEGORIES = Object.keys(CATEGORY_CONFIG) as DocumentCategory[]
@@ -19,7 +21,9 @@ const CATEGORY_DETAILS: Record<DocumentCategory, { description: string; icon: st
   FEE_RECEIPT: { description: 'Create branded receipts for payments and collections.', icon: '↗' },
   MARKSHEET: { description: 'Present exam results, subject marks, and grades.', icon: 'A+' },
   ID_CARD: { description: 'Design student or staff cards ready for batch printing.', icon: 'ID' },
+  ADMIT_CARD: { description: 'Design exam admit cards with a candidate paper schedule.', icon: 'EX' },
   CERTIFICATE: { description: 'Prepare certificates for awards, events, and milestones.', icon: '✦' },
+  LETTERHEAD: { description: 'Build a reusable school letterhead for printable documents.', icon: 'LH' },
 }
 const PAGE_SIZE_LABELS: Record<PageSizeId, string> = {
   A4P: 'A4 portrait', A4L: 'A4 landscape', CR80: 'ID card (CR80)',
@@ -104,7 +108,30 @@ export default function TemplateStudioPage({ accessToken }: { accessToken: strin
   const filteredItems = useMemo(() => items.filter((item) => item.name.toLowerCase().includes(search.trim().toLowerCase())), [items, search])
 
   if (editing) {
-    return <StudioEditor accessToken={accessToken} template={editing} onBack={() => setEditing(null)} />
+    if (isLayoutV3(editing.layout) || editing.category === 'LETTERHEAD') {
+      return (
+        <StudioNextPage
+          accessToken={accessToken}
+          templateId={editing.id}
+          initialTemplate={editing}
+          onBack={(saved) => {
+            setEditing(null)
+            if (saved) templates.reload()
+          }}
+        />
+      )
+    }
+
+    return (
+      <StudioEditor
+        accessToken={accessToken}
+        template={editing as DocumentTemplateRecord & { layout: LayoutV2 }}
+        onBack={(saved) => {
+          setEditing(null)
+          if (saved) templates.reload()
+        }}
+      />
+    )
   }
 
   if (!category) {
@@ -164,7 +191,7 @@ export default function TemplateStudioPage({ accessToken }: { accessToken: strin
       </header>
       {notice && <p role="alert" className="stu-notice">{notice}</p>}
       <div className="stu-library-toolbar">
-        <div><h2>Saved templates</h2><p>{templates.loading ? 'Loading your templates…' : `${items.length} saved template${items.length === 1 ? '' : 's'}`}</p></div>
+        <div><h2>Saved templates</h2><p>{templates.loading ? <Skeleton width="9rem" height=".8rem" /> : `${items.length} saved template${items.length === 1 ? '' : 's'}`}</p></div>
         <label className="stu-library-search"><span aria-hidden="true">⌕</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search templates" aria-label="Search templates" /></label>
       </div>
       <StatePanel loading={templates.loading} error={templates.error} onRetry={templates.reload}
@@ -174,14 +201,14 @@ export default function TemplateStudioPage({ accessToken }: { accessToken: strin
             <article key={template.id} className={`stu-gallery-card${template.isDefault ? ' is-default' : ''}`}>
               <div className="stu-template-open">
                 <DocumentPreview template={template} />
-                <span className="stu-template-state">{template.isDefault ? 'Default' : category === 'ID_CARD' && template.publishedVersion ? `Published · v${template.publishedVersion.version}` : category === 'ID_CARD' ? 'Draft' : 'Saved'}</span>
+                <span className="stu-template-state">{template.isDefault ? 'Default' : ['ID_CARD', 'ADMIT_CARD', 'MARKSHEET'].includes(category) && template.publishedVersion ? `Published · v${template.publishedVersion.version}` : ['ID_CARD', 'ADMIT_CARD', 'MARKSHEET'].includes(category) ? 'Draft' : 'Saved'}</span>
                 <span className="stu-template-title">{template.name}</span>
                 <span className="stu-template-format">{PAGE_SIZE_LABELS[template.layout.page.sizeId]} <span>·</span> {template.layout.pages.length} page{template.layout.pages.length === 1 ? '' : 's'}</span>
                 <button type="button" className="stu-template-open-hit" onClick={() => setEditing(template)} aria-label={`Open ${template.name} in editor`} />
               </div>
               <div className="stu-gallery-actions">
                 <button type="button" className="stu-btn stu-btn--primary" onClick={() => setEditing(template)}>Open editor</button>
-                {category === 'ID_CARD' && <button type="button" className="stu-btn" disabled={busy}
+                {['ID_CARD', 'ADMIT_CARD', 'MARKSHEET'].includes(category) && <button type="button" className="stu-btn" disabled={busy}
                   onClick={() => run(publishDocumentTemplate(accessToken, template.id))}>Publish</button>}
                 <button type="button" className="stu-btn" disabled={busy}
                   onClick={() => run(createDocumentTemplate(accessToken, { name: `Copy of ${template.name}`, category, layout: template.layout }))}>Duplicate</button>

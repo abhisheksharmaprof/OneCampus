@@ -259,6 +259,9 @@ class ClassSection(TimeStampedModel):
         null=True,
         blank=True,
     )
+    default_room = models.ForeignKey(
+        Room, on_delete=models.SET_NULL, related_name="class_sections", null=True, blank=True
+    )
     max_strength = models.PositiveIntegerField(default=100, null=True, blank=True)
 
     class Meta:
@@ -296,6 +299,11 @@ class ClassSection(TimeStampedModel):
             errors["academic_year"] = "Academic year must belong to the branch's institute."
         if self.max_strength is not None and self.max_strength < 1:
             errors["max_strength"] = "Maximum strength must be at least 1."
+        if self.default_room_id:
+            if self.default_room.branch_id != self.branch_id:
+                errors["default_room"] = "Classroom must belong to the section's campus."
+            if self.default_room.room_type.upper() != "CLASSROOM":
+                errors["default_room"] = "Only classroom rooms can be assigned to a class section."
         if errors:
             raise ValidationError(errors)
         _validate_teacher(
@@ -467,3 +475,328 @@ class AcademicOperation(TimeStampedModel):
     def save(self, *args, **kwargs):
         self.full_clean()
         return super().save(*args, **kwargs)
+
+
+class Exam(TimeStampedModel):
+    class Category(models.TextChoices):
+        CLASS_TEST = "CLASS_TEST", "Class test"
+        UNIT_TEST = "UNIT_TEST", "Unit test"
+        HALF_YEARLY = "HALF_YEARLY", "Half yearly"
+        PRE_BOARD = "PRE_BOARD", "Pre-board"
+        ANNUAL = "ANNUAL", "Annual"
+        PRACTICAL = "PRACTICAL", "Practical"
+        OTHER = "OTHER", "Other"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    institute = models.ForeignKey(
+        "institutes.Institute", on_delete=models.PROTECT, related_name="exams"
+    )
+    branch = models.ForeignKey(
+        "institutes.Branch", on_delete=models.PROTECT, related_name="exams"
+    )
+    academic_year = models.ForeignKey(
+        AcademicYear, on_delete=models.PROTECT, related_name="exams"
+    )
+    term = models.ForeignKey(
+        AcademicTerm,
+        on_delete=models.PROTECT,
+        related_name="exams",
+        null=True,
+        blank=True,
+    )
+    name = models.CharField(max_length=250)
+    category = models.CharField(max_length=16, choices=Category.choices)
+    custom_label = models.CharField(max_length=100, blank=True, default="")
+    starts_on = models.DateField(null=True, blank=True)
+    ends_on = models.DateField(null=True, blank=True)
+    coordinator = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name="coordinated_exams",
+        null=True,
+        blank=True,
+    )
+    instructions = models.TextField(blank=True, default="")
+    class Status(models.TextChoices):
+        DRAFT = "DRAFT", "Draft"
+        PUBLISHED = "PUBLISHED", "Published"
+
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.DRAFT, editable=False)
+    revision = models.PositiveIntegerField(default=1)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name="created_exams",
+        null=True,
+        blank=True,
+    )
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name="updated_exams",
+        null=True,
+        blank=True,
+    )
+    source_exam = models.ForeignKey(
+        "self",
+        on_delete=models.SET_NULL,
+        related_name="duplicates",
+        null=True,
+        blank=True,
+    )
+
+    class Meta:
+        db_table = "exams"
+        ordering = ("-updated_at", "name")
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(status__in=("DRAFT", "PUBLISHED")), name="ck_exam_status_valid"
+            ),
+            models.CheckConstraint(
+                condition=Q(revision__gt=0), name="ck_exam_revision_positive"
+            ),
+            models.CheckConstraint(
+                condition=(Q(starts_on__isnull=True, ends_on__isnull=True)
+                           | Q(starts_on__isnull=False, ends_on__isnull=False,
+                               ends_on__gte=models.F("starts_on"))),
+                name="ck_exam_date_pair_order",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=("institute", "academic_year", "status", "starts_on"),
+                name="exam_institute_year_idx",
+            ),
+            models.Index(
+                fields=("branch", "academic_year", "starts_on"),
+                name="exam_branch_year_idx",
+            ),
+        ]
+
+    def clean(self):
+        self.name = self.name.strip()
+        self.custom_label = self.custom_label.strip()
+        errors = {}
+        if not self.name:
+            errors["name"] = "Name is required."
+        if bool(self.starts_on) != bool(self.ends_on):
+            errors["starts_on"] = "Start and end dates must be supplied together."
+        if self.category != self.Category.OTHER and self.custom_label:
+            errors["custom_label"] = "Custom label is only allowed for OTHER."
+        if len(self.instructions) > 10_000:
+            errors["instructions"] = "Instructions must be 10,000 characters or fewer."
+        if self.branch_id and self.institute_id and self.branch.institute_id != self.institute_id:
+            errors["branch"] = "Campus must belong to the selected institute."
+        if (
+            self.academic_year_id
+            and self.institute_id
+            and self.academic_year.institute_id != self.institute_id
+        ):
+            errors["academic_year"] = "Academic year must belong to the selected institute."
+        if self.term_id and self.academic_year_id:
+            if self.term.academic_year_id != self.academic_year_id:
+                errors["term"] = "Term must belong to the selected academic year."
+            if self.starts_on and self.ends_on and (
+                self.starts_on < self.term.start_date or self.ends_on > self.term.end_date
+            ):
+                errors["starts_on"] = "Exam dates must fall within the selected term."
+        if self.academic_year_id and self.starts_on and self.ends_on and (
+            self.starts_on < self.academic_year.start_date
+            or self.ends_on > self.academic_year.end_date
+        ):
+            errors["starts_on"] = "Exam dates must fall within the academic year."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+
+class ExamTarget(TimeStampedModel):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    exam = models.ForeignKey(Exam, on_delete=models.CASCADE, related_name="targets")
+    class_section = models.ForeignKey(
+        ClassSection, on_delete=models.PROTECT, related_name="exam_targets"
+    )
+
+    class Meta:
+        db_table = "exam_targets"
+        constraints = [
+            models.UniqueConstraint(
+                fields=("exam", "class_section"), name="uq_exam_target_section"
+            )
+        ]
+
+
+class ExamSubjectSelection(TimeStampedModel):
+    """A curriculum subject selected as a paper for one exam section target."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    target = models.ForeignKey(
+        ExamTarget, on_delete=models.CASCADE, related_name="subject_selections"
+    )
+    class_subject = models.ForeignKey(
+        ClassSubject, on_delete=models.PROTECT, related_name="exam_selections"
+    )
+    theory_max = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True, default=100)
+    practical_max = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
+    pass_marks = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True, default=33)
+    duration_minutes = models.PositiveSmallIntegerField(default=180)
+
+    class Meta:
+        db_table = "exam_subject_selections"
+        constraints = [
+            models.UniqueConstraint(
+                fields=("target", "class_subject"), name="uq_exam_target_class_subject"
+            )
+        ]
+
+
+class ExamPaperSchedule(TimeStampedModel):
+    """Draft timing for the single paper represented by a subject selection."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    selection = models.OneToOneField(
+        ExamSubjectSelection, on_delete=models.CASCADE, related_name="schedule"
+    )
+    scheduled_on = models.DateField(null=True, blank=True)
+    start_time = models.TimeField(null=True, blank=True)
+    end_time = models.TimeField(null=True, blank=True)
+    room = models.ForeignKey(Room, null=True, blank=True, on_delete=models.PROTECT, related_name="exam_papers")
+    invigilator = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="invigilated_exam_papers")
+
+    class Meta:
+        db_table = "exam_paper_schedules"
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    Q(scheduled_on__isnull=True, start_time__isnull=True, end_time__isnull=True)
+                    | Q(
+                        scheduled_on__isnull=False,
+                        start_time__isnull=False,
+                        end_time__isnull=False,
+                    )
+                ),
+                name="ck_exam_paper_schedule_complete",
+            ),
+            models.CheckConstraint(
+                condition=Q(end_time__gt=models.F("start_time")) | Q(end_time__isnull=True),
+                name="ck_exam_paper_schedule_time_order",
+            ),
+        ]
+
+
+class ExamElectiveStudentAssignment(TimeStampedModel):
+    """Explicitly assigns an active section enrollment to one elective exam paper."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    selection = models.ForeignKey(
+        ExamSubjectSelection, on_delete=models.CASCADE, related_name="elective_assignments"
+    )
+    enrollment = models.ForeignKey(
+        StudentEnrollment, on_delete=models.CASCADE, related_name="elective_exam_assignments"
+    )
+
+    class Meta:
+        db_table = "exam_elective_student_assignments"
+        constraints = [
+            models.UniqueConstraint(
+                fields=("selection", "enrollment"), name="uq_exam_elective_selection_enrollment"
+            )
+        ]
+        indexes = [models.Index(fields=("enrollment", "selection"))]
+
+
+class ExamDraftChange(TimeStampedModel):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    exam = models.ForeignKey(Exam, on_delete=models.CASCADE, related_name="changes")
+    revision = models.PositiveIntegerField()
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name="exam_draft_changes",
+        null=True,
+        blank=True,
+    )
+    actor_id_snapshot = models.UUIDField()
+    actor_display_snapshot = models.CharField(max_length=150, blank=True, default="")
+    action = models.CharField(max_length=24)
+    changes = models.JSONField(default=dict)
+
+    class Meta:
+        db_table = "exam_draft_changes"
+        constraints = [
+            models.UniqueConstraint(
+                fields=("exam", "revision"), name="uq_exam_change_revision"
+            ),
+            models.CheckConstraint(
+                condition=Q(revision__gt=0), name="ck_exam_change_revision_positive"
+            ),
+        ]
+        indexes = [models.Index(fields=("exam", "created_at"), name="exam_change_timeline_idx")]
+
+
+class ExamPublicationSnapshot(TimeStampedModel):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    exam = models.ForeignKey(Exam, on_delete=models.PROTECT, related_name="publications")
+    revision = models.PositiveIntegerField()
+    snapshot = models.JSONField()
+    published_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="exam_publications",
+    )
+    published_by_id_snapshot = models.UUIDField()
+    published_by_display_snapshot = models.CharField(max_length=150, blank=True, default="")
+
+    class Meta:
+        db_table = "exam_publication_snapshots"
+        constraints = [
+            models.UniqueConstraint(fields=("exam", "revision"), name="uq_exam_publication_revision"),
+            models.CheckConstraint(condition=Q(revision__gt=0), name="ck_exam_publication_revision_positive"),
+        ]
+
+
+class ExamRequestReceipt(TimeStampedModel):
+    class Action(models.TextChoices):
+        CREATE = "CREATE", "Create"
+        DUPLICATE = "DUPLICATE", "Duplicate"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    institute = models.ForeignKey(
+        "institutes.Institute", on_delete=models.PROTECT, related_name="exam_request_receipts"
+    )
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name="exam_request_receipts",
+        null=True,
+        blank=True,
+    )
+    actor_id_snapshot = models.UUIDField()
+    actor_display_snapshot = models.CharField(max_length=150, blank=True, default="")
+    action = models.CharField(max_length=16, choices=Action.choices)
+    request_id = models.UUIDField()
+    fingerprint = models.CharField(max_length=64)
+    exam = models.ForeignKey(
+        Exam,
+        on_delete=models.SET_NULL,
+        related_name="request_receipts",
+        null=True,
+        blank=True,
+    )
+    saved_revision = models.PositiveIntegerField()
+
+    class Meta:
+        db_table = "exam_request_receipts"
+        constraints = [
+            models.UniqueConstraint(
+                fields=("institute", "actor_id_snapshot", "action", "request_id"),
+                name="uq_exam_request_receipt_key",
+            ),
+            models.CheckConstraint(
+                condition=Q(saved_revision__gt=0), name="ck_exam_receipt_revision_positive"
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=("institute", "request_id"), name="exam_receipt_request_idx"
+            )
+        ]

@@ -137,7 +137,7 @@ def container_for(asset_type: str) -> str:
 
 def blob_name(
     *,
-    institute_id: UUID,
+    institute_id: UUID | None,
     owner_type: str,
     owner_id: UUID,
     asset_type: str,
@@ -149,11 +149,12 @@ def blob_name(
         "STAFF": "staff",
         "TEACHER": "teachers",
         "INSTITUTE": "institute",
+        "USER_PROFILE": "users",
     }[owner_type]
     asset_folder = asset_type.lower()
     return str(
         PurePosixPath(
-            str(institute_id),
+            *([str(institute_id)] if institute_id else []),
             owner_folder,
             str(owner_id),
             asset_folder,
@@ -215,6 +216,22 @@ def upload_blob(
 
 
 def read_url(asset: FileAsset) -> str:
+    if asset.storage_provider == "R2":
+        from urllib.parse import quote
+
+        if asset.visibility == FileAsset.Visibility.PUBLIC:
+            public_url = asset.public_url or settings.R2_PUBLIC_BASE_URL
+            if public_url:
+                return f"{public_url.rstrip('/')}/{quote(asset.blob_name, safe='/')}"
+        from modules.file_storage.storage import get_storage_provider
+
+        return get_storage_provider().create_read_grant(
+            bucket=asset.container_name,
+            key=asset.blob_name,
+            expires_in=settings.R2_DOWNLOAD_TTL_SECONDS,
+            content_disposition=f"inline; filename*=UTF-8''{quote(asset.original_file_name)}",
+        ).url
+
     from azure.storage.blob import BlobSasPermissions, generate_blob_sas
 
     expires = timezone.now() + timedelta(minutes=settings.AZURE_STORAGE_SAS_MINUTES)

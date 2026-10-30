@@ -12,7 +12,13 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from modules.academics.models import AcademicYear, ClassSection, Grade, StudentEnrollment
-from modules.academics.services import AcademicsValidationError, create_enrollment, ensure_default_section
+from modules.academics.services import (
+    AcademicsValidationError,
+    create_enrollment,
+    ensure_default_section,
+    lock_student_cohort,
+    update_enrollment,
+)
 from modules.institutes.api.permissions import IsCurrentInstituteAdmin
 from modules.institutes.models import Branch
 from modules.people.models import Student, StudentGuardian
@@ -286,8 +292,15 @@ class StudentBulkDeleteView(APIView):
         if not student_snapshots:
             raise RestValidationError({"studentIds": ["No active students found for the given IDs in your scope."]})
         with transaction.atomic():
-            StudentGuardian.objects.filter(student_id__in=students.values("id")).delete()
-            deleted_count = students.update(is_active=False)
+            student_ids = list(students.values_list("id", flat=True))
+            section_ids = StudentEnrollment.objects.filter(
+                student_id__in=student_ids, left_at__isnull=True
+            ).values_list("class_section_id", flat=True)
+            lock_student_cohort(section_ids=section_ids, student_ids=student_ids)
+            StudentGuardian.objects.filter(student_id__in=student_ids).delete()
+            deleted_count = Student.objects.filter(
+                institute=request.institute, id__in=student_ids, is_active=True
+            ).update(is_active=False)
         for snap in student_snapshots:
             audit_mutation(
                 request=request,
@@ -364,9 +377,12 @@ class StudentDetailView(APIView):
                     academic_year=section.academic_year
                 ).first()
                 if enrollment:
-                    enrollment.class_section = section
-                    enrollment.left_at = None
-                    enrollment.save()
+                    update_enrollment(
+                        enrollment=enrollment,
+                        class_section=section,
+                        left_at_marker=True,
+                        left_at=None,
+                    )
                 else:
                     create_enrollment(
                         student=student,
@@ -394,6 +410,11 @@ class StudentDetailView(APIView):
     def delete(self, request, student_id):
         student = self._get_student(request, student_id)
         with transaction.atomic():
+            section_ids = StudentEnrollment.objects.filter(
+                student_id=student.id, left_at__isnull=True
+            ).values_list("class_section_id", flat=True)
+            lock_student_cohort(section_ids=section_ids, student_ids=[student.id])
+            student = Student.objects.select_for_update().get(pk=student.pk)
             StudentGuardian.objects.filter(student=student).delete()
             student.is_active = False
             student.save(update_fields=("is_active", "updated_at"))

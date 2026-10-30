@@ -347,6 +347,19 @@ PRESET_ID_CARD = [
     },
 ]
 
+PRESET_ADMIT_CARD = [
+    {"name": "Exam admit card", "is_default": True, "layout": _layout([
+        _shape(0, 0, 210, 28, BRAND),
+        _text(14, 7, 182, 8, "{{school_name}}", size=16, bold=True, color="#FFFFFF", align="center"),
+        _text(10, 34, 190, 10, "{{admit_card_title}} · {{exam_name}} · {{academic_year}}", size=14, bold=True, color=BRAND, align="center"),
+        _divider(12, 48, 186, ACCENT),
+        _text(14, 55, 182, 24, "Candidate: {{student_name}}\nAdmission no: {{student_id}} · Class: {{class_section}} · Roll: {{roll_no}}", size=11, bold=True),
+        _table(12, 90, 186, 150, "exam_schedule", [_col("c1", "Subject", width=38), _col("c2", "Date", width=22), _col("c3", "Time", width=24), _col("c4", "Room", width=16)], font=10),
+        _text(14, 250, 182, 16, "{{exam_instructions}}", size=9, color=SOFT),
+        _signature(128, 270, 60, label="Principal / Examination authority"),
+    ], size="A4P", margin=10)}
+]
+
 # Certificates: A4 landscape (297 x 210). Border built from four thin shapes.
 def _border(color=BRAND, inset=8, thickness=1.2):
     outer_w, outer_h = 297, 210
@@ -387,10 +400,23 @@ PRESET_CERTIFICATE = [
                             accent=SOFT)},
 ]
 
+PRESET_LETTERHEAD = [{
+    "name": "School letterhead", "is_default": True,
+    "layout": _layout([
+        _shape(0, 0, 210, 32, BRAND),
+        _image(12, 5, 22, 22),
+        _text(40, 7, 155, 9, "{{school_name}}", size=16, bold=True, color="#FFFFFF"),
+        _text(40, 18, 155, 7, "{{school_address}} · {{school_phone}} · {{school_email}}", size=8, color="#E8EEF5"),
+        _divider(12, 36, 186, ACCENT),
+    ], header=40),
+}]
+
 PRESETS: dict[str, list[dict]] = {
     "FEE_INVOICE": PRESET_FEE_INVOICE,
     "FEE_RECEIPT": PRESET_FEE_RECEIPT,
     "MARKSHEET": PRESET_MARKSHEET,
     "ID_CARD": PRESET_ID_CARD,
+    "ADMIT_CARD": PRESET_ADMIT_CARD,
     "CERTIFICATE": PRESET_CERTIFICATE,
+    "LETTERHEAD": PRESET_LETTERHEAD,
 }

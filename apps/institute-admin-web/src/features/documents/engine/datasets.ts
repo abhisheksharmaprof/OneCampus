@@ -23,6 +23,8 @@ export const SAMPLE_TOKENS: Record<string, string> = {
   invoice_no: 'INV-2026-0001', invoice_date: '12 Aug 2026', due_date: '31 Aug 2026', payment_status: 'Pending',
   receipt_no: 'RCP-2026-0001', payment_method: 'UPI',
   exam_name: 'Term 1 Examination', event_name: 'Annual Science Fair', academic_year: 'AY 2026-27',
+  exam_instructions: 'Bring this admit card to every paper.', exam_window: '30 Oct – 6 Nov 2026', reporting_time: '08:15 AM', exam_center: 'Main examination hall',
+  admit_card_title: 'EXAMINATION ADMIT CARD',
   issue_date: '13 Aug 2026',
   school_name: 'Step Next Academy', school_address: 'Jodhpur, Rajasthan',
   school_gstin: '08AAAAA0000A1Z5', school_pan: 'AAAAA0000A', school_phone: '+91 98765 43210',
@@ -106,6 +108,11 @@ export const CATEGORY_CONFIG: Record<DocumentCategory, CategoryConfig> = {
     ],
     datasets: [],
   },
+  ADMIT_CARD: {
+    label: 'Admit Card', pageSizeIds: ['A4P', 'A4L'], pageCount: 1,
+    tokenGroups: [STUDENT_TOKENS, { source: 'Exam', fields: ['admit_card_title', 'exam_name', 'academic_year', 'exam_window', 'reporting_time', 'exam_center', 'exam_instructions'] }, SCHOOL_TOKENS],
+    datasets: [{ id: 'exam_schedule', label: 'Assigned exam schedule', columns: [col('c1', 'Subject', { widthPct: 38 }), col('c2', 'Date', { widthPct: 22 }), col('c3', 'Time', { widthPct: 24 }), col('c4', 'Room', { widthPct: 16 })], sampleRows: [{ c1: 'Mathematics', c2: '30 Oct 2026', c3: '09:00–12:00', c4: 'Hall A' }] }],
+  },
   CERTIFICATE: {
     label: 'Certificate', pageSizeIds: ['A4L', 'A4P'], pageCount: 1,
     tokenGroups: [
@@ -114,6 +121,10 @@ export const CATEGORY_CONFIG: Record<DocumentCategory, CategoryConfig> = {
       SCHOOL_TOKENS,
     ],
     datasets: [],
+  },
+  LETTERHEAD: {
+    label: 'Letterhead', pageSizeIds: ['A4P'], pageCount: 1,
+    tokenGroups: [SCHOOL_TOKENS], datasets: [],
   },
 }
 

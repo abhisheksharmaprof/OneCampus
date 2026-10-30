@@ -57,11 +57,13 @@ export function renderElementInner(el: CanvasElement, ctx: RenderContext): strin
       return `<div class="doc-img-fallback">${escapeHtml(el.fallbackInitials || '?')}</div>`
     }
     case 'table': {
+      const columns = el.columns.filter((column) => column.visible !== false)
+      const visibleWidth = columns.reduce((total, column) => total + safePct(column.widthPct), 0) || 1
       const rows = computeTableRows(el.columns, ctx.data.rows)
-      const header = el.columns.map((column) =>
-        `<th style="width:${safePct(column.widthPct)}%;text-align:${safeAlign(column.align)}">${escapeHtml(column.label)}</th>`,
+      const header = columns.map((column) =>
+        `<th style="width:${safePct(column.widthPct) / visibleWidth * 100}%;text-align:${safeAlign(column.align)}">${escapeHtml(column.label)}</th>`,
       ).join('')
-      const body = rows.map((row) => `<tr>${el.columns.map((column) => {
+      const body = rows.map((row) => `<tr>${columns.map((column) => {
         const raw = row[column.id]
         const value = (column.dtype === 'number' || column.type === 'formula') && raw !== '#ERR'
           ? formatNumber(raw)

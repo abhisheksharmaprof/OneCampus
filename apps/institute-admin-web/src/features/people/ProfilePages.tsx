@@ -4,7 +4,7 @@ import {
   ArrowLeft, ChevronLeft, ChevronRight, Download, Edit3, Eye,
   FileText, MoreHorizontal, Save, Trash2, Upload, UserRound, X,
 } from 'lucide-react'
-import { FileUploadField, PageSkeleton } from '../../components/admin-ui'
+import { FileUploadField, PageSkeleton, Skeleton } from '../../components/admin-ui'
 import { Card, SectionHeader } from '../../components/ui/primitives'
 import { adminRequest, adminUpload, AdminApiError } from '../admin/admin.api'
 import { listAllRoles } from '../access-control/access-control.api'
@@ -350,7 +350,7 @@ function StudentProfilePage({ id, accessToken, onBack }: { id?: string; accessTo
     setSearchParams(next)
   }
 
-  if (loading) return <Spinner />
+  if (loading) return <PageSkeleton name="student-profile" label="Loading student profile" variant="detail" />
 
   const name = student ? `${student.firstName} ${student.lastName ?? ''}`.trim() : 'Student'
   const initials = name.split(' ').map((p) => p[0] ?? '').join('').slice(0, 2).toUpperCase()
@@ -1055,7 +1055,7 @@ function StaffProfilePage({ id, accessToken, onBack }: { id?: string; accessToke
 
   const selectedClassSections = sections.filter((s) => s.gradeId === mappingClass)
 
-  if (profileLoading) return <Spinner />
+  if (profileLoading) return <PageSkeleton name="staff-profile" label="Loading staff profile" variant="detail" />
 
   return (
     <div className="profile-page">
@@ -1236,7 +1236,7 @@ function StaffTimetable({ staff, assignments, publishedTimetable, loading, onOpe
     <Card className="profile-table-card">
       <SectionHeader title="Time Table" action={<button className="button-secondary button-small" type="button" onClick={onOpenTimetable}>Open timetable builder</button>} />
       {loading
-        ? <p className="section-caption">Loading published timetable…</p>
+        ? <PageSkeleton name="staff-timetable" label="Loading published timetable" variant="list" />
         : hasPublishedTimetable
           ? <div className="staff-timetable-status"><span className="status-badge tone-success">Published</span><span>Synced from the timetable builder</span>{publishedTimetable?.timetableTitle && <strong>{publishedTimetable.timetableTitle}</strong>}{publishedTimetable?.timetableUpdatedAt && <time dateTime={publishedTimetable.timetableUpdatedAt}>Updated {new Date(publishedTimetable.timetableUpdatedAt).toLocaleDateString()}</time>}</div>
           : <div className="staff-timetable-empty-banner"><strong>No published timetable yet</strong><span>This weekly grid is ready for the teacher. Publish a timetable to sync classes, subjects, rooms, and times here.</span></div>
@@ -1478,7 +1478,7 @@ function ParentProfilePage({ id, accessToken, onBack }: { id?: string; accessTok
     setSearchParams(next)
   }
 
-  if (loading) return <Spinner />
+  if (loading) return <PageSkeleton name="parent-profile" label="Loading parent profile" variant="detail" />
 
   return (
     <div className="profile-page">
@@ -1632,7 +1632,7 @@ function AttendanceCard({
             ? <button key={cell.day} type="button" className={`profile-attendance-day ${cell.status}`} onClick={() => setSelected(cell)} title={`${cell.date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })} — ${humanize(cell.status)}`}><strong>{cell.day}</strong><span>{humanize(cell.status)}</span></button>
             : <span className="profile-attendance-day empty" key={`empty-${index}`} />)}
         </div>
-        <p className="section-caption">{loading ? 'Loading attendance records…' : 'Select a date to review attendance details.'}</p>
+        <p className="section-caption">{loading ? <><span className="sr-only">Loading attendance records</span><Skeleton width="10rem" height=".8rem" /></> : 'Select a date to review attendance details.'}</p>
         {selected && (
           <div className="attendance-detail-panel">
             <strong>{selected.date.toLocaleDateString(undefined, { dateStyle: 'long' })} · {humanize(selected.status)}</strong>

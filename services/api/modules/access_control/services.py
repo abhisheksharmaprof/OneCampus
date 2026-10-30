@@ -3,6 +3,7 @@ from django.db import IntegrityError, transaction
 from django.db.models import Q
 from django.utils import timezone
 
+from .exam_scopes import EXAM_ACTIONS, require_exam_scope_delegation, validate_exam_configuration
 from .exceptions import InvalidOperation
 from .models import Permission, Role, RolePermission, UserRoleAssignment
 from .policies import require_delegable_permissions, require_permission
@@ -43,6 +44,20 @@ def _replace_grants(*, role, permissions, configurations):
     )
 
 
+def _validate_exam_grants(*, actor, institute, branch, permissions, configurations):
+    for key in set(permissions) & EXAM_ACTIONS:
+        try:
+            configurations[key] = validate_exam_configuration(
+                configurations.get(key, {}), institute=institute, branch=branch
+            )
+            require_exam_scope_delegation(
+                actor=actor, action=key, configuration=configurations[key],
+                institute=institute, branch=branch,
+            )
+        except ValueError as exc:
+            raise InvalidOperation(str(exc), field="permissionOptions") from exc
+
+
 @transaction.atomic
 def create_role(
     *, actor, institute, name, description="", branch=None, permission_keys=(), configurations=None
@@ -61,6 +76,8 @@ def create_role(
         raise InvalidOperation(
             "Configuration was supplied for an unselected permission.", field="permissionOptions"
         )
+    _validate_exam_grants(actor=actor, institute=institute, branch=branch,
+                          permissions=permissions, configurations=configurations)
     try:
         role = Role.objects.create(
             institute=institute,
@@ -119,6 +136,8 @@ def update_role(
                 "Configuration was supplied for an unselected permission.",
                 field="permissionOptions",
             )
+        _validate_exam_grants(actor=actor, institute=role.institute, branch=target_branch,
+                              permissions=permissions, configurations=configurations)
     if name is not None:
         role.name = name
     if description is not None:
@@ -204,6 +223,16 @@ def assign_role(
         institute=institute,
         permission_keys=permission_keys,
         branch=branch,
+    )
+    configurations = {
+        grant.permission.permission_key: grant.configuration
+        for grant in role.permission_grants.select_related("permission").filter(
+            permission__is_active=True, permission__permission_key__in=EXAM_ACTIONS
+        )
+    }
+    _validate_exam_grants(
+        actor=actor, institute=institute, branch=branch,
+        permissions={key: None for key in configurations}, configurations=configurations,
     )
     if valid_until and valid_until <= (valid_from or now):
         raise InvalidOperation("Expiry must be later than the validity start.", field="validUntil")

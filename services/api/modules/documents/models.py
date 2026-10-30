@@ -15,7 +15,9 @@ class DocumentTemplate(TimeStampedModel):
         FEE_RECEIPT = "FEE_RECEIPT", "Fee receipt"
         MARKSHEET = "MARKSHEET", "Mark sheet"
         ID_CARD = "ID_CARD", "ID card"
+        ADMIT_CARD = "ADMIT_CARD", "Admit card"
         CERTIFICATE = "CERTIFICATE", "Certificate"
+        LETTERHEAD = "LETTERHEAD", "Letterhead"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     institute = models.ForeignKey(
@@ -24,6 +26,7 @@ class DocumentTemplate(TimeStampedModel):
     name = models.CharField(max_length=120)
     category = models.CharField(max_length=20, choices=Category.choices)
     layout = models.JSONField(default=dict, blank=True)
+    layout_revision = models.PositiveIntegerField(default=1)
     is_default = models.BooleanField(default=False)
     published_version = models.ForeignKey(
         "documents.DocumentTemplateVersion",

@@ -98,6 +98,26 @@ describe('renderDocumentHtml', () => {
     expect(html).toContain('@page{size:86mm 54mm')
     expect(html).toContain('doc-watermark')
   })
+
+  it('dispatches to v3 renderer when layout version is 3', () => {
+    const v3Layout = {
+      version: 3 as const,
+      page: {
+        sizeId: 'A4P' as const,
+        orientation: 'PORTRAIT' as const,
+        marginsMm: { top: 10, right: 10, bottom: 10, left: 10 },
+        background: '#FFFFFF',
+      },
+      zones: { headerMm: 0, footerMm: 0 },
+      pages: [{ id: 'p1', elements: [{ id: 'el-1', type: 'text' as const, xMm: 15, yMm: 25, widthMm: 80, heightMm: 12, content: 'V3 Student: {{student_name}}' }] }],
+      watermark: { mode: 'none' as const },
+    }
+    const data = sampleDocumentData('FEE_INVOICE')
+    data.tokens.student_name = 'Ada Lovelace'
+    const html = renderDocumentHtml({ layout: v3Layout, data, mode: 'preview' })
+    expect(html).toContain('V3 Student: Ada Lovelace')
+    expect(html).toContain('left:15mm;top:25mm;width:80mm;height:12mm')
+  })
 })
 
 describe('tableRowsPerPage', () => {

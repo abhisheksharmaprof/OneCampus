@@ -3,7 +3,7 @@ import type { DocumentTemplateRecord } from '../documents.api'
 import { invoiceToDocumentData } from './datasets'
 import { openPrintWindow, renderDocumentHtml } from './docRender'
 import { prepareQrDataUrls } from './qrPayload'
-import type { CanvasElement, LayoutV2, TableColumn, TotalsRow } from './types'
+import { isLayoutV2, type CanvasElement, type LayoutV2, type TableColumn, type TotalsRow } from './types'
 
 const INK = '#16212E'
 const SOFT = '#5B6675'
@@ -61,8 +61,8 @@ function financeFallbackLayout(category: 'FEE_INVOICE' | 'FEE_RECEIPT', brandCol
   }
 }
 
-function hasRenderableElements(layout: LayoutV2 | null | undefined): layout is LayoutV2 {
-  return Boolean(layout?.pages?.some((page) => page.elements.length > 0))
+function hasRenderableElements(layout: unknown): layout is LayoutV2 {
+  return isLayoutV2(layout) && Boolean(layout.pages?.some((page) => page.elements.length > 0))
 }
 
 const PRESET_BRAND_COLORS = new Set([DEFAULT_BRAND, '#16A085'])

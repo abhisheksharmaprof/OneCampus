@@ -1,7 +1,7 @@
 import { type ReactNode, FormEvent, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AlertCircle, ChevronLeft, ChevronRight, Eye, Plus, Search, Trash2 } from 'lucide-react'
-import { DataTable, Modal, type DataTableColumn, type TableSort } from '../../components/admin-ui'
+import { DataTable, Modal, Skeleton, type DataTableColumn, type TableSort } from '../../components/admin-ui'
 import { Card, SectionHeader } from '../../components/ui/primitives'
 import { adminRequest, AdminApiError, type PageData } from '../admin/admin.api'
 import { StudentBulkImport } from './StudentBulkImport'
@@ -14,6 +14,7 @@ type Student = {
   admissionNumber: string
   firstName: string
   lastName: string
+  profilePhotoUrl?: string | null
   fatherName?: string
   motherName?: string
   studentNicId?: string
@@ -316,6 +317,19 @@ function QuickStudentModal({ open, accessToken, branches, selectedBranch, classe
 }
 
 /* ─────────────────────────── main page ─────────────────────────── */
+function StudentAvatar({ student }: { student: Student }) {
+  const [imageFailed, setImageFailed] = useState(false)
+  const initials = `${(student.firstName[0] ?? '').toUpperCase()}${(student.lastName?.[0] ?? '').toUpperCase()}`
+
+  return (
+    <span className="sa-avatar">
+      {student.profilePhotoUrl && !imageFailed
+        ? <img src={student.profilePhotoUrl} alt="" loading="lazy" onError={() => setImageFailed(true)} />
+        : initials}
+    </span>
+  )
+}
+
 export function StudentsPage({ accessToken, branches = [], selectedBranch, selectedStudentId, onSelectStudent }: {
   accessToken: string
   branches: Branch[]
@@ -659,7 +673,7 @@ export function StudentsPage({ accessToken, branches = [], selectedBranch, selec
       id: 'student', header: 'Student', sortable: true,
       cell: (s) => (
         <span className="sa-name-cell">
-          <span className="sa-avatar">{(s.firstName[0] ?? '').toUpperCase()}{(s.lastName?.[0] ?? '').toUpperCase()}</span>
+          <StudentAvatar student={s} />
           <span>
             <strong>{`${s.firstName} ${s.lastName}`.trim()}</strong>
             <small>{s.admissionNumber}</small>
@@ -804,7 +818,7 @@ export function StudentsPage({ accessToken, branches = [], selectedBranch, selec
                 <div className="sa-grid sa-grid-3">
                   {assignedBranch
                     ? <div className="auto-assigned-field"><span>Default branch</span><strong>{assignedBranch.name}</strong><small>Automatically selected for this institute</small><input type="hidden" name="branchId" value={assignedBranch.id} /></div>
-                    : <div className="auto-assigned-field"><span>Default branch</span><strong>Loading branch context…</strong><small>Select a branch in the global header before adding a student.</small><input type="hidden" name="branchId" value={selectedBranch === 'all' ? '' : selectedBranch} /></div>}
+                    : <div className="auto-assigned-field"><span>Default branch</span><strong><span className="sr-only">Loading branch context</span><Skeleton width="8rem" height=".9rem" /></strong><small>Select a branch in the global header before adding a student.</small><input type="hidden" name="branchId" value={selectedBranch === 'all' ? '' : selectedBranch} /></div>}
                   <IField name="admissionDate" label="Date of Admission" required type="date"
                     fd={fd} set={setFd} placeholder={new Date().toISOString().slice(0, 10)} />
                   <IField name="srNumber" label="Admission Number / SR No" fd={fd} set={setFd} placeholder="Will be auto-generated if blank" />

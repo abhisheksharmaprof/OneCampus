@@ -36,7 +36,10 @@ def test_admin_login_returns_role_aware_session_profile(api_client):
     assert payload["success"] is True
     assert payload["data"]["accessToken"]
     assert payload["data"]["refreshToken"]
-    assert payload["data"]["user"] == {
+    assert {
+        key: payload["data"]["user"][key]
+        for key in ("id", "displayName", "roles", "activeRole", "instituteId", "branchIds")
+    } == {
         "id": str(user.id),
         "displayName": "Ananya Mehta",
         "roles": ["INSTITUTE_ADMIN"],
@@ -44,6 +47,9 @@ def test_admin_login_returns_role_aware_session_profile(api_client):
         "instituteId": str(institute.id),
         "branchIds": [str(branch.id)],
     }
+    assert {"assessment.create", "assessment.view", "assessment.edit"} <= set(
+        payload["data"]["user"]["permissions"]
+    )
 
 
 @pytest.mark.django_db

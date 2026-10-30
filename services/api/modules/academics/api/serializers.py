@@ -281,6 +281,7 @@ class ClassSectionSerializer(serializers.ModelSerializer):
     academicYear = AcademicYearSerializer(source="academic_year", read_only=True)
     sectionName = serializers.CharField(source="section_name")
     classTeacher = UserSummarySerializer(source="class_teacher", read_only=True)
+    roomId = serializers.UUIDField(source="default_room_id", allow_null=True)
     maxStrength = serializers.IntegerField(source="max_strength", allow_null=True)
     enrollmentCount = serializers.SerializerMethodField()
     createdAt = serializers.DateTimeField(source="created_at", read_only=True)
@@ -295,6 +296,7 @@ class ClassSectionSerializer(serializers.ModelSerializer):
             "academicYear",
             "sectionName",
             "classTeacher",
+            "roomId",
             "maxStrength",
             "enrollmentCount",
             "createdAt",
@@ -318,6 +320,7 @@ class ClassSectionWriteSerializer(StrictSerializer):
     classTeacherId = serializers.UUIDField(
         source="class_teacher_id", required=False, allow_null=True
     )
+    roomId = serializers.UUIDField(source="default_room_id", required=False, allow_null=True)
     maxStrength = serializers.IntegerField(
         source="max_strength", required=False, allow_null=True, min_value=1
     )

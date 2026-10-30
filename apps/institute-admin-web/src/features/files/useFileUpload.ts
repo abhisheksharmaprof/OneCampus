@@ -1,10 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import {
-  calculateFileChecksums,
-  completeFileUpload,
-  initiateFileUpload,
-  putFileDirectly,
+  uploadFile as uploadThroughCentralPipeline,
 } from './files.api'
 import type { FileAsset, FileOwner, FileCategory, FileVisibility, UploadPhase } from './files.types'
 
@@ -41,32 +38,13 @@ export function useFileUpload(accessToken: string) {
     setError(null)
     setProgress(0)
     try {
-      setPhase('hashing')
-      const checksums = await calculateFileChecksums(file)
-      if (current.signal.aborted) throw current.signal.reason
-      setPhase('initiating')
-      const authorization = await initiateFileUpload(
-        accessToken,
-        crypto.randomUUID(),
-        {
-          ...options,
-          originalFileName: file.name,
-          mediaType: file.type,
-          sizeBytes: file.size,
-          ...checksums,
-          visibility: options.visibility ?? 'PRIVATE',
-        },
-        current.signal,
-      )
-      setPhase('uploading')
-      const etag = await putFileDirectly(
-        authorization,
-        file,
-        ({ percent }) => setProgress(percent),
-        current.signal,
-      )
-      setPhase('completing')
-      const completed = await completeFileUpload(accessToken, authorization, etag, current.signal)
+      const completed = await uploadThroughCentralPipeline(accessToken, file, {
+        ...options,
+        visibility: options.visibility ?? 'PRIVATE',
+        signal: current.signal,
+        onPhase: setPhase,
+        onProgress: ({ percent }) => setProgress(percent),
+      })
       setAsset(completed)
       setProgress(100)
       setPhase('complete')

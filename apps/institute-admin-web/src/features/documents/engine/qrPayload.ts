@@ -8,9 +8,10 @@
  *  before inflating, never throws, and validates the decoded shape before
  *  returning ok. */
 
+import type { LayoutV3 } from '@campusone/document-engine'
 import { deflate, inflate } from 'pako'
 import QRCode from 'qrcode'
-import type { DocumentCategory, DocumentData, LayoutV2 } from './types'
+import { isLayoutV2, type DocumentCategory, type DocumentData, type LayoutV2 } from './types'
 
 export interface QrDocPayload {
   v: 1
@@ -35,7 +36,7 @@ const MAX_ENCODED_LENGTH = FRAGMENT_BUDGET * 4
  *  verify page (client-side DoS). Real documents stay far below this. */
 const MAX_PAIR_ENTRIES = 200
 
-const CATEGORIES: readonly DocumentCategory[] = ['FEE_INVOICE', 'FEE_RECEIPT', 'MARKSHEET', 'ID_CARD', 'CERTIFICATE']
+const CATEGORIES: readonly DocumentCategory[] = ['FEE_INVOICE', 'FEE_RECEIPT', 'MARKSHEET', 'ID_CARD', 'ADMIT_CARD', 'CERTIFICATE']
 
 function toBase64Url(bytes: Uint8Array): string {
   let binary = ''
@@ -115,11 +116,12 @@ export function payloadFromDocumentData(data: DocumentData): QrDocPayload {
 
 /** Pre-generate QR data URLs for every qr element (async; docRender is sync). */
 export async function prepareQrDataUrls(
-  layout: LayoutV2,
+  layout: LayoutV2 | LayoutV3,
   data: DocumentData,
   verifyBaseUrl: string = window.location.origin,
 ): Promise<Record<string, string>> {
   const result: Record<string, string> = {}
+  if (!isLayoutV2(layout)) return result
   const payload = payloadFromDocumentData(data)
   for (const page of layout.pages) {
     for (const element of page.elements) {

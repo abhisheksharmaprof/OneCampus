@@ -2,7 +2,7 @@ import {
   useEffect, useRef, useState,
   type Dispatch, type DragEvent, type KeyboardEvent, type PointerEvent as ReactPointerEvent,
 } from 'react'
-import { renderElementInner, type RenderContext } from '../engine/renderHtml'
+import { ELEMENT_CSS, renderElementInner, type RenderContext } from '../engine/renderHtml'
 import { PAGE_SIZES_MM, type CanvasElement, type DocumentData } from '../engine/types'
 import { defaultElement } from './elementDefaults'
 import { computeSnap, type SnapGuide } from './snap'
@@ -185,6 +185,7 @@ export function CanvasStage({ state, dispatch, data }: CanvasStageProps) {
         onDrop={onDrop}
         onPointerDown={(event) => { if (event.target === pageRef.current) dispatch({ type: 'select', id: null }) }}
       >
+        <style>{ELEMENT_CSS}</style>
         {layout.watermark.enabled && (
           <div className="stu-watermark">
             {layout.watermark.mode === 'text'
@@ -209,8 +210,8 @@ export function CanvasStage({ state, dispatch, data }: CanvasStageProps) {
           <div
             key={element.id}
             aria-label={TYPE_LABELS[element.type]}
-            data-typelabel={TYPE_LABELS[element.type]}
-            className={`stu-el${element.id === selectedId ? ' is-selected' : ''}${element.locked ? ' is-locked' : ''}`}
+            data-typelabel={`${TYPE_LABELS[element.type]}${element.visible === false ? ' · hidden' : ''}`}
+            className={`stu-el${element.id === selectedId ? ' is-selected' : ''}${element.locked ? ' is-locked' : ''}${element.visible === false ? ' is-hidden' : ''}`}
             style={{ left: element.x * scale, top: element.y * scale, width: element.w * scale, height: element.h * scale }}
             onPointerDown={(event) => startDrag(event, element, 'move')}
             onDoubleClick={() => { if (element.type === 'text' && !element.locked) setEditingId(element.id) }}

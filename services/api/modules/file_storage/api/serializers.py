@@ -24,6 +24,11 @@ class InitiateFileUploadSerializer(serializers.Serializer):
     )
     replacesFileId = serializers.UUIDField(required=False)
 
+    def validate_category(self, value):
+        if value == FileAsset.AssetType.LETTERHEAD:
+            raise serializers.ValidationError("Create letterhead designs in Template Studio.")
+        return value
+
 
 class CompleteFileUploadSerializer(serializers.Serializer):
     etag = serializers.CharField(max_length=255, required=False, allow_blank=True)
@@ -45,9 +50,17 @@ class FileAssetSerializer(serializers.Serializer):
         source="retention_until", read_only=True, allow_null=True
     )
     version = serializers.IntegerField(read_only=True)
+    url = serializers.SerializerMethodField()
 
     def get_owner(self, asset):
         return {"type": asset.owner_type, "id": str(asset.owner_id)}
+
+    def get_url(self, asset):
+        if asset.status != FileAsset.Status.ACTIVE:
+            return None
+        from modules.file_storage.services.legacy import read_url
+
+        return read_url(asset)
 
 
 def initiated_upload_data(result) -> dict:

@@ -31,3 +31,15 @@
 .ac-scope > label strong { color: #27364b; font-size: .82rem; }
 .ac-scope > label small { color: #7a8799; font-size: .7rem; }
 .ac-builder .admin-wizard-actions { width: min(100%, 52rem); margin-inline: auto; border: 1px solid #e3e8f0; border-radius: .15rem; box-shadow: 0 -4px 18px rgba(34,52,84,.04); }
+.ac-assessment-scope { display: grid; gap: .65rem; margin-top: .75rem; padding: .8rem; border: 1px solid var(--border, #d8e0e9); border-radius: .65rem; }
+.ac-assessment-scope legend { padding: 0 .3rem; font-weight: 700; }
+.ac-assessment-scope-choice { display: flex; align-items: flex-start; gap: .55rem; }
+.ac-assessment-scope-choice input { margin-top: .2rem; }
+.ac-assessment-scope-choice span { display: grid; gap: .15rem; }
+.ac-assessment-scope-choice small, .ac-selected-sections small { color: var(--text-muted, #64748b); }
+.ac-selected-sections { display: grid; gap: .55rem; padding: .7rem; border-radius: .55rem; background: var(--surface-subtle, #f5f8fb); }
+.ac-selected-sections .ac-chip-options { max-height: 13rem; overflow: auto; }
+.ac-exam-preset { display: grid; grid-template-columns: 1fr auto; gap: .3rem 1rem; align-items: center; margin: .8rem 0; padding: .8rem; border: 1px solid #cbdaf0; border-radius: .65rem; background: #f2f7ff; }
+.ac-exam-preset span { color: #5e6d80; font-size: .8rem; }
+.ac-exam-preset button { grid-column: 2; grid-row: 1 / span 2; }
+@media(max-width:700px){.ac-exam-preset{grid-template-columns:1fr}.ac-exam-preset button{grid-column:1;grid-row:auto;justify-self:start}}

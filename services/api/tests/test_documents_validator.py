@@ -92,3 +92,120 @@ def test_rejects_wrong_typed_page_settings():
     bad_margin["page"]["marginMm"] = "abc"
     with pytest.raises(serializers.ValidationError):
         validate_layout(bad_margin, category="FEE_INVOICE")
+
+
+def test_v3_accepts_multiple_tables_and_zero_height_zones():
+    layout = {
+        "version": 3,
+        "page": {
+            "sizeId": "A4P",
+            "orientation": "PORTRAIT",
+            "marginsMm": {"top": 0, "right": 10, "bottom": 0, "left": 10},
+        },
+        "zones": {"headerMm": 0, "footerMm": 0},
+        "pages": [{"id": "page-1", "elements": [
+            {
+                "id": "static", "type": "table", "xMm": 10, "yMm": 10,
+                "widthMm": 80, "heightMm": 20, "mode": "static", "cells": [],
+            },
+            {
+                "id": "dynamic", "type": "table", "xMm": 10, "yMm": 40,
+                "widthMm": 80, "heightMm": 20, "mode": "dynamic",
+                "datasetId": "marks", "columns": [],
+            },
+        ]}],
+        "watermark": {"mode": "none"},
+    }
+
+    validate_layout(layout, category="MARKSHEET")
+
+
+def test_v3_rejects_non_finite_geometry_with_element_path():
+    layout = {
+        "version": 3,
+        "page": {
+            "sizeId": "A4P",
+            "orientation": "PORTRAIT",
+            "marginsMm": {"top": 0, "right": 0, "bottom": 0, "left": 0},
+        },
+        "zones": {"headerMm": 0, "footerMm": 0},
+        "pages": [{"id": "p1", "elements": [{
+            "id": "bad", "type": "text", "xMm": float("nan"), "yMm": 0,
+            "widthMm": 10, "heightMm": 5,
+        }]}],
+        "watermark": {"mode": "none"},
+    }
+
+    with pytest.raises(serializers.ValidationError, match="bad.xMm"):
+        validate_layout(layout, category="MARKSHEET")
+
+
+def test_v3_rejects_page_size_orientation_mismatch():
+    layout = {
+        "version": 3,
+        "page": {
+            "sizeId": "A4L",
+            "orientation": "PORTRAIT",
+            "marginsMm": {"top": 0, "right": 0, "bottom": 0, "left": 0},
+        },
+        "zones": {"headerMm": 0, "footerMm": 0},
+        "pages": [{"id": "p1", "elements": []}],
+        "watermark": {"mode": "none"},
+    }
+
+    with pytest.raises(serializers.ValidationError, match="orientation.*size"):
+        validate_layout(layout, category="MARKSHEET")
+
+
+def test_v3_rejects_element_type_without_renderer_support():
+    layout = {
+        "version": 3,
+        "page": {
+            "sizeId": "A4P",
+            "orientation": "PORTRAIT",
+            "marginsMm": {"top": 0, "right": 0, "bottom": 0, "left": 0},
+        },
+        "zones": {"headerMm": 0, "footerMm": 0},
+        "pages": [{"id": "p1", "elements": [{
+            "id": "unknown", "type": "video", "xMm": 0, "yMm": 0,
+            "widthMm": 10, "heightMm": 10,
+        }]}],
+        "watermark": {"mode": "none"},
+    }
+
+    with pytest.raises(serializers.ValidationError, match="Unknown element type"):
+        validate_layout(layout, category="MARKSHEET")
+
+
+def test_v3_preserves_two_authored_card_sides():
+    layout = {
+        "version": 3,
+        "page": {
+            "sizeId": "CR80",
+            "orientation": "PORTRAIT",
+            "marginsMm": {"top": 0, "right": 0, "bottom": 0, "left": 0},
+        },
+        "zones": {"headerMm": 0, "footerMm": 0},
+        "pages": [{"id": "front", "elements": []}, {"id": "back", "elements": []}],
+        "watermark": {"mode": "none"},
+    }
+
+    validate_layout(layout, category="ID_CARD")
+
+
+def test_v3_rejects_malformed_master_binding():
+    layout = {
+        "version": 3,
+        "page": {
+            "sizeId": "A4P",
+            "orientation": "PORTRAIT",
+            "marginsMm": {"top": 0, "right": 0, "bottom": 0, "left": 0},
+        },
+        "zones": {"headerMm": 0, "footerMm": 0},
+        "pages": [{"id": "p1", "elements": []}],
+        "watermark": {"mode": "none"},
+        "masterLetterhead": {"templateId": "bad-id", "mode": "latest"},
+    }
+
+    with pytest.raises(serializers.ValidationError, match="[Mm]aster letterhead"):
+        validate_layout(layout, category="MARKSHEET")

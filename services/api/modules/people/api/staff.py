@@ -420,8 +420,13 @@ class StaffListCreateView(APIView):
         if branch_id:
             get_object_or_404(Branch, id=branch_id, institute=institute)
             staff = staff.filter(
-                user__institute_memberships__branch_id=branch_id,
                 user__institute_memberships__institute=institute,
+            ).filter(
+                Q(user__institute_memberships__branch_id=branch_id)
+                | Q(
+                    user__institute_memberships__branch__isnull=True,
+                    user__institute_memberships__role=InstituteMembership.Role.INSTITUTE_ADMIN,
+                )
             )
         if search:
             staff = staff.filter(

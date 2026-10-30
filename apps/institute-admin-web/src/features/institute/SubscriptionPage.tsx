@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { CreditCard, RefreshCw } from 'lucide-react'
+import { PageSkeleton } from '../../components/admin-ui'
 import { adminRequest } from '../admin/admin.api'
 import './subscription.css'
 
@@ -55,7 +56,7 @@ export function SubscriptionPage({ accessToken }: { accessToken: string }) {
     <header className="subscription-heading">
       <div><p className="breadcrumb">Home　›　Institute Setup　›　Subscription</p><h1>Subscription &amp; Billing</h1><p>View the subscription assigned to this institute.</p></div>
     </header>
-    {error ? <div className="subscription-state" role="alert"><p>{error}</p><button className="button-secondary" type="button" onClick={() => setRevision((value) => value + 1)}><RefreshCw size={15} /> Retry</button></div> : loading ? <div className="subscription-state" role="status">Loading subscription details…</div> : subscription && plan ? <>
+    {error ? <div className="subscription-state" role="alert"><p>{error}</p><button className="button-secondary" type="button" onClick={() => setRevision((value) => value + 1)}><RefreshCw size={15} /> Retry</button></div> : loading ? <PageSkeleton name="subscription" label="Loading subscription details" variant="detail" /> : subscription && plan ? <>
       <section className="subscription-kpis" aria-label="Subscription summary">
         <article className="subscription-card"><span className="section-caption">Current plan</span><strong>{plan.name}</strong><small>{statusLabel}</small></article>
         <article className="subscription-card"><span className="section-caption">Student limit</span><strong>{plan.maxStudents.toLocaleString('en-IN')}</strong><small>Plan maximum</small></article>

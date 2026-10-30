@@ -69,6 +69,7 @@ export const adminNavigation: AdminNavigationItem[] = [
     route('AH1', 'Academic Overview', '/academics', 'Academics', 'academics'),
     route('AHT1', 'Teaching & Learning', '/academics/teaching-learning', 'Academics', 'academic-operations'),
     route('AAR1', 'Assessment & Results', '/academics/assessment-results', 'Academics', 'academic-operations'),
+    route('AAR2', 'Admit Cards', '/academics/admit-cards', 'Academics', 'academic-operations'),
   ] },
   { label: 'Communication', icon: 'communication', children: [
     route('CM1', 'Circulars', '/communication/circulars', 'Communication'),

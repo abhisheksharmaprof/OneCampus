@@ -33,6 +33,8 @@ class FileUploadSerializer(serializers.Serializer):
     def validate(self, attrs):
         owner_type = attrs["ownerType"]
         asset_type = attrs["assetType"]
+        if asset_type == FileAsset.AssetType.LETTERHEAD:
+            raise serializers.ValidationError("Create letterhead designs in Template Studio.")
         if (
             owner_type == FileAsset.OwnerType.INSTITUTE
             and attrs["ownerId"] != self.context["institute"].id
@@ -271,6 +273,14 @@ class FileAssetDetailView(APIView):
         asset = get_object_or_404(
             FileAsset, id=asset_id, institute=request.institute, status=FileAsset.Status.ACTIVE
         )
+        if asset.asset_type == FileAsset.AssetType.LETTERHEAD:
+            from modules.documents.models import DocumentTemplate, DocumentTemplateVersion
+
+            asset_id_text = str(asset.id)
+            templates = DocumentTemplate.objects.filter(institute=request.institute).only("layout")
+            versions = DocumentTemplateVersion.objects.filter(institute=request.institute).only("layout")
+            if any(item.layout.get("letterheadAssetId") == asset_id_text for item in (*templates, *versions)):
+                raise serializers.ValidationError({"asset": ["This letterhead is used by a saved template. Choose another letterhead there before removing it."]})
         asset.status = FileAsset.Status.DELETED
         asset.deleted_at = timezone.now()
         asset.save(update_fields=("status", "deleted_at", "updated_at"))

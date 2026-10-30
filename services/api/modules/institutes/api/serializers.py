@@ -9,6 +9,7 @@ from rest_framework import serializers
 from modules.identity.models import User
 from modules.institutes.models import (Branch, Institute, InstituteConsentRecord,
     InstituteDocument, InstituteMembership, InstituteSubscription, SubscriptionPlan)
+from modules.people.models import StaffProfile
 from .admin_serializers import short_branch_code
 
 
@@ -148,6 +149,11 @@ class InstituteOnboardingSerializer(serializers.Serializer):
             user=user,
             institute=institute,
             role=InstituteMembership.Role.INSTITUTE_ADMIN,
+        )
+        StaffProfile.objects.get_or_create(
+            user=user,
+            institute=institute,
+            defaults={"department": "Administration", "invite_pending": False},
         )
         return {
             "user": user,

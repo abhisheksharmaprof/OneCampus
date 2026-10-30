@@ -208,6 +208,8 @@
 .attendance-chart-loading { display: grid; gap: 14px; grid-template-columns: 1fr 1fr; margin-bottom: 18px; }
 .attendance-chart-loading span { animation: attendance-shimmer 1.2s infinite; background: linear-gradient(90deg, #edf1f6, #f8fafd, #edf1f6); background-size: 200% 100%; border-radius: 16px; height: 320px; }
 .attendance-workspace .attendance-calendar { display: grid; gap: 8px; grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.attendance-calendar-skeleton { display: grid; gap: .75rem; padding: .5rem 0; }
+.attendance-calendar-skeleton > div { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; }
 .attendance-calendar button { align-items: center; background: #eaf8f2; border: 1px solid #a9dbc9; border-radius: 10px; color: #096247; cursor: pointer; display: flex; flex-direction: column; justify-content: center; min-height: 82px; padding: 10px 6px; transition: transform .3s ease, box-shadow .3s ease; }
 .attendance-calendar button:hover { box-shadow: 0 7px 15px rgba(29, 56, 101, .1); transform: translateY(-2px); }
 .attendance-calendar button small { font-size: 10px; margin-top: 4px; text-align: center; }

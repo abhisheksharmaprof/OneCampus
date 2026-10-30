@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { adminRequest } from '../../admin/admin.api'
-import { BoneScreen } from '../../../components/admin-ui'
+import { BoneScreen, Skeleton } from '../../../components/admin-ui'
 import { getOverviewRegister } from '../api/attendanceApi'
 import type { AttendanceStatus } from '../types'
 import { AttendanceCharts } from './AttendanceCharts'
@@ -141,7 +141,7 @@ export function OverviewTab({
 
       <div className="attendance-section-intro">
         <div><span className="attendance-section-intro__tag">Live register intelligence</span><h2>Monthly attendance health</h2><p>All charts and calendar states are calculated from saved attendance—no sample or placeholder analytics.</p></div>
-        <div className="attendance-approval-route"><strong>Recorded events</strong><span>{loading ? 'Loading…' : overview.records.length}</span></div>
+        <div className="attendance-approval-route"><strong>Recorded events</strong><span>{loading ? <><span className="sr-only">Loading attendance event count</span><Skeleton width="2.5rem" height=".9rem" /></> : overview.records.length}</span></div>
       </div>
 
       {loading ? <BoneScreen name="attendance-overview-charts" loading label="Loading attendance charts"><div className="attendance-chart-loading"><span /><span /></div></BoneScreen> : <AttendanceCharts records={overview.records} />}
@@ -198,7 +198,7 @@ export function OverviewTab({
         </div>
 
         {loading ? (
-          <BoneScreen name="attendance-overview-calendar" loading label="Loading overview register"><p>Loading overview register…</p></BoneScreen>
+          <BoneScreen name="attendance-overview-calendar" loading label="Loading overview register"><div className="attendance-calendar-skeleton" aria-hidden="true"><Skeleton width="40%" height="1rem" /><div>{Array.from({ length: 35 }, (_, index) => <Skeleton key={index} height="2rem" />)}</div></div></BoneScreen>
         ) : calendarCells.length === 0 ? (
           <p>No calendar data for month {selectedDate.slice(0, 7)}.</p>
         ) : (

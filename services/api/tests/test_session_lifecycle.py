@@ -1,6 +1,7 @@
 import pytest
 from rest_framework_simplejwt.tokens import RefreshToken
 
+from modules.access_control.models import Permission
 from modules.identity.models import User
 from modules.institutes.models import Branch, Institute, InstituteMembership
 
@@ -40,22 +41,21 @@ def test_current_session_revalidates_server_authoritative_tenant_context(api_cli
     response = api_client.get("/api/v1/identity/sessions/current")
 
     assert response.status_code == 200
-    assert response.json() == {
-        "success": True,
-        "data": {
-            "user": {
-                "id": str(user.id),
-                "displayName": "Aarav Sharma",
-                "roles": ["INSTITUTE_ADMIN"],
-                "activeRole": "INSTITUTE_ADMIN",
-                "instituteId": str(institute.id),
-                "branchIds": [str(branch.id)],
-            }
-        },
+    profile = response.json()["data"]["user"]
+    assert profile == {
+        "id": str(user.id),
+        "displayName": "Aarav Sharma",
+        "roles": ["INSTITUTE_ADMIN"],
+        "activeRole": "INSTITUTE_ADMIN",
+        "instituteId": str(institute.id),
+        "branchIds": [str(branch.id)],
+        "permissions": sorted(
+            Permission.objects.filter(is_active=True).values_list("permission_key", flat=True)
+        ),
     }
 
-    institute.is_active = False
-    institute.save(update_fields=("is_active", "updated_at"))
+    membership.is_active = False
+    membership.save(update_fields=("is_active", "updated_at"))
     response = api_client.get("/api/v1/identity/sessions/current")
 
     assert response.status_code == 403

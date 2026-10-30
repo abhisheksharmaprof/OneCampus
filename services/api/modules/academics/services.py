@@ -2,14 +2,21 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 
 from modules.institutes.models import Branch, Institute
+from modules.people.models import Student
 
-from .models import AcademicYear, ClassSection, Grade, StudentEnrollment
+from .models import AcademicYear, ClassSection, ExamTarget, Grade, StudentEnrollment
 
 
 class AcademicsValidationError(Exception):
     def __init__(self, field_errors):
         self.field_errors = field_errors
         super().__init__("Academic structure validation failed.")
+
+
+def lock_student_cohort(*, section_ids=(), student_ids=()):
+    """Use section-then-student lock order shared with exam timetable publication."""
+    list(ClassSection.objects.select_for_update().filter(id__in=set(section_ids)).order_by("id"))
+    list(Student.objects.select_for_update().filter(id__in=set(student_ids)).order_by("id"))
 
 
 def _field_errors(exc):
@@ -88,7 +95,29 @@ def save_class_section(*, section):
     if section.max_strength is None:
         section.max_strength = 100
     if section.pk:
-        ClassSection.objects.select_for_update().filter(pk=section.pk).exists()
+        original = ClassSection.objects.select_for_update().filter(pk=section.pk).values(
+            "branch_id", "grade_id", "academic_year_id"
+        ).first()
+        if original and any(
+            original[field] != getattr(section, field)
+            for field in ("branch_id", "grade_id", "academic_year_id")
+        ):
+            exam_ids = list(
+                ExamTarget.objects.filter(class_section_id=section.pk)
+                .exclude(exam__status="CANCELLED")
+                .values_list("exam_id", flat=True)
+                .distinct()
+            )
+            if exam_ids:
+                message = (
+                    "Campus, class, and academic year cannot change while this "
+                    "section is used by exams. "
+                    "Resolve or cancel exams first: "
+                    + ", ".join(str(item) for item in exam_ids)
+                )
+                raise AcademicsValidationError({
+                    "classSection": [message]
+                })
     active_enrollment_count = 0
     if section.pk:
         active_enrollment_count = section.student_enrollments.filter(left_at__isnull=True).count()
@@ -110,7 +139,11 @@ def save_class_section(*, section):
 
 @transaction.atomic
 def create_enrollment(*, student, class_section, roll_number):
-    section = ClassSection.objects.select_for_update().get(pk=class_section.pk)
+    lock_student_cohort(section_ids=[class_section.pk], student_ids=[student.pk])
+    student = Student.objects.get(pk=student.pk)
+    if not student.is_active:
+        raise AcademicsValidationError({"studentId": ["Only active students can be enrolled."]})
+    section = ClassSection.objects.get(pk=class_section.pk)
     if section.max_strength is None:
         section.max_strength = 100
         section.save(update_fields=("max_strength", "updated_at"))
@@ -142,22 +175,31 @@ def update_enrollment(
     left_at_marker=False,
     left_at=None,
 ):
+    initial = StudentEnrollment.objects.select_related("class_section").get(pk=enrollment.pk)
+    target_section_id = (class_section or initial.class_section).pk
+    section_ids = {initial.class_section_id, target_section_id}
+    lock_student_cohort(section_ids=section_ids, student_ids=[initial.student_id])
     locked = (
         StudentEnrollment.objects.select_for_update()
         .select_related("student", "class_section__branch", "academic_year")
         .get(pk=enrollment.pk)
     )
-    target_section = class_section or locked.class_section
+    if locked.class_section_id not in section_ids:
+        raise AcademicsValidationError(
+            {"classSectionId": ["This enrollment changed. Reload it and try again."]}
+        )
+    if left_at_marker and left_at is None and not locked.student.is_active:
+        raise AcademicsValidationError({"studentId": ["Only active students can be enrolled."]})
+    target_section = ClassSection.objects.get(pk=target_section_id)
     if target_section.pk != locked.class_section_id and left_at is None:
-        section = ClassSection.objects.select_for_update().get(pk=target_section.pk)
-        if section.max_strength is not None:
-            count = section.student_enrollments.filter(left_at__isnull=True).count()
-            if count >= section.max_strength:
+        if target_section.max_strength is not None:
+            count = target_section.student_enrollments.filter(left_at__isnull=True).count()
+            if count >= target_section.max_strength:
                 raise AcademicsValidationError(
                     {"classSectionId": ["This section has reached its maximum strength."]}
                 )
-        locked.class_section = section
-        locked.academic_year = section.academic_year
+        locked.class_section = target_section
+        locked.academic_year = target_section.academic_year
     if roll_number is not None:
         locked.roll_number = roll_number
     if left_at_marker:
@@ -167,3 +209,13 @@ def update_enrollment(
     except DjangoValidationError as exc:
         raise AcademicsValidationError(_field_errors(exc)) from exc
     return locked
+
+
+@transaction.atomic
+def delete_enrollment(*, enrollment):
+    current = StudentEnrollment.objects.get(pk=enrollment.pk)
+    lock_student_cohort(
+        section_ids=[current.class_section_id], student_ids=[current.student_id]
+    )
+    locked = StudentEnrollment.objects.select_for_update().get(pk=current.pk)
+    locked.delete()

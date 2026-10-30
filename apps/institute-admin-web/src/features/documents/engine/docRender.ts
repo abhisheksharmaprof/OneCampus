@@ -2,6 +2,7 @@
  *  Deterministic mm geometry: pagination math is pure and unit-tested; the same
  *  numbers drive the editor preview, so what you see is what prints. */
 
+import { buildRenderPlan, renderDocumentHtml as renderV3Html, type LayoutV3 } from '@campusone/document-engine'
 import { ELEMENT_CSS, escapeHtml, renderElementInner, safeColor, type RenderContext } from './renderHtml'
 import { PAGE_SIZES_MM, type CanvasElement, type DocumentData, type LayoutV2, type TableElement } from './types'
 
@@ -32,7 +33,7 @@ function zoneOf(element: CanvasElement, layout: LayoutV2): Zone {
 
 /** Plan the physical pages for ONE layout page (grow-and-push around its table). */
 export function paginateLayout(layout: LayoutV2, pageIndex: number, rowCount: number): PagePlan[] {
-  const elements = layout.pages[pageIndex].elements
+  const elements = layout.pages[pageIndex].elements.filter((element) => element.visible !== false)
   const { h: pageH } = PAGE_SIZES_MM[layout.page.sizeId]
   const table = elements.find((element): element is TableElement => element.type === 'table')
   const headerEls = elements.filter((element) => zoneOf(element, layout) === 'header')
@@ -100,15 +101,27 @@ export function paginateLayout(layout: LayoutV2, pageIndex: number, rowCount: nu
 }
 
 export interface RenderDocumentOptions {
-  layout: LayoutV2
+  layout: LayoutV2 | LayoutV3
   data: DocumentData
   mode: 'print' | 'preview'
   sampleMode?: boolean
 }
 
 export function renderDocumentHtml({ layout, data, mode, sampleMode = true }: RenderDocumentOptions): string {
+  if (layout.version === 3) {
+    const fields = {
+      ...data.tokens,
+      ...(data as unknown as { fields?: Record<string, string | number | null | undefined> }).fields,
+    }
+    const safeImages = Object.fromEntries(
+      Object.entries(data.images ?? {}).filter((entry): entry is [string, string] => typeof entry[1] === 'string')
+    )
+    const plan = buildRenderPlan(layout as LayoutV3, { fields }, safeImages)
+    return renderV3Html(plan)
+  }
+
   const { w: pageW, h: pageH } = PAGE_SIZES_MM[layout.page.sizeId]
-  const table = layout.pages.flatMap((page) => page.elements).find((element): element is TableElement => element.type === 'table')
+  const table = layout.pages.flatMap((page) => page.elements).find((element): element is TableElement => element.type === 'table' && element.visible !== false)
   const ctx: RenderContext = {
     data, sampleMode, highlightTokens: false,
     table: table ? { columns: table.columns, rows: data.rows } : null,
@@ -121,6 +134,11 @@ export function renderDocumentHtml({ layout, data, mode, sampleMode = true }: Re
       ? `<div class="doc-watermark"><span style="opacity:${Math.min(Math.max(mm(layout.watermark.opacity), 0.02), 0.4)}">${escapeHtml(layout.watermark.text)}</span></div>`
       : `<div class="doc-watermark"><img src="${escapeHtml(layout.watermark.imageUrl)}" style="opacity:${Math.min(Math.max(mm(layout.watermark.opacity) * 4, 0.05), 0.6)}" alt="" /></div>`)
     : ''
+  const letterhead = layout.letterhead?.elements.filter((element) => element.visible !== false).map((element) => {
+    if (element.type === 'table' || element.type === 'totals' || element.type === 'qr') return ''
+    const content = renderElementInner(element, ctx)
+    return `<div class="doc-el doc-letterhead-el" style="left:${mm(element.x)}mm;top:${mm(element.y)}mm;width:${mm(element.w)}mm;height:${mm(element.h)}mm;z-index:0">${content}</div>`
+  }).join('') ?? ''
 
   const sheets: string[] = []
   layout.pages.forEach((_page, pageIndex) => {
@@ -132,7 +150,7 @@ export function renderDocumentHtml({ layout, data, mode, sampleMode = true }: Re
           : renderElementInner(element, ctx)
         return `<div class="doc-el" style="left:${mm(element.x)}mm;top:${mm(y)}mm;width:${mm(element.w)}mm;${element.type === 'table' || element.type === 'totals' ? '' : `height:${mm(element.h)}mm;`}">${content}</div>`
       }).join('')
-      sheets.push(`<div class="doc-sheet" style="${background}">${watermark}${inner}</div>`)
+      sheets.push(`<div class="doc-sheet" style="${background}">${letterhead}${watermark}${inner}</div>`)
     })
   })
 
@@ -145,7 +163,8 @@ export function renderDocumentHtml({ layout, data, mode, sampleMode = true }: Re
 *{box-sizing:border-box}
 body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;color:#16212E}
 .doc-sheet{width:${pageW}mm;height:${pageH}mm;position:relative;overflow:hidden}
-.doc-el{position:absolute}
+.doc-letterhead-el{pointer-events:none}
+.doc-el{position:absolute;z-index:1}
 .doc-watermark{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;overflow:hidden}
 .doc-watermark span{font-size:64px;font-weight:800;color:#173A5E;transform:rotate(-28deg);white-space:nowrap}
 .doc-watermark img{max-width:60%;max-height:60%;transform:rotate(-20deg);object-fit:contain}
@@ -159,7 +178,7 @@ export function openPrintWindow(html: string, existingPopup?: Window | null): bo
   const popup = existingPopup ?? window.open('', '_blank', 'width=900,height=900')
   if (!popup) return false
   popup.opener = null
-  popup.document.write(html.replace('</body>', "<script>window.addEventListener('load',()=>setTimeout(()=>window.print(),250))</script></body>"))
+  popup.document.write(html.replace('</body>', "<script>window.addEventListener('load',async()=>{await Promise.all(Array.from(document.images,image=>image.decode().catch(()=>undefined)));window.print()})</script></body>"))
   popup.document.close()
   return true
 }

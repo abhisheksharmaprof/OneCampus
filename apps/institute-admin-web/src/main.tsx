@@ -1,6 +1,7 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './bones/registry'
+import './bones/exams/registry'
 import { App } from './App'
 
 const root = document.getElementById('root')

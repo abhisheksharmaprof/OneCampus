@@ -11,6 +11,8 @@ import { AdminErrorBoundary } from './features/admin/AdminErrorBoundary'
 import { AcademicStructurePage } from './features/academics'
 import { AcademicOperationsPage } from './features/academics/AcademicOperationsPage'
 import { AcademicOverviewPage } from './features/academics/AcademicOverviewPage'
+import { listAcademicYears } from './features/academics/academics.api'
+import type { AcademicYear } from './features/academics/academics.types'
 import { RoleAssignmentsPage, RoleBuilderPage, RolesListPage, type AssignableUser } from './features/access-control'
 import { ADMIN_SESSION_EXPIRED_EVENT, adminRequest } from './features/admin/admin.api'
 import { AttendancePage, type AttendanceTab } from './features/attendance/AttendancePage'
@@ -33,6 +35,7 @@ import { ProfilePage } from './features/people/ProfilePages'
 import { AuditLogPage } from './features/audit/AuditLogPage'
 import TemplateStudioPage from './features/documents/TemplateStudioPage'
 import VerifyPage from './features/documents/verify/VerifyPage'
+import { AccountPage } from './features/account/AccountPage'
 
 import './styles/tokens.css'
 import './styles/global.css'
@@ -109,12 +112,16 @@ function RoutedApp() {
   const [availableBranches, setAvailableBranches] = useState<DashboardData['context']['branches']>([])
   const [dashboardError, setDashboardError] = useState('')
   const [dashboardRevision, setDashboardRevision] = useState(0)
+  const [availableAcademicYears, setAvailableAcademicYears] = useState<AcademicYear[]>([])
   const [assignableUsers, setAssignableUsers] = useState<AssignableUser[]>([])
   const requestedBranch = searchParams.get('branch')
   const branch = (requestedBranch && requestedBranch !== 'all'
     ? requestedBranch
     : session?.user.branchIds[0] ?? 'all') as BranchContext
-  const academicYear = searchParams.get('year') ?? '2026-27'
+  const isExamStaffSession = Boolean(session && !['INSTITUTE_ADMIN', 'BRANCH_ADMIN'].includes(session.user.activeRole))
+  const shellAcademicYears = isExamStaffSession ? [] : availableAcademicYears
+  const currentAcademicYearName = shellAcademicYears.find((year) => year.isCurrent)?.name ?? '2026-27'
+  const academicYear = searchParams.get('year') ?? currentAcademicYearName
   const requestedAttendanceDate = searchParams.get('date')
   const attendanceDate = requestedAttendanceDate && /^\d{4}-\d{2}-\d{2}$/.test(requestedAttendanceDate) && !Number.isNaN(Date.parse(requestedAttendanceDate))
     ? requestedAttendanceDate
@@ -136,6 +143,7 @@ function RoutedApp() {
       ? attendanceTabByRoute[route.id]
       : undefined
   const isBranchAdmin = session?.user.activeRole === 'BRANCH_ADMIN'
+  // Only institute-web eligible staff sessions reach this app; the backend grants that session only for exam access.
   const selectedBranch = isBranchAdmin ? (session?.user.branchIds[0] ?? branch) : branch
   const canViewAllBranches = session?.user.activeRole === 'INSTITUTE_ADMIN'
   const canViewAudit = session?.user.activeRole === 'INSTITUTE_ADMIN'
@@ -181,16 +189,25 @@ function RoutedApp() {
   }, [location.pathname, location.search, navigate])
 
   useEffect(() => {
-    if (!session) return
+    if (!session || isExamStaffSession) return
     const controller = new AbortController()
     getDashboard(session.accessToken, selectedBranch === 'all' ? null : selectedBranch, controller.signal)
       .then((data) => { setDashboard(data); setDashboardError('') })
       .catch((error: unknown) => { if (!controller.signal.aborted) setDashboardError(error instanceof Error ? error.message : 'Dashboard data could not be loaded.') })
     return () => controller.abort()
-  }, [dashboardRevision, selectedBranch, session])
+  }, [dashboardRevision, selectedBranch, session, isExamStaffSession])
 
   useEffect(() => {
-    if (!session) {
+    if (!session || isExamStaffSession) return
+    const controller = new AbortController()
+    void listAcademicYears(session.accessToken, { page: 1, pageSize: 100, ...(selectedBranch !== 'all' ? { branchId: selectedBranch } : {}) }, controller.signal)
+      .then((page) => setAvailableAcademicYears(Array.isArray(page.items) ? page.items : []))
+      .catch(() => { if (!controller.signal.aborted) setAvailableAcademicYears([]) })
+    return () => controller.abort()
+  }, [dashboardRevision, selectedBranch, session, isExamStaffSession])
+
+  useEffect(() => {
+    if (!session || isExamStaffSession) {
       setAvailableBranches([])
       return
     }
@@ -199,10 +216,10 @@ function RoutedApp() {
       .then((result) => setAvailableBranches(result.items ?? []))
       .catch(() => { if (!controller.signal.aborted) setAvailableBranches([]) })
     return () => controller.abort()
-  }, [dashboardRevision, session])
+  }, [dashboardRevision, session, isExamStaffSession])
 
   useEffect(() => {
-    if (!session || !['RP1', 'RP2', 'RP3'].includes(route?.id ?? '')) return
+    if (!session || isExamStaffSession || !['RP1', 'RP2', 'RP3'].includes(route?.id ?? '')) return
     const controller = new AbortController()
     const params = new URLSearchParams({ pageSize: '100' })
     if (selectedBranch !== 'all') params.set('branchId', selectedBranch)
@@ -210,11 +227,11 @@ function RoutedApp() {
       .then((response) => setAssignableUsers(response.items.map((person) => ({ id: person.userId, name: person.fullName, email: person.email, employeeCode: person.employee_code }))))
       .catch(() => setAssignableUsers([]))
     return () => controller.abort()
-  }, [route?.id, selectedBranch, session])
+  }, [route?.id, selectedBranch, session, isExamStaffSession])
 
   const updateQuery = (key: string, value: string | null) => {
     const next = new URLSearchParams(searchParams)
-    if (!value || value === 'all' || (key === 'year' && value === '2026-27')) next.delete(key)
+    if (!value || value === 'all' || (key === 'year' && value === currentAcademicYearName)) next.delete(key)
     else next.set(key, value)
     setSearchParams(next, { replace: true })
   }
@@ -278,6 +295,7 @@ function RoutedApp() {
   }
   if (session.onboarding?.status === 'pending_review') return <PendingReviewPage session={session} onSignOut={() => void handleSignOut()} />
   if (location.pathname === '/login' || isOnboardingRoute) return <Navigate to="/dashboard" replace />
+  if (isExamStaffSession && !['AAR1', 'AAR2', 'PR1'].includes(route?.id ?? '')) return <Navigate to="/academics/assessment-results" replace />
   if (location.pathname === '/') return <Navigate to="/dashboard" replace />
   if (!canViewAllBranches && route?.id?.startsWith('BR')) return <Navigate to="/dashboard" replace />
   if (!canViewAudit && route?.id === 'AL1') return <Navigate to="/dashboard" replace />
@@ -288,6 +306,8 @@ function RoutedApp() {
       branches={visibleBranches}
       activePage={route?.label ?? ''}
       academicYear={academicYear}
+      academicYears={shellAcademicYears}
+      currentAcademicYear={currentAcademicYearName}
       onAcademicYearChange={(year) => updateQuery('year', year)}
       onBranchChange={(nextBranch) => updateQuery('branch', nextBranch)}
       onNavigate={handleNavigate}
@@ -295,9 +315,11 @@ function RoutedApp() {
       isBranchAdmin={isBranchAdmin}
       canViewAllBranches={canViewAllBranches}
       canViewAudit={canViewAudit}
+      examOnly={isExamStaffSession}
     >
       <AdminErrorBoundary resetKey={`${location.pathname}${location.search}`}>
       {route?.view === 'dashboard' && <DashboardPage branch={selectedBranch} data={dashboard} error={dashboardError} displayName={session.user.displayName} academicYear={academicYear} onBranchChange={(nextBranch) => updateQuery('branch', nextBranch)} onReview={handleDashboardReview} onNavigate={handleNavigate} />}
+      {route?.id === 'PR1' && <AccountPage accessToken={session.accessToken} />}
       {(route?.id === 'BR1' || route?.id === 'BR2') && <InstituteSetupPage accessToken={session.accessToken} branchId={route.id === 'BR2' ? searchParams.get('branchDetail') ?? undefined : undefined} onOpenBranch={(branchId) => navigateWithBranch(`/branches/detail?branchDetail=${branchId}`)} onBranchesChanged={() => setDashboardRevision((value) => value + 1)} />}
       {route?.view === 'institute-profile' && <InstituteProfilePage accessToken={session.accessToken} />}
       {route?.view === 'branding' && <BrandingPage accessToken={session.accessToken} />}
@@ -321,13 +343,13 @@ function RoutedApp() {
       {route?.id === 'SU1' && <AcademicStructurePage accessToken={session.accessToken} branches={visibleBranches} selectedBranch={selectedBranch} initialTab="subjects" pageTitle="Subjects & Curriculum" pageDescription="Manage your subject catalogue and map curriculum to each class." showTabs={false} />}
       {route?.id === 'AH1' && <AcademicOverviewPage accessToken={session.accessToken} selectedBranch={selectedBranch} onNavigate={handleNavigate} />}
       {route?.id === 'AHS1' && <AcademicStructurePage accessToken={session.accessToken} branches={visibleBranches} selectedBranch={selectedBranch} pageTitle="Academic Structure" pageDescription="Maintain the academic year, class, section, subject, and curriculum relationships that power the rest of CampusOne." showTabs />}
-      {route?.view === 'academic-operations' && <AcademicOperationsPage key={route.id} page={route.id as 'ACL1' | 'ACH1' | 'ACE1' | 'ACM1' | 'ACC1' | 'AHT1' | 'AAR1'} accessToken={session.accessToken} selectedBranch={selectedBranch} />}
+      {route?.view === 'academic-operations' && <AcademicOperationsPage key={route.id} page={route.id as 'ACL1' | 'ACH1' | 'ACE1' | 'ACM1' | 'ACC1' | 'AHT1' | 'AAR1' | 'AAR2'} accessToken={session.accessToken} selectedBranch={selectedBranch} />}
       {route?.id === 'RF1' && <RoomsFacilitiesPage accessToken={session.accessToken} branches={visibleBranches} selectedBranch={selectedBranch} />}
       {route?.id === 'RP1' && <RolesListPage accessToken={session.accessToken} branches={visibleBranches} users={assignableUsers} onCreateRole={() => navigateWithBranch('/roles/builder')} onEditRole={(roleId) => navigateWithBranch(`/roles/builder?role=${roleId}`)} />}
       {route?.id === 'RP2' && <RoleBuilderPage accessToken={session.accessToken} branches={visibleBranches} roleId={searchParams.get('role') ?? undefined} onSaved={() => navigateWithBranch('/roles')} onCancel={() => navigateWithBranch('/roles')} />}
       {route?.id === 'RP3' && <RoleAssignmentsPage accessToken={session.accessToken} branches={visibleBranches} users={assignableUsers} />}
       {route?.view === 'coming-soon' && <UnavailableModulePage title={route.label} breadcrumb={route.breadcrumb} comingSoon />}
-      {route?.view === 'operational' && !['AY1', 'CL1', 'SU1', 'AHS1', 'RF1', 'HC1', 'FN1', 'FN5', 'FN6', 'FN7', 'FN8', 'SE3', 'RP1', 'RP2', 'RP3', 'BR2', 'STP1', 'SDP1', 'PDP1', 'ST3', 'RA1', 'AT1', 'AT2', 'AT4', 'AT5', 'AT6', 'AT7', 'AL1'].includes(route.id) && <OperationalListPage accessToken={session.accessToken} route={route} selectedBranch={selectedBranch} />}
+      {route?.view === 'operational' && !['AY1', 'CL1', 'SU1', 'AHS1', 'RF1', 'HC1', 'FN1', 'FN5', 'FN6', 'FN7', 'FN8', 'SE3', 'RP1', 'RP2', 'RP3', 'BR2', 'STP1', 'SDP1', 'PDP1', 'ST3', 'RA1', 'AT1', 'AT2', 'AT4', 'AT5', 'AT6', 'AT7', 'AL1', 'PR1'].includes(route.id) && <OperationalListPage accessToken={session.accessToken} route={route} selectedBranch={selectedBranch} />}
       {!route && <UnavailableModulePage title="Page not found" breadcrumb="Admin" />}
       </AdminErrorBoundary>
       <div className="sr-only" role="status" aria-live="polite">{announcement}</div>
